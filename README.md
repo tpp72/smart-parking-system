@@ -181,3 +181,7 @@ Admin analytics dashboard
 👨‍💻 Developer
 
 Developed by tpp72
+
+📄 License
+
+This project is open-source and available under the MIT License.
