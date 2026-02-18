@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('suspicious_vehicles', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+            $table->string('license_plate')->unique();
+            $table->string('reason')->nullable();
+            $table->string('level')->default('medium');
+            $table->boolean('is_active')->default(true);
+
+            $table->timestamps(0);
         });
     }
 
