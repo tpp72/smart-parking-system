@@ -58,6 +58,15 @@ return [
     'user.vehicles.create'              => 'เพิ่มรถ',
     'user.parking-logs.index'           => 'ประวัติการจอด',
 
+    // AI Scan (admin)
+    'admin.scan.create'                 => 'สแกนรถ AI',
+    'admin.scan.store'                  => 'สแกนรถ AI',
+    'admin.scan.history'                => 'ประวัติการสแกน',
+
+    // AI Scan (user)
+    'user.scan.create'                  => 'สแกนรถ AI',
+    'user.scan.store'                   => 'สแกนรถ AI',
+
     // ── Shared ────────────────────────────────────────────
     'notifications.index'               => 'การแจ้งเตือน',
     'profile.edit'                      => 'โปรไฟล์',

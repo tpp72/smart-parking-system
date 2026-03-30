@@ -14,25 +14,13 @@
                     <span class="text-xs text-gray-500 hidden sm:block">{{ now()->format('d M Y, H:i') }}</span>
                 </div>
 
-                {{-- Quick action buttons --}}
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <a href="{{ route('admin.check-in.create') }}"
-                        class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg>
-                        <span class="text-sm font-semibold">รถเข้า</span>
-                        <span class="text-xs opacity-50">Check-In</span>
-                    </a>
-                    <a href="{{ route('admin.check-out.index') }}"
-                        class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l4 4m0 0l-4 4m4-4H3"/></svg>
-                        <span class="text-sm font-semibold">รถออก</span>
-                        <span class="text-xs opacity-50">Check-Out</span>
-                    </a>
-                    <a href="{{ route('admin.reservations.create') }}"
+                {{-- Quick action cards (Management — ต่างจาก Navbar) --}}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <a href="{{ route('admin.reservations.index') }}"
                         class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        <span class="text-sm font-semibold">สร้างการจอง</span>
-                        <span class="text-xs opacity-50">Reserve</span>
+                        <span class="text-sm font-semibold">การจอง</span>
+                        <span class="text-xs opacity-50">Reservations</span>
                     </a>
                     <a href="{{ route('admin.vehicles.index') }}"
                         class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
@@ -40,21 +28,27 @@
                         <span class="text-sm font-semibold">จัดการรถ</span>
                         <span class="text-xs opacity-50">Vehicles</span>
                     </a>
-                    <a href="{{ route('admin.parking-lots.index') }}"
+                    <a href="{{ route('admin.parking-slots.index') }}"
                         class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        <span class="text-sm font-semibold">ลานจอด</span>
-                        <span class="text-xs opacity-50">Parking Lots</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>
+                        <span class="text-sm font-semibold">ช่องจอด</span>
+                        <span class="text-xs opacity-50">Slots</span>
+                    </a>
+                    <a href="{{ route('admin.users.index') }}"
+                        class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span class="text-sm font-semibold">ผู้ใช้งาน</span>
+                        <span class="text-xs opacity-50">Users</span>
                     </a>
                 </div>
 
-                {{-- Secondary quick links --}}
+                {{-- Tertiary links (Settings / Less frequent) --}}
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('admin.parking-slots.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ช่องจอด · Slots</a>
-                    <a href="{{ route('admin.reservations.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">รายการจอง · Reservations</a>
-                    <a href="{{ route('admin.parking-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ประวัติจอด · Parking Logs</a>
-                    <a href="{{ route('admin.users.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ผู้ใช้งาน · Users</a>
+                    <a href="{{ route('admin.parking-lots.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ลานจอด · Lots</a>
+                    <a href="{{ route('admin.parking-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ประวัติจอด · Logs</a>
+                    <a href="{{ route('admin.reservation-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Log การจอง</a>
                     <a href="{{ route('admin.devices.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">อุปกรณ์ · Devices</a>
+                    <a href="{{ route('admin.admin-actions.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Admin Log</a>
                 </div>
             </div>
 

@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\CheckOutController;
 use App\Http\Controllers\Admin\ParkingLogController;
 use App\Http\Controllers\Admin\VehicleController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\CarScanController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -72,6 +73,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     // Payments
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [PaymentController::class, 'markPaid'])->name('payments.mark-paid');
+    // AI Car Scan
+    Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
+    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
+    Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
 });
 
 // ===== User Routes (role: user เท่านั้น) =====
@@ -89,6 +94,9 @@ Route::prefix('user')->name('user.')->middleware(['auth', 'verified', 'force.pas
     Route::delete('vehicles/{vehicle}', [UserVehicleController::class, 'destroy'])->name('vehicles.destroy');
     // ประวัติการจอดของตัวเอง
     Route::get('parking-logs', [UserParkingLogController::class, 'index'])->name('parking-logs.index');
+    // AI Car Scan (user)
+    Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
+    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
 });
 
 // ===== Notifications (ทุก role) =====

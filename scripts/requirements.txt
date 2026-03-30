@@ -1,0 +1,6 @@
+# Smart Parking AI — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+easyocr>=1.7.1
+opencv-python-headless>=4.9.0
+numpy>=1.24.0

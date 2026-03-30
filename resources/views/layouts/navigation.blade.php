@@ -28,7 +28,7 @@
             <div class="hidden md:flex items-center gap-1 flex-1 px-4">
 
                 @if($isAdmin)
-                    {{-- Admin Quick Access --}}
+                    {{-- ── Admin Navbar: ปฏิบัติการประจำวันเท่านั้น ── --}}
                     <a href="{{ route('admin.dashboard') }}" class="{{ $navClass('admin.dashboard') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                         Dashboard
@@ -36,6 +36,7 @@
 
                     <div class="w-px h-5 bg-white/10 mx-1"></div>
 
+                    {{-- Daily Operations --}}
                     <a href="{{ route('admin.check-in.create') }}" class="{{ $navClass('admin.check-in.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg>
                         รถเข้า
@@ -44,16 +45,6 @@
                     <a href="{{ route('admin.check-out.index') }}" class="{{ $navClass('admin.check-out.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l4 4m0 0l-4 4m4-4H3"/></svg>
                         รถออก
-                    </a>
-
-                    <a href="{{ route('admin.reservations.index') }}" class="{{ $navClass(['admin.reservations.*']) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        การจอง
-                    </a>
-
-                    <a href="{{ route('admin.parking-logs.index') }}" class="{{ $navClass('admin.parking-logs.*') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        ประวัติ
                     </a>
 
                     <a href="{{ route('admin.payments.index') }}" class="{{ $navClass('admin.payments.*') }}">
@@ -65,16 +56,9 @@
                         @endif
                     </a>
 
-                    <div class="w-px h-5 bg-white/10 mx-1"></div>
-
-                    <a href="{{ route('admin.vehicles.index') }}" class="{{ $navClass('admin.vehicles.*') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg>
-                        รถ
-                    </a>
-
-                    <a href="{{ route('admin.parking-slots.index') }}" class="{{ $navClass('admin.parking-slots.*') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>
-                        ช่องจอด
+                    <a href="{{ route('admin.scan.create') }}" class="{{ $navClass(['admin.scan.*']) }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        AI สแกน
                     </a>
 
                 @else
@@ -105,6 +89,13 @@
                     <a href="{{ route('user.parking-logs.index') }}" class="{{ $navClass('user.parking-logs.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         ประวัติ
+                    </a>
+
+                    <div class="w-px h-5 bg-white/10 mx-1"></div>
+
+                    <a href="{{ route('user.scan.create') }}" class="{{ $navClass('user.scan.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        AI สแกน
                     </a>
                 @endif
             </div>
@@ -189,17 +180,29 @@
         <div class="px-4 py-4 space-y-1">
 
             @if($isAdmin)
-                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">Quick Access</p>
-                <a href="{{ route('admin.dashboard') }}"    class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.dashboard') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">ปฏิบัติการ</p>
+                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.dashboard') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg> Dashboard</a>
-                <a href="{{ route('admin.check-in.create') }}"  class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.check-in.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                <a href="{{ route('admin.check-in.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.check-in.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg> รถเข้า</a>
-                <a href="{{ route('admin.check-out.index') }}"  class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.check-out.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                <a href="{{ route('admin.check-out.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.check-out.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l4 4m0 0l-4 4m4-4H3"/></svg> รถออก</a>
+                <a href="{{ route('admin.payments.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.payments.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ชำระเงิน</a>
+                <a href="{{ route('admin.scan.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.scan.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg> AI สแกน</a>
+
+                <div class="border-t border-red-900/30 mt-2 pt-2">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">จัดการ</p>
                 <a href="{{ route('admin.reservations.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.reservations.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg> การจอง</a>
+                <a href="{{ route('admin.vehicles.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.vehicles.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg> รถ</a>
+                <a href="{{ route('admin.parking-slots.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.parking-slots.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg> ช่องจอด</a>
                 <a href="{{ route('admin.parking-logs.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.parking-logs.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> ประวัติ</a>
+                </div>
             @else
                 <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">Quick Access</p>
                 <a href="{{ route('user.dashboard') }}"        class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.dashboard') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
@@ -212,6 +215,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg> รถของฉัน</a>
                 <a href="{{ route('user.parking-logs.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.parking-logs.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ประวัติ</a>
+                <a href="{{ route('user.scan.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.scan.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg> AI สแกน</a>
             @endif
 
             <div class="border-t border-red-900/30 mt-2 pt-3 space-y-1">
