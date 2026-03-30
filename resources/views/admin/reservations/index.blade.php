@@ -91,6 +91,15 @@
                                 </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex justify-end gap-2">
+                                        @if($r->status === 'pending')
+                                            <form method="POST" action="{{ route('admin.reservations.confirm', $r) }}">
+                                                @csrf
+                                                <button type="submit"
+                                                    class="sp-btn sp-btn-outline border-green-600/50 text-green-300 hover:bg-green-900/30">
+                                                    ✓ ยืนยัน
+                                                </button>
+                                            </form>
+                                        @endif
                                         <a href="{{ route('admin.reservations.edit', $r) }}"
                                             class="sp-btn sp-btn-outline">แก้ไข</a>
                                         <form method="POST" action="{{ route('admin.reservations.destroy', $r) }}"

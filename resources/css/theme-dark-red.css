@@ -92,4 +92,78 @@
   color: #fff;
 }
 
+/* ─── Button: success (green) ─────────────────────────── */
+.sp-btn-success {
+  background: rgba(16,185,129,0.15);
+  border: 1px solid rgba(16,185,129,0.50);
+  color: rgb(167,243,208);
+}
+.sp-btn-success:hover {
+  background: rgba(16,185,129,0.28);
+  color: #fff;
+}
 
+/* ─── Table: hover row ────────────────────────────────── */
+.sp-table tbody tr:hover {
+  background: rgba(220,38,38,0.07);
+}
+.sp-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(156,163,175);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(185,28,28,0.35);
+}
+.sp-table td { vertical-align: middle; }
+
+/* ─── Alert ───────────────────────────────────────────── */
+.sp-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  padding: 0.875rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.sp-alert-success {
+  background: rgba(16,185,129,0.10);
+  border-color: rgba(16,185,129,0.35);
+  color: rgb(167,243,208);
+}
+.sp-alert-error {
+  background: rgba(239,68,68,0.10);
+  border-color: rgba(239,68,68,0.35);
+  color: rgb(254,202,202);
+}
+.sp-alert-warning {
+  background: rgba(245,158,11,0.10);
+  border-color: rgba(245,158,11,0.35);
+  color: rgb(253,230,138);
+}
+
+/* ─── Slot status cards ───────────────────────────────── */
+.sp-slot { border-radius: 0.75rem; padding: 0.75rem; text-align: center; border: 1px solid transparent; }
+.sp-slot-available { background: rgba(16,185,129,0.08);  border-color: rgba(16,185,129,0.30); }
+.sp-slot-occupied   { background: rgba(239,68,68,0.08);   border-color: rgba(239,68,68,0.30); }
+.sp-slot-reserved   { background: rgba(245,158,11,0.08);  border-color: rgba(245,158,11,0.30); }
+
+/* ─── Empty state ─────────────────────────────────────── */
+.sp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3.5rem 1rem;
+  color: rgb(107,114,128);
+  text-align: center;
+}
+.sp-empty svg { opacity: 0.35; }
+
+/* ─── Form group ──────────────────────────────────────── */
+.sp-form-group { display: flex; flex-direction: column; gap: 0.375rem; }
+.sp-form-label { font-size: 0.8125rem; font-weight: 700; color: rgb(209,213,219); letter-spacing: 0.02em; }
+.sp-form-hint  { font-size: 0.75rem; color: rgb(107,114,128); margin-top: 0.25rem; }

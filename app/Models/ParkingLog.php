@@ -8,6 +8,11 @@ class ParkingLog extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'check_in_time'  => 'datetime',
+        'check_out_time' => 'datetime',
+    ];
+
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class);

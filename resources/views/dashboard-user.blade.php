@@ -15,9 +15,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                    <a href="/reservations/create" class="sp-btn sp-btn-primary sp-glow-btn">จองที่จอด</a>
-                    <a href="/vehicles" class="sp-btn sp-btn-outline">รถของฉัน</a>
-                    <a href="/history" class="sp-btn sp-btn-outline">ประวัติ</a>
+                    <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary sp-glow-btn">จองที่จอด</a>
+                    <a href="{{ route('user.vehicles.index') }}" class="sp-btn sp-btn-outline">รถของฉัน</a>
+                    <a href="{{ route('user.parking-logs.index') }}" class="sp-btn sp-btn-outline">ประวัติ</a>
                 </div>
             </div>
 
@@ -59,20 +59,9 @@
                         </div>
 
                         <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="/parking/logs/{{ $activeLog->log_id }}" class="sp-btn sp-btn-outline text-center">
-                                ดูรายละเอียดการจอด
+                            <a href="{{ route('user.parking-logs.index') }}" class="sp-btn sp-btn-outline text-center">
+                                ดูประวัติการจอด
                             </a>
-
-                            @if (($activeLog->payment_status ?? null) === 'unpaid' && !empty($activeLog->payment_id))
-                                <a href="/admin/payments/{{ $activeLog->payment_id }}"
-                                    class="sp-btn sp-btn-primary sp-glow-btn text-center">
-                                    ชำระเงิน ({{ number_format((float) ($activeLog->total_amount ?? 0), 2) }} ฿)
-                                </a>
-                            @else
-                                <a href="/payments" class="sp-btn sp-btn-primary sp-glow-btn text-center">
-                                    ไปหน้า Payments
-                                </a>
-                            @endif
                         </div>
                     </div>
                 @elseif($activeReservation)
@@ -112,13 +101,9 @@
                         </div>
 
                         <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="/reservations/{{ $activeReservation->reservation_id }}"
+                            <a href="{{ route('user.reservations.index') }}"
                                 class="sp-btn sp-btn-primary sp-glow-btn text-center">
-                                ดูรายละเอียดการจอง
-                            </a>
-                            <a href="/reservations/{{ $activeReservation->reservation_id }}/cancel"
-                                class="sp-btn sp-btn-outline text-center">
-                                ยกเลิกการจอง
+                                ดูรายการจองทั้งหมด
                             </a>
                         </div>
                     </div>
@@ -131,11 +116,8 @@
                         </div>
 
                         <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="/reservations/create" class="sp-btn sp-btn-primary sp-glow-btn text-center">
+                            <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary sp-glow-btn text-center">
                                 จองที่จอดตอนนี้
-                            </a>
-                            <a href="/parking-lots" class="sp-btn sp-btn-outline text-center">
-                                ดูลานจอดทั้งหมด
                             </a>
                         </div>
                     </div>
@@ -166,12 +148,12 @@
             <div class="sp-card rounded-2xl p-6 mt-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-extrabold">ลานที่ว่างแนะนำ</h2>
-                    <a href="/parking-lots" class="text-red-300 hover:text-red-200 text-sm font-bold">ดูทั้งหมด →</a>
+                    <a href="{{ route('user.reservations.create') }}" class="text-red-300 hover:text-red-200 text-sm font-bold">จองเลย →</a>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     @forelse($lotsAvailable as $lot)
-                        <a href="/reservations/create?lot_id={{ $lot->id }}"
+                        <a href="{{ route('user.reservations.create') }}?lot_id={{ $lot->id }}"
                             class="rounded-xl border sp-divider p-4 hover:opacity-95">
                             <div class="flex items-center justify-between">
                                 <p class="font-extrabold">{{ $lot->name }}</p>
@@ -189,7 +171,7 @@
             <div class="sp-card rounded-2xl p-6 mt-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-extrabold">ประวัติล่าสุด</h2>
-                    <a href="/history" class="text-red-300 hover:text-red-200 text-sm font-bold">ดูทั้งหมด →</a>
+                    <a href="{{ route('user.parking-logs.index') }}" class="text-red-300 hover:text-red-200 text-sm font-bold">ดูทั้งหมด →</a>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -211,7 +193,7 @@
                                     <td class="py-3 pr-4 text-gray-300">{{ $h->check_in_time }}</td>
                                     <td class="py-3 pr-4 text-gray-300">{{ $h->check_out_time ?? '-' }}</td>
                                     <td class="py-3 text-right">
-                                        <a href="/parking/logs/{{ $h->log_id }}"
+                                        <a href="{{ route('user.parking-logs.index') }}"
                                             class="sp-btn sp-btn-outline px-3 py-1.5 text-sm">
                                             ดู
                                         </a>
