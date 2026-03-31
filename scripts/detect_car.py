@@ -19,9 +19,14 @@ import re
 import random
 import warnings
 
+# ── Force UTF-8 stdout on Windows (prevents Thai → cp874 garbling) ──
+if sys.stdout.encoding != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["PYTHONWARNINGS"] = "ignore"
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -135,36 +140,43 @@ def _run_ocr_on_image(reader, img_array) -> list:
 def _score_plate_text(text: str) -> float:
     """
     Score how likely a string is a Thai license plate.
-    Higher = more plate-like.
+    Handles both Thai plate formats:
+      Format A: กข 1234      (Thai + digit)
+      Format B: 5กก 6285     (digit + Thai + digit)  ← common in Thailand
     """
-    # Remove noise characters
     clean = re.sub(r"[^ก-๙A-Za-z0-9\s]", "", text).strip()
     if not clean or len(clean) < 3:
         return 0.0
 
-    score = 0.5  # base: any text is better than nothing
+    score = 0.3
 
-    # Must have at least one digit
-    if re.search(r"\d", clean):
+    has_digit = bool(re.search(r"\d", clean))
+    has_thai  = bool(re.search(r"[ก-๙]", clean))
+
+    if has_digit:
         score += 0.3
-
-    # Thai chars present → likely Thai plate
-    if re.search(r"[ก-๙]", clean):
+    if has_thai:
         score += 0.4
 
-    # Classic Thai plate: 2 Thai + space + 4 digits  (กข 1234)
+    # Format A: 1-3 Thai + 1-4 digits  (กข 1234)
     if re.match(r"^[ก-๙]{1,3}\s*\d{1,4}$", clean):
-        score += 0.5
+        score += 0.6
 
-    # Province name follows
-    if re.match(r"^[ก-๙]{1,3}\s*\d{1,4}\s+[ก-๙]+", clean):
+    # Format B: 1 digit + 1-3 Thai + space + 4 digits  (5กก 6285)
+    if re.match(r"^\d\s*[ก-๙]{1,3}\s*\d{1,4}$", clean):
+        score += 0.6
+
+    # With province name
+    if re.search(r"[ก-๙]{1,3}\s*\d{1,4}\s+[ก-๙]+", clean):
         score += 0.2
 
-    # Too long strings are probably not plates
-    if len(clean) > 15:
-        score -= 0.3
+    # Penalize: too long, or pure English/digits only
+    if len(clean) > 18:
+        score -= 0.4
+    if not has_thai and not re.search(r"[A-Z]{1,3}", clean.upper()):
+        score -= 0.2
 
-    return score
+    return max(score, 0.0)
 
 
 def detect_license_plate(image_path: str) -> tuple[str, float]:
@@ -178,48 +190,74 @@ def detect_license_plate(image_path: str) -> tuple[str, float]:
         import cv2
         import easyocr
         import numpy as np
+    except ImportError as e:
+        print(f"[WARN] Missing library: {e}", file=sys.stderr)
+        return "", 0.0
 
+    try:
         reader = easyocr.Reader(["th", "en"], gpu=False, verbose=False)
+    except Exception as e:
+        print(f"[WARN] EasyOCR Reader init failed: {e}", file=sys.stderr)
+        return "", 0.0
+
+    try:
         img_bgr = cv2.imread(image_path)
         if img_bgr is None:
+            print(f"[WARN] cv2 could not read image: {image_path}", file=sys.stderr)
             return "", 0.0
 
-        all_candidates: list[tuple[str, float, float]] = []  # (text, ocr_conf, plate_score)
+        all_candidates: list[tuple[str, float, float]] = []
 
-        # --- Pass A: full image with preprocessing variants ---
-        for variant in _preprocess_variants(img_bgr):
-            for text, conf in _run_ocr_on_image(reader, variant):
-                ps = _score_plate_text(text)
-                if ps > 0 and conf > 0.1:
-                    all_candidates.append((text, conf, ps))
-
-        # --- Pass B: focused plate ROI (if found) ---
-        plate_roi = _find_plate_roi(img_bgr)
-        if plate_roi is not None:
-            for variant in _preprocess_variants(plate_roi):
+        # --- Pass A: full image variants ---
+        try:
+            for variant in _preprocess_variants(img_bgr):
                 for text, conf in _run_ocr_on_image(reader, variant):
                     ps = _score_plate_text(text)
+                    if ps > 0 and conf > 0.1:
+                        all_candidates.append((text, conf, ps))
+        except Exception as e:
+            print(f"[WARN] Pass A failed: {e}", file=sys.stderr)
+
+        # --- Pass B: focused plate ROI ---
+        try:
+            plate_roi = _find_plate_roi(img_bgr)
+            if plate_roi is not None:
+                for variant in _preprocess_variants(plate_roi):
+                    for text, conf in _run_ocr_on_image(reader, variant):
+                        ps = _score_plate_text(text)
+                        if ps > 0 and conf > 0.05:
+                            all_candidates.append((text, conf * 1.2, ps + 0.3))
+        except Exception as e:
+            print(f"[WARN] Pass B failed: {e}", file=sys.stderr)
+
+        if not all_candidates:
+            # --- Pass C: simple fallback — raw readtext, no preprocessing ---
+            try:
+                results = reader.readtext(image_path, detail=1, paragraph=False)
+                for (_, text, conf) in results:
+                    ps = _score_plate_text(text)
                     if ps > 0 and conf > 0.05:
-                        # Boost: ROI results are more reliable
-                        all_candidates.append((text, conf * 1.2, ps + 0.3))
+                        all_candidates.append((text, conf, ps))
+            except Exception as e:
+                print(f"[WARN] Pass C failed: {e}", file=sys.stderr)
 
         if not all_candidates:
             return "", 0.0
 
-        # Combined score = ocr_confidence × plate_score
         all_candidates.sort(key=lambda x: x[1] * x[2], reverse=True)
         best_text, best_conf, _ = all_candidates[0]
 
-        # Clean up final text
+        # Preserve Thai — only uppercase ASCII portion
         clean = re.sub(r"[^ก-๙A-Z0-9\s]", "", best_text.upper()).strip()
         clean = re.sub(r"\s+", " ", clean)
-        confidence = round(min(best_conf * 100, 99.9), 1)
+        if len(clean) < 3:
+            clean = re.sub(r"[^ก-๙0-9\s]", "", best_text).strip()
 
+        confidence = round(min(best_conf * 100, 99.9), 1)
         return clean, confidence
 
-    except ImportError:
-        return "", 0.0
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] detect_license_plate unexpected: {e}", file=sys.stderr)
         return "", 0.0
 
 
@@ -290,9 +328,11 @@ def detect_dominant_color(image_path: str) -> str:
 
         return _hsv_to_color_name(h_val, s_val, v_val)
 
-    except ImportError:
+    except ImportError as e:
+        print(f"[WARN] Color detection missing lib: {e}", file=sys.stderr)
         return "unknown"
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Color detection failed: {e}", file=sys.stderr)
         return "unknown"
 
 
@@ -342,16 +382,62 @@ def _hsv_to_color_name(h: int, s: int, v: int) -> str:
 # STEP 3: BRAND ESTIMATION (mock + color hint)
 # ══════════════════════════════════════════════════════════════════════
 
-def estimate_brand(color: str = "") -> str:
+def estimate_brand(image_path: str) -> str:
     """
-    Mock brand with weighted random.
-    In production: use CNN classifier (MobileNetV3 / YOLOv8).
+    Try to detect brand from front grille logo using ORB feature matching.
+    Falls back to None (unknown) — random guessing removed to avoid wrong results.
+    In production: use YOLOv8 or MobileNetV3 fine-tuned on car logos.
     """
-    brands  = ["Toyota", "Honda", "Isuzu", "Nissan",
-               "Mitsubishi", "Mazda", "Ford", "Chevrolet",
-               "Suzuki", "Mercedes-Benz"]
-    weights = [30, 20, 15, 10, 8, 5, 4, 3, 3, 2]
-    return random.choices(brands, weights=weights, k=1)[0]
+    try:
+        import cv2
+        import numpy as np
+        import os
+
+        img = cv2.imread(image_path)
+        if img is None:
+            return None
+
+        h, w = img.shape[:2]
+
+        # Crop center-bottom 30% of image (where front logo/grille usually is)
+        logo_roi = img[int(h * 0.45): int(h * 0.80),
+                       int(w * 0.30): int(w * 0.70)]
+        gray = cv2.cvtColor(logo_roi, cv2.COLOR_BGR2GRAY)
+
+        # Look for logo templates in scripts/logos/ if they exist
+        logo_dir = os.path.join(os.path.dirname(__file__), "logos")
+        if not os.path.isdir(logo_dir):
+            return None
+
+        orb = cv2.ORB_create(nfeatures=500)
+        kp_scene, des_scene = orb.detectAndCompute(gray, None)
+        if des_scene is None:
+            return None
+
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        best_brand = None
+        best_matches = 25   # high threshold — only match when very confident
+
+        for fname in os.listdir(logo_dir):
+            if not fname.lower().endswith((".jpg", ".png")):
+                continue
+            brand_name = re.sub(r'_\d+$', '', os.path.splitext(fname)[0]).capitalize()
+            tmpl = cv2.imread(os.path.join(logo_dir, fname), cv2.IMREAD_GRAYSCALE)
+            if tmpl is None:
+                continue
+            kp_tmpl, des_tmpl = orb.detectAndCompute(tmpl, None)
+            if des_tmpl is None:
+                continue
+            matches = bf.match(des_tmpl, des_scene)
+            good = [m for m in matches if m.distance < 45]  # stricter distance
+            if len(good) > best_matches:
+                best_matches = len(good)
+                best_brand = brand_name
+
+        return best_brand
+
+    except Exception:
+        return None
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -359,6 +445,19 @@ def estimate_brand(color: str = "") -> str:
 # ══════════════════════════════════════════════════════════════════════
 
 def main():
+    # Always print diagnostic to stderr so Laravel log can catch it
+    print(f"[INFO] Python={sys.executable} v{sys.version[:6]}", file=sys.stderr)
+    try:
+        import easyocr
+        print(f"[INFO] easyocr={easyocr.__version__} OK", file=sys.stderr)
+    except ImportError:
+        print("[WARN] easyocr NOT found — OCR disabled", file=sys.stderr)
+    try:
+        import cv2
+        print(f"[INFO] cv2={cv2.__version__} OK", file=sys.stderr)
+    except ImportError:
+        print("[WARN] cv2 NOT found — color detection disabled", file=sys.stderr)
+
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Usage: python detect_car.py <image_path>"}))
         sys.exit(1)
@@ -371,12 +470,12 @@ def main():
 
     license_plate, confidence = detect_license_plate(image_path)
     color                     = detect_dominant_color(image_path)
-    brand                     = estimate_brand(color)
+    brand                     = estimate_brand(image_path)
 
     result = {
         "license_plate": license_plate,
         "color":         color,
-        "brand":         brand,
+        "brand":         brand,   # None = ไม่ระบุ
         "confidence":    round(confidence, 1),
     }
 

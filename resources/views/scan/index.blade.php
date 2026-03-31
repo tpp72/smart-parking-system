@@ -115,7 +115,12 @@
                             {{-- Brand --}}
                             <div class="rounded-xl border border-white/10 bg-black/30 p-4">
                                 <p class="text-xs text-gray-500 mb-1">ยี่ห้อรถ</p>
-                                <p class="font-extrabold text-white text-lg">{{ $scan->brand ?: '—' }}</p>
+                                @if($scan->brand)
+                                    <p class="font-extrabold text-white text-lg">{{ $scan->brand }}</p>
+                                @else
+                                    <p class="font-semibold text-gray-500 text-base">ไม่ระบุ</p>
+                                    <p class="text-xs text-gray-700 mt-0.5">ต้องการโมเดล AI เพิ่มเติม</p>
+                                @endif
                             </div>
                         </div>
 

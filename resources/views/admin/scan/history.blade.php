@@ -90,7 +90,7 @@
                                     </td>
 
                                     {{-- Brand --}}
-                                    <td class="px-4 py-3 text-gray-300">{{ $scan->brand ?: '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-300">{!! $scan->brand ?? '<span class="text-gray-600">ไม่ระบุ</span>' !!}</td>
 
                                     {{-- Confidence --}}
                                     <td class="px-4 py-3">

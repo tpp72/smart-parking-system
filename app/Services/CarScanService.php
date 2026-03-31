@@ -6,7 +6,6 @@ use App\Models\LicensePlateScan;
 use App\Models\SuspiciousVehicle;
 use App\Models\Vehicle;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
@@ -22,15 +21,23 @@ class CarScanService
         $scriptPath = base_path('scripts/detect_car.py');
 
         $process = new Process([$pythonBin, $scriptPath, $absoluteImagePath]);
-        $process->setTimeout(60);
+        $process->setTimeout(120);
+        // Force UTF-8 output from Python on Windows (prevents Thai → cp874 garbling)
+        $process->setEnv(['PYTHONIOENCODING' => 'utf-8', 'PYTHONUTF8' => '1']);
         $process->run();
 
+        $stdout = $process->getOutput();
+        $stderr = $process->getErrorOutput();
+
+        Log::info('[CarScan] exit=' . $process->getExitCode()
+            . ' | stdout=' . substr($stdout, 0, 500)
+            . ' | stderr=' . substr($stderr, 0, 500));
+
         if (!$process->isSuccessful()) {
-            Log::error('[CarScan] Python error: ' . $process->getErrorOutput());
-            throw new \RuntimeException('AI script failed: ' . $process->getErrorOutput());
+            throw new \RuntimeException('AI script failed: ' . $stderr);
         }
 
-        $output = trim($process->getOutput());
+        $output = trim($stdout);
 
         // Extract last JSON object from stdout (EasyOCR may print warnings before it)
         if (preg_match('/(\{.*\})\s*$/s', $output, $matches)) {
@@ -59,7 +66,8 @@ class CarScanService
         // 2. Run AI
         $result = $this->detect($absolutePath);
 
-        $licensePlate = strtoupper(trim($result['license_plate'] ?? ''));
+        // strtoupper() breaks Thai UTF-8 — use mb_strtoupper for English digits only
+        $licensePlate = trim($result['license_plate'] ?? '');
         $color        = $result['color']       ?? null;
         $brand        = $result['brand']       ?? null;
         $confidence   = isset($result['confidence']) ? (float) $result['confidence'] : null;
