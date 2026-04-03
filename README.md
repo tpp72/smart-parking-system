@@ -39,7 +39,7 @@
 - PostgreSQL 15+
 - Node.js 18+
 - Composer
-- Google Gemini API Key — ฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- Google Gemini API Key [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ---
 
@@ -111,7 +111,7 @@ php artisan schedule:work
 | `brand` | `Honda` |
 | `confidence` | `95` |
 
-Gemini models ที่ใช้ได้ (free tier):
+Gemini models ที่ใช้ได้:
 
 | Model | Free Quota | หมายเหตุ |
 |-------|-----------|---------|
