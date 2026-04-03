@@ -3,10 +3,17 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Python Binary
+    | Google Gemini API Key
     |--------------------------------------------------------------------------
-    | Path to the python executable. On Windows try 'python', on Linux 'python3'.
-    | Override via .env: CARSCAN_PYTHON_BIN=python3
+    | Used by CarScanService to call Gemini Vision API for car image analysis.
+    | Set via .env: GEMINI_API_KEY=AIza...
     */
-    'python_bin' => env('CARSCAN_PYTHON_BIN', 'python'),
+    'gemini_api_key' => env('GEMINI_API_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gemini Model
+    |--------------------------------------------------------------------------
+    */
+    'model' => env('CARSCAN_MODEL', 'gemini-2.0-flash'),
 ];

@@ -83,32 +83,33 @@
                                 <p class="text-xs text-gray-500 mb-1">สีรถ</p>
                                 <div class="flex items-center gap-2">
                                     @php
+                                        // Gemini returns Thai color names — map directly
                                         $colorMap = [
-                                            'white'  => '#f8fafc',
-                                            'black'  => '#1e1e1e',
-                                            'silver' => '#c0c0c0',
-                                            'gray'   => '#6b7280',
-                                            'red'    => '#dc2626',
-                                            'blue'   => '#2563eb',
-                                            'green'  => '#16a34a',
-                                            'yellow' => '#eab308',
-                                            'orange' => '#f97316',
-                                            'brown'  => '#92400e',
-                                            'pink'   => '#ec4899',
-                                            'purple' => '#9333ea',
+                                            'ขาว'     => '#f8fafc',
+                                            'ดำ'      => '#1e1e1e',
+                                            'เงิน'    => '#c0c0c0',
+                                            'เทา'     => '#9ca3af',
+                                            'แดง'     => '#ef4444',
+                                            'น้ำเงิน' => '#3b82f6',
+                                            'เขียว'   => '#22c55e',
+                                            'เหลือง'  => '#eab308',
+                                            'ส้ม'     => '#f97316',
+                                            'น้ำตาล'  => '#92400e',
+                                            'ชมพู'    => '#ec4899',
+                                            'ม่วง'    => '#9333ea',
+                                            'ทอง'     => '#d97706',
+                                            'ครีม'    => '#fef3c7',
+                                            'ฟ้า'     => '#60a5fa',
+                                            'เบจ'     => '#d4b896',
                                         ];
-                                        $colorKey = strtolower($scan->color ?? '');
-                                        $colorHex = $colorMap[$colorKey] ?? '#6b7280';
-                                        $colorTh  = [
-                                            'white' => 'ขาว', 'black' => 'ดำ', 'silver' => 'เงิน',
-                                            'gray' => 'เทา', 'red' => 'แดง', 'blue' => 'น้ำเงิน',
-                                            'green' => 'เขียว', 'yellow' => 'เหลือง', 'orange' => 'ส้ม',
-                                            'brown' => 'น้ำตาล', 'pink' => 'ชมพู', 'purple' => 'ม่วง',
-                                        ][$colorKey] ?? ($scan->color ?? '—');
+                                        $colorLabel = $scan->color ?? '';
+                                        $colorHex   = $colorMap[$colorLabel] ?? null;
                                     @endphp
-                                    <span class="w-5 h-5 rounded-full border border-white/20 shrink-0"
-                                          style="background:{{ $colorHex }}"></span>
-                                    <span class="font-extrabold text-white text-lg">{{ $colorTh }}</span>
+                                    @if($colorHex)
+                                        <span class="w-5 h-5 rounded-full border border-white/20 shrink-0"
+                                              style="background:{{ $colorHex }}"></span>
+                                    @endif
+                                    <span class="font-extrabold text-white text-lg">{{ $colorLabel ?: '—' }}</span>
                                 </div>
                             </div>
 

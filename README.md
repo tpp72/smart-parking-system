@@ -1,187 +1,159 @@
-# 🚗 Smart Parking System
+# Smart Parking System
 
-A Smart Parking Management System built with **Laravel 12** and **PostgreSQL**.  
-This system provides parking lot management, slot reservations, vehicle tracking, payments, and suspicious vehicle monitoring.
+ระบบจัดการที่จอดรถอัจฉริยะ พัฒนาด้วย **Laravel 11** + **Google Gemini Vision AI**
 
----
-
-![Laravel](https://img.shields.io/badge/Laravel-12-red)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue)
+![Laravel](https://img.shields.io/badge/Laravel-11-red)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue)
+![Gemini](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
-## 📌 Project Overview
+## Features
 
-Smart Parking System is a web-based application designed to manage parking lots efficiently.  
-It allows users to reserve parking slots, track vehicle entries/exits, process payments, and monitor suspicious vehicles.
-
-The system is built following the MVC architecture using Laravel Framework.
-
----
-
-## ✨ Features
-
-### 👤 User Management
-
-- User registration & authentication
-- Role-based access (`user`, `admin`)
-- Notification system
-
-### 🅿️ Parking Management
-
-- Manage parking lots
-- Manage parking slots
-- Dynamic hourly rates
-- Entry/Exit device tracking
-
-### 🚘 Vehicle Management
-
-- Register vehicles
-- Unique license plate tracking
-- Link vehicles to users
-
-### 📅 Reservation System
-
-- Reserve parking slots
-- Reservation logs
-- Status tracking (pending, approved, etc.)
-
-### 💳 Payment System
-
-- Parking fee calculation
-- Reservation discount support
-- Payment status tracking
-- Penalty management
-
-### 📷 Monitoring & Security
-
-- License plate scanning
-- Suspicious vehicle tracking
-- Admin action logs
+- **รถเข้า-ออก** — บันทึก check-in/out พร้อมคำนวณค่าจอดอัตโนมัติ (ปัดชั่วโมงขึ้น)
+- **จองล่วงหน้า** — workflow จอง → อนุมัติ → ใช้งาน พร้อม auto-expire
+- **AI สแกนรถ** — อัปโหลดรูปรถ → Gemini Vision อ่านทะเบียน + สี + ยี่ห้อ
+- **Blacklist** — แจ้งเตือนอัตโนมัติเมื่อพบรถต้องสงสัย
+- **ชำระเงิน** — ติดตามสถานะ ค้างชำระ/ชำระแล้ว พร้อมส่วนลดจากการจอง
+- **Audit Log** — บันทึกทุก action ของ admin
+- **Dashboard KPI** — รถในลาน, ช่องว่าง, รายได้วันนี้, การจองรออนุมัติ
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
-- **Backend:** Laravel 12
-- **Database:** PostgreSQL
-- **ORM:** Eloquent
-- **Authentication:** Laravel built-in auth
-- **Architecture:** MVC Pattern
-
----
-
-## 🗂 Database Structure
-
-Main entities:
-
-- Users
-- Vehicles
-- Parking Lots
-- Parking Slots
-- Reservations
-- Parking Logs
-- Payments
-- Penalties
-- License Plate Scans
-- Suspicious Vehicles
-- Notifications
-
-Relational integrity is enforced using foreign key constraints with cascade rules.
+| Layer | Technology |
+|-------|-----------|
+| Backend | PHP 8.4, Laravel 11 |
+| Frontend | Blade, Tailwind CSS, Alpine.js, Vite |
+| Database | PostgreSQL 15+ |
+| AI Vision | Google Gemini 2.5 Flash |
+| Auth | Laravel Breeze |
 
 ---
 
-## ⚙️ Installation Guide
+## Requirements
 
-### 1️⃣ Clone Repository
+- PHP 8.4+
+- PostgreSQL 15+
+- Node.js 18+
+- Composer
+- Google Gemini API Key — ฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+
+---
+
+## Installation
 
 ```bash
+# 1. Clone
 git clone https://github.com/tpp72/smart-parking-system.git
 cd smart-parking-system
-```
 
-### 2️⃣ Install Dependencies
-
-```bash
+# 2. Install dependencies
 composer install
-```
+npm install
 
-### 3️⃣ Setup Environment File
-
-```bash
+# 3. Environment
 cp .env.example .env
+php artisan key:generate
 ```
 
-Edit .env:
+แก้ไข `.env`:
 
-```bash
+```env
+# Database
 DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_DATABASE=smart-parking-system
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
+
+# AI Car Scan (required)
+GEMINI_API_KEY=AIzaSy...
+CARSCAN_MODEL=gemini-2.5-flash
 ```
 
-### 4️⃣ Generate Application Key
-
 ```bash
-php artisan key:generate
-```
-
-### 5️⃣ Run Database Migration
-
-```bash
+# 4. Migrate & build
 php artisan migrate
-(Optional) Seed database:
-php artisan db:seed
-```
+php artisan config:cache
+php artisan storage:link
+npm run build
 
-### 6️⃣ Start Development Server
-
-```bash
+# 5. Run
 php artisan serve
+
+# Scheduler — สำหรับ auto-expire reservation (แยก terminal)
+php artisan schedule:work
 ```
 
-🧠 System Architecture
+---
 
-This project follows Laravel MVC architecture:
+## Roles
 
-Models → Handle database relationships & business logic
+| Role | สิทธิ์ |
+|------|--------|
+| **admin** | จัดการทุกอย่าง: รถเข้า-ออก, การจอง, ชำระเงิน, ผู้ใช้, ลานจอด, AI สแกน |
+| **user** | จองที่จอด, ดูประวัติ, จัดการรถของตัวเอง, AI สแกนรถ |
 
-Controllers → Handle HTTP requests
+---
 
-Migrations → Define database schema
+## AI Car Scan
 
-PostgreSQL → Enforce relational constraints
+อัปโหลดรูปรถ → **Google Gemini Vision API** วิเคราะห์ → ได้ผล:
 
-🔒 Security Notes
+| Field | ตัวอย่าง |
+|-------|---------|
+| `license_plate` | `5กก 6285` |
+| `color` | `เงิน` |
+| `brand` | `Honda` |
+| `confidence` | `95` |
 
-.env file is excluded from Git
+Gemini models ที่ใช้ได้ (free tier):
 
-Database credentials are not committed
+| Model | Free Quota | หมายเหตุ |
+|-------|-----------|---------|
+| `gemini-2.5-flash` | 1,500 req/วัน | แนะนำ |
+| `gemini-2.5-flash-lite` | 1,500 req/วัน | เร็วสุด |
+| `gemini-2.5-pro` | น้อยกว่า | แม่นสุด |
 
-Role-based access control
+---
 
-Foreign key constraints prevent orphan data
+## Project Structure
 
-🚀 Future Improvements
+```
+app/
+├── Http/Controllers/
+│   ├── Admin/               # Check-in, Check-out, Payment, ฯลฯ
+│   ├── User/                # Reservation, Vehicle, Parking logs
+│   └── CarScanController.php
+├── Services/
+│   └── CarScanService.php   # Gemini Vision API logic
+└── Models/                  # 15 Eloquent models
 
-Real-time parking availability dashboard
+config/
+└── carscan.php              # Gemini API key + model
 
-QR Code entry system
+docs/
+├── project-documentation.md
+└── ai-scan-documentation.md
+```
 
-Payment gateway integration
+---
 
-Mobile responsive UI
+## Documentation
 
-Admin analytics dashboard
+- [เอกสารโปรเจคฉบับสมบูรณ์](docs/project-documentation.md)
+- [เอกสาร AI Car Scan](docs/ai-scan-documentation.md)
 
-👨‍💻 Developer
+---
 
-Developed by tpp72
+## Developer
 
-📄 License
+Developed by [tpp72](https://github.com/tpp72)
 
-This project is open-source and available under the MIT License.
+## License
+
+MIT License
