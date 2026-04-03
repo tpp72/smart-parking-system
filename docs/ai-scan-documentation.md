@@ -1,4 +1,5 @@
 # ระบบ AI Car Scan — Smart Parking System
+
 ## เอกสารประกอบโปรเจคจบ
 
 ---
@@ -48,14 +49,14 @@
 
 ### 3.1 ภาพรวม Gemini Vision
 
-| รายการ | รายละเอียด |
-|--------|-----------|
-| **Provider** | Google DeepMind |
-| **Model** | Gemini 2.5 Flash (default) |
-| **ความสามารถ** | Multimodal — รับ text + image พร้อมกัน |
-| **OCR** | รองรับภาษาไทย + อังกฤษ + ตัวเลข |
-| **Vision** | วิเคราะห์วัตถุ, สี, ยี่ห้อ, โลโก้ |
-| **API Version** | v1beta |
+| รายการ          | รายละเอียด                             |
+| --------------- | -------------------------------------- |
+| **Provider**    | Google DeepMind                        |
+| **Model**       | Gemini 2.5 Flash (default)             |
+| **ความสามารถ**  | Multimodal — รับ text + image พร้อมกัน |
+| **OCR**         | รองรับภาษาไทย + อังกฤษ + ตัวเลข        |
+| **Vision**      | วิเคราะห์วัตถุ, สี, ยี่ห้อ, โลโก้      |
+| **API Version** | v1beta                                 |
 
 ### 3.2 Gemini Architecture (ภาพรวม)
 
@@ -105,13 +106,17 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:ge
 
 ```json
 {
-  "candidates": [{
-    "content": {
-      "parts": [{
-        "text": "{\"license_plate\":\"5กก 6285\",\"color\":\"เงิน\",\"brand\":\"Honda\",\"confidence\":95}"
-      }]
-    }
-  }]
+    "candidates": [
+        {
+            "content": {
+                "parts": [
+                    {
+                        "text": "{\"license_plate\":\"5กก 6285\",\"color\":\"เงิน\",\"brand\":\"Honda\",\"confidence\":95}"
+                    }
+                ]
+            }
+        }
+    ]
 }
 ```
 
@@ -119,10 +124,10 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:ge
 
 ```json
 {
-  "license_plate": "5กก 6285",
-  "color":         "เงิน",
-  "brand":         "Honda",
-  "confidence":    95
+    "license_plate": "5กก 6285",
+    "color": "เงิน",
+    "brand": "Honda",
+    "confidence": 95
 }
 ```
 
@@ -150,14 +155,14 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:ge
 
 ## 6. Tech Stack
 
-| Layer | Technology | Version | ใช้ทำอะไร |
-|-------|-----------|---------|----------|
-| Web Framework | Laravel | 11 | Web framework (MVC) |
-| Language (Backend) | PHP | 8.4 | Backend language |
-| HTTP Client | Laravel HTTP (Guzzle) | — | เรียก Gemini REST API |
-| **AI Vision** | **Google Gemini** | **2.5 Flash** | **วิเคราะห์รูปรถ** |
-| Database | PostgreSQL | 15+ | บันทึกผลสแกน |
-| Authentication | Laravel Breeze | — | ระบบ Login |
+| Layer              | Technology            | Version       | ใช้ทำอะไร             |
+| ------------------ | --------------------- | ------------- | --------------------- |
+| Web Framework      | Laravel               | 11            | Web framework (MVC)   |
+| Language (Backend) | PHP                   | 8.4           | Backend language      |
+| HTTP Client        | Laravel HTTP (Guzzle) | —             | เรียก Gemini REST API |
+| **AI Vision**      | **Google Gemini**     | **2.5 Flash** | **วิเคราะห์รูปรถ**    |
+| Database           | PostgreSQL            | 15+           | บันทึกผลสแกน          |
+| Authentication     | Laravel Breeze        | —             | ระบบ Login            |
 
 ---
 
@@ -165,20 +170,20 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:ge
 
 ### ตาราง `license_plate_scans`
 
-| Column | Type | คำอธิบาย |
-|--------|------|---------|
-| `id` | bigint PK | Primary key |
-| `device_id` | FK nullable | กล้อง IoT (ถ้ามาจากอุปกรณ์) |
-| `user_id` | FK nullable | ผู้ที่ upload รูป |
-| `vehicle_id` | FK nullable | รถในระบบที่ทะเบียนตรง |
-| `license_plate` | string | ผล OCR จาก Gemini |
-| `color` | string | สีรถภาษาไทย |
-| `brand` | string nullable | ยี่ห้อรถ หรือ null |
-| `confidence` | float | ความมั่นใจ 0–100 |
-| `is_suspicious` | boolean | flag รถใน blacklist |
-| `source` | string | `manual_upload` / `device` |
-| `image_path` | string | path รูปใน storage |
-| `scan_time` | timestamp | เวลาสแกน |
+| Column          | Type            | คำอธิบาย                    |
+| --------------- | --------------- | --------------------------- |
+| `id`            | bigint PK       | Primary key                 |
+| `device_id`     | FK nullable     | กล้อง IoT (ถ้ามาจากอุปกรณ์) |
+| `user_id`       | FK nullable     | ผู้ที่ upload รูป           |
+| `vehicle_id`    | FK nullable     | รถในระบบที่ทะเบียนตรง       |
+| `license_plate` | string          | ผล OCR จาก Gemini           |
+| `color`         | string          | สีรถภาษาไทย                 |
+| `brand`         | string nullable | ยี่ห้อรถ หรือ null          |
+| `confidence`    | float           | ความมั่นใจ 0–100            |
+| `is_suspicious` | boolean         | flag รถใน blacklist         |
+| `source`        | string          | `manual_upload` / `device`  |
+| `image_path`    | string          | path รูปใน storage          |
+| `scan_time`     | timestamp       | เวลาสแกน                    |
 
 ---
 
@@ -230,36 +235,36 @@ Route::prefix('user')->middleware(['auth','role:user'])->group(function () {
 
 ## 9. ผลการทดสอบ (Test Results)
 
-| รูปทดสอบ | ทะเบียนจริง | OCR ได้ | สีจริง | ระบบได้ | ยี่ห้อจริง | ระบบได้ | Confidence |
-|---------|------------|---------|-------|---------|----------|---------|-----------|
-| Honda Accord สีเงิน | 5กก 6285 | ✓ 5กก 6285 | เงิน | ✓ เงิน | Honda | ✓ Honda | 95% |
-| Honda สีเทา | 6ขน 4257 | ✓ 6ขน 4257 | เทา | ✓ เทา | Honda | ✓ Honda | 90% |
-| รถไม่ชัด | — | — | — | — | — | null | 0% |
+| รูปทดสอบ            | ทะเบียนจริง | OCR ได้    | สีจริง | ระบบได้ | ยี่ห้อจริง | ระบบได้ | Confidence |
+| ------------------- | ----------- | ---------- | ------ | ------- | ---------- | ------- | ---------- |
+| Honda Accord สีเงิน | 5กก 6285    | ✓ 5กก 6285 | เงิน   | ✓ เงิน  | Honda      | ✓ Honda | 95%        |
+| Honda สีเทา         | 6ขน 4257    | ✓ 6ขน 4257 | เทา    | ✓ เทา   | Honda      | ✓ Honda | 90%        |
+| รถไม่ชัด            | —           | —          | —      | —       | —          | null    | 0%         |
 
 ---
 
 ## 10. เปรียบเทียบก่อน/หลัง
 
-| รายการ | เดิม (Python Local) | ปัจจุบัน (Gemini API) |
-|--------|--------------------|-----------------------|
-| เวลาวิเคราะห์ | ~15–30 วินาที | ~3–5 วินาที |
-| ความแม่นยำ OCR ไทย | ปานกลาง | สูงมาก |
-| ความแม่นยำสีรถ | ปานกลาง | สูงมาก |
-| ความแม่นยำยี่ห้อ | ต้องมี template | ไม่ต้องมี template |
-| Dependencies | Python 3.11, EasyOCR, OpenCV, PyTorch | ไม่มี |
-| การติดตั้ง | ซับซ้อน (หลาย package) | แค่ GEMINI_API_KEY |
-| Free Quota | ไม่มี (ใช้ CPU เครื่อง) | 1,500 req/วัน |
+| รายการ             | เดิม (Python Local)                   | ปัจจุบัน (Gemini API) |
+| ------------------ | ------------------------------------- | --------------------- |
+| เวลาวิเคราะห์      | ~15–30 วินาที                         | ~3–5 วินาที           |
+| ความแม่นยำ OCR ไทย | ปานกลาง                               | สูงมาก                |
+| ความแม่นยำสีรถ     | ปานกลาง                               | สูงมาก                |
+| ความแม่นยำยี่ห้อ   | ต้องมี template                       | ไม่ต้องมี template    |
+| Dependencies       | Python 3.11, EasyOCR, OpenCV, PyTorch | ไม่มี                 |
+| การติดตั้ง         | ซับซ้อน (หลาย package)                | แค่ GEMINI_API_KEY    |
+| Free Quota         | ไม่มี (ใช้ CPU เครื่อง)               | 1,500 req/วัน         |
 
 ---
 
 ## 11. ข้อจำกัดและแนวทางพัฒนา
 
-| ข้อจำกัด | สาเหตุ | แนวทางพัฒนา |
-|---------|--------|-------------|
-| ต้องการ internet | เรียก Cloud API | Cache ผลลัพธ์, fallback offline |
-| Free Tier 1,500 req/วัน | Gemini Free Quota | Upgrade เป็น Pay-as-you-go |
-| ขึ้นอยู่กับ Google | External dependency | เพิ่ม fallback model (Gemini Pro) |
-| ข้อมูลรูปส่งออก cloud | Privacy concern | ใช้ Vertex AI on-premise แทน |
+| ข้อจำกัด                | สาเหตุ              | แนวทางพัฒนา                       |
+| ----------------------- | ------------------- | --------------------------------- |
+| ต้องการ internet        | เรียก Cloud API     | Cache ผลลัพธ์, fallback offline   |
+| Free Tier 1,500 req/วัน | Gemini Free Quota   | Upgrade เป็น Pay-as-you-go        |
+| ขึ้นอยู่กับ Google      | External dependency | เพิ่ม fallback model (Gemini Pro) |
+| ข้อมูลรูปส่งออก cloud   | Privacy concern     | ใช้ Vertex AI on-premise แทน      |
 
 ---
 
@@ -275,17 +280,18 @@ CARSCAN_MODEL=gemini-2.5-flash  # หรือ gemini-2.5-pro สำหรับ
 
 ### โมเดลที่ใช้ได้
 
-| Model ID | ความเร็ว | ความแม่น | Free Quota |
-|----------|---------|---------|-----------|
-| `gemini-2.5-flash` | เร็ว | ดี | 1,500/วัน ✅ แนะนำ |
-| `gemini-2.5-flash-lite` | เร็วสุด | ปานกลาง | 1,500/วัน |
-| `gemini-2.5-pro` | ช้า | ดีสุด | น้อยกว่า |
+| Model ID                | ความเร็ว | ความแม่น | Free Quota         |
+| ----------------------- | -------- | -------- | ------------------ |
+| `gemini-2.5-flash`      | เร็ว     | ดี       | 1,500/วัน ✅ แนะนำ |
+| `gemini-2.5-flash-lite` | เร็วสุด  | ปานกลาง  | 1,500/วัน          |
+| `gemini-2.5-pro`        | ช้า      | ดีสุด    | น้อยกว่า           |
 
 ### ไม่ต้องติดตั้งอะไรเพิ่ม
+
 - Laravel HTTP Client (Guzzle) มีอยู่แล้วใน Laravel
 - ไม่ต้อง Python, ไม่ต้อง pip install
 
 ---
 
-*เอกสารฉบับนี้จัดทำโดย Smart Parking System Project*
-*สถาบัน: — | ปีการศึกษา: 2566–2567*
+_เอกสารฉบับนี้จัดทำโดย Smart Parking System Project_
+_สถาบัน: — | ปีการศึกษา: 2566–2567_
