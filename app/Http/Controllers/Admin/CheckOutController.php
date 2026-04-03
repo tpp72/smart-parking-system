@@ -66,10 +66,10 @@ class CheckOutController extends Controller
             }
         });
 
-        // expire reservations ของรถคันนี้ที่เลยเวลาแล้ว
+        // expire reservations ของรถคันนี้ที่เกินเวลาเช็คอิน 1 ชั่วโมงแล้ว
         Reservation::where('vehicle_id', $log->vehicle_id)
             ->whereIn('status', ['pending', 'confirmed'])
-            ->where('reserve_end', '<=', now())
+            ->where('reserve_start', '<=', now()->subHour())
             ->update(['status' => 'expired']);
 
         $log->load('vehicle:id,license_plate', 'parkingSlot:id,slot_number');

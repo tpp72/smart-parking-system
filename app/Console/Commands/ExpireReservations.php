@@ -2,39 +2,57 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Reservation;
+use App\Models\ReservationLog;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class ExpireReservations extends Command
 {
     protected $signature = 'reservations:expire {--dry-run : Show how many rows would be updated without updating}';
-    protected $description = 'Mark reservations as expired when reserve_end has passed';
+    protected $description = 'Mark reservations as expired when reserve_start + 1 hour has passed without check-in';
 
     public function handle(): int
     {
         $now = now();
 
-        // ✅ ค่าเริ่มต้น: หมดเวลาแล้วให้ expired สำหรับ pending + confirmed
-        // ถ้าคุณอยากให้ expired เฉพาะ pending ให้ลบ confirmed ออกจาก array นี้
-        $eligibleStatuses = ['pending', 'confirmed'];
+        // หมดเวลา: ผ่านเวลาเช็คอิน + 1 ชั่วโมงแล้ว ยังไม่ได้เช็คอิน
+        $expireAt = $now->copy()->subHour();
 
-        $base = DB::table('reservations')
-            ->whereIn('status', $eligibleStatuses)
-            ->where('reserve_end', '<=', $now);
+        $eligibleIds = Reservation::whereIn('status', ['pending', 'confirmed'])
+            ->where('reserve_start', '<=', $expireAt)
+            ->pluck('id');
 
-        $count = (clone $base)->count();
+        $count = $eligibleIds->count();
 
         if ($this->option('dry-run')) {
             $this->info("DRY RUN: would update {$count} reservation(s) to expired.");
             return self::SUCCESS;
         }
 
-        $updated = $base->update([
-            'status' => 'expired',
+        if ($count === 0) {
+            $this->info('No reservations to expire.');
+            return self::SUCCESS;
+        }
+
+        Reservation::whereIn('id', $eligibleIds)->update([
+            'status'     => 'expired',
             'updated_at' => $now,
         ]);
 
-        $this->info("Updated {$updated} reservation(s) to expired.");
+        // บันทึก ReservationLog สำหรับทุกรายการที่ expire
+        $logs = $eligibleIds->map(fn($id) => [
+            'reservation_id' => $id,
+            'old_status'     => 'pending',
+            'new_status'     => 'expired',
+            'changed_by'     => null,
+            'note'           => 'Auto-expired: เกินเวลาเช็คอิน 1 ชั่วโมง',
+            'created_at'     => $now,
+            'updated_at'     => $now,
+        ])->toArray();
+
+        ReservationLog::insert($logs);
+
+        $this->info("Updated {$count} reservation(s) to expired.");
         return self::SUCCESS;
     }
 }

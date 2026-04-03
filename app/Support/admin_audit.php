@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AdminAction;
+use Illuminate\Support\Facades\Auth;
 
 if (! function_exists('admin_audit')) {
     /**
@@ -14,7 +15,7 @@ if (! function_exists('admin_audit')) {
             $request = request();
 
             AdminAction::create([
-                'admin_id'     => $user->id ?? null,
+                'admin_id'     => Auth::id(),
                 'action'       => $action,
                 'subject_type' => $subject ? class_basename($subject) : null,
                 'subject_id'   => $subject?->getKey(), // ✅ ดีกว่า ->id

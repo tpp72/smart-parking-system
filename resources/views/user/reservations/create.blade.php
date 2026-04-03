@@ -89,7 +89,6 @@
                     @php
                         $minDatetime = now()->format('Y-m-d\TH:i');
                         $exampleStart = now()->addHour()->startOfHour()->format('Y-m-d\TH:i');
-                        $exampleEnd = now()->addHours(3)->startOfHour()->format('Y-m-d\TH:i');
                     @endphp
                     <div>
                         <x-input-label for="reserve_start" value="เวลาเริ่ม (Reserve Start)" />
@@ -101,15 +100,8 @@
                         <x-input-error :messages="$errors->get('reserve_start')" class="mt-2" />
                     </div>
 
-                    {{-- เวลาสิ้นสุด --}}
-                    <div>
-                        <x-input-label for="reserve_end" value="เวลาสิ้นสุด (Reserve End)" />
-                        <x-text-input id="reserve_end" name="reserve_end" type="datetime-local"
-                            class="mt-1 block w-full @error('reserve_end') border-red-500 @enderror"
-                            value="{{ old('reserve_end', $exampleEnd) }}" min="{{ $minDatetime }}" />
-                        <p class="text-xs text-gray-500 mt-1">ตัวอย่าง:
-                            {{ now()->addHours(3)->startOfHour()->format('d/m/Y H:i') }} น. (ต้องหลังเวลาเริ่มเสมอ)</p>
-                        <x-input-error :messages="$errors->get('reserve_end')" class="mt-2" />
+                    <div class="rounded-xl border border-blue-700/40 bg-blue-900/10 p-3 text-sm text-blue-300">
+                        การจองจะถูกยกเลิกอัตโนมัติหากไม่มีการเช็คอินภายใน 1 ชั่วโมงหลังเวลาที่จอง
                     </div>
 
                     <div class="flex gap-3 pt-2">

@@ -64,16 +64,6 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm text-gray-200 mb-1">สิ้นสุด *</label>
-                            <input type="datetime-local" name="reserve_end"
-                                value="{{ old('reserve_end', \Carbon\Carbon::parse($reservation->reserve_end)->format('Y-m-d\TH:i')) }}"
-                                class="sp-select" />
-                            @error('reserve_end')
-                                <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div>
                             <label class="block text-sm text-gray-200 mb-1">ค่าจอง *</label>
                             <input type="number" step="0.01" name="reservation_fee"
                                 value="{{ old('reservation_fee', $reservation->reservation_fee) }}"

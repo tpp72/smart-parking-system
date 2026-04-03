@@ -55,7 +55,7 @@
                             <th class="py-3 pr-4">ผู้ใช้</th>
                             <th class="py-3 pr-4">ลาน</th>
                             <th class="py-3 pr-4">ช่อง</th>
-                            <th class="py-3 pr-4">ช่วงเวลา</th>
+                            <th class="py-3 pr-4">เวลาเริ่ม</th>
                             <th class="py-3 pr-4">ค่าจอง</th>
                             <th class="py-3 pr-4">สถานะ</th>
                             <th class="py-3 pr-4" style="text-align:right">จัดการ</th>
@@ -69,7 +69,7 @@
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->parkingLot?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->parkingSlot?->slot_number ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-300">
-                                    {{ $r->reserve_start }} → {{ $r->reserve_end }}
+                                    {{ $r->reserve_start }}
                                 </td>
                                 <td class="py-3 pr-4 font-bold text-red-200">
                                     {{ number_format((float) $r->reservation_fee, 2) }}

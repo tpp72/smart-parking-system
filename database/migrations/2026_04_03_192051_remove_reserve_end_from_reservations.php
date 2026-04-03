@@ -11,17 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('posts', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::table('reservations', function (Blueprint $table) {
+            $table->dropColumn('reserve_end');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('posts');
+        Schema::table('reservations', function (Blueprint $table) {
+            $table->dateTime('reserve_end')->nullable()->after('reserve_start');
+        });
     }
 };

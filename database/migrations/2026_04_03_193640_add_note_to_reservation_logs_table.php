@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('penalties', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('parking_log_id')->constrained('parking_logs')->cascadeOnDelete();
-            $table->string('reason');
-            $table->decimal('amount', 8, 2);
-            $table->timestamps(0);
+        Schema::table('reservation_logs', function (Blueprint $table) {
+            $table->string('note')->nullable()->after('changed_by');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('penalties');
+        Schema::table('reservation_logs', function (Blueprint $table) {
+            $table->dropColumn('note');
+        });
     }
 };

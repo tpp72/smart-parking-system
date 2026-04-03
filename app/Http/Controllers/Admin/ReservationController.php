@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
+use App\Models\ReservationLog;
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class ReservationController extends Controller
@@ -42,7 +44,7 @@ class ReservationController extends Controller
             ->when($status, fn($query) => $query->where('status', $status))
             ->when($lotId, fn($query) => $query->where('parking_lot_id', $lotId))
             ->when($from, fn($query) => $query->whereDate('reserve_start', '>=', $from))
-            ->when($to, fn($query) => $query->whereDate('reserve_end', '<=', $to))
+            ->when($to, fn($query) => $query->whereDate('reserve_start', '<=', $to))
             ->orderByDesc('reserve_start')
             ->paginate(15)
             ->withQueryString();
@@ -66,7 +68,6 @@ class ReservationController extends Controller
 
         $lots = ParkingLot::orderBy('name')->get(['id', 'name', 'hourly_rate']);
 
-        // ส่ง available slots ทั้งหมดให้ Alpine.js filter client-side ตาม lot ที่เลือก
         $slots = ParkingSlot::where('status', 'available')
             ->orderBy('parking_lot_id')
             ->orderBy('slot_number')
@@ -82,19 +83,16 @@ class ReservationController extends Controller
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
             'reserve_start'   => ['required', 'date', 'after:now'],
-            'reserve_end'     => ['required', 'date', 'after:reserve_start'],
             'reservation_fee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        // [1] กัน slot ข้ามลาน
         if (!empty($data['parking_slot_id'])) {
             $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
             if ((string) $slotLotId !== (string) $data['parking_lot_id']) {
                 return back()->withErrors(['parking_slot_id' => 'ช่องจอดนี้ไม่ได้อยู่ในลานที่เลือก'])->withInput();
             }
 
-            // [2] ห้ามจอง slot ซ้ำเวลาทับซ้อน
-            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'], $data['reserve_end'])) {
+            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'])) {
                 return back()
                     ->withErrors(['parking_slot_id' => 'ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว กรุณาเลือกช่องอื่นหรือเปลี่ยนเวลา'])
                     ->withInput();
@@ -109,9 +107,16 @@ class ReservationController extends Controller
             'parking_lot_id'  => $data['parking_lot_id'],
             'parking_slot_id' => $data['parking_slot_id'] ?? null,
             'reserve_start'   => $data['reserve_start'],
-            'reserve_end'     => $data['reserve_end'],
             'reservation_fee' => $data['reservation_fee'] ?? 0,
             'status'          => 'pending',
+        ]);
+
+        ReservationLog::create([
+            'reservation_id' => $reservation->id,
+            'old_status'     => null,
+            'new_status'     => 'pending',
+            'changed_by'     => Auth::id(),
+            'note'           => 'Admin สร้างการจอง',
         ]);
 
         admin_audit('reservation.create', $reservation, []);
@@ -125,7 +130,6 @@ class ReservationController extends Controller
         $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
         $statuses = $this->statuses;
 
-        // slots เฉพาะ lot ปัจจุบัน เพื่อเลือกง่าย
         $slots = ParkingSlot::query()
             ->where('parking_lot_id', $reservation->parking_lot_id)
             ->orderBy('slot_number')
@@ -142,27 +146,35 @@ class ReservationController extends Controller
             'parking_lot_id'   => ['required', 'exists:parking_lots,id'],
             'parking_slot_id'  => ['nullable', 'exists:parking_slots,id'],
             'reserve_start'    => ['required', 'date'],
-            'reserve_end'      => ['required', 'date', 'after:reserve_start'],
             'reservation_fee'  => ['required', 'numeric', 'min:0'],
             'status'           => ['required', Rule::in($this->statuses)],
         ]);
 
-        // [1] กัน slot ข้ามลาน
         if (!empty($data['parking_slot_id'])) {
             $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
             if ((string) $slotLotId !== (string) $data['parking_lot_id']) {
                 return back()->withErrors(['parking_slot_id' => 'ช่องจอดนี้ไม่ได้อยู่ในลานที่เลือก'])->withInput();
             }
 
-            // [2] ห้ามจอง slot ซ้ำเวลาทับซ้อน (exclude ตัวเองเมื่อ update)
-            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'], $data['reserve_end'], $reservation->id)) {
+            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'], $reservation->id)) {
                 return back()
                     ->withErrors(['parking_slot_id' => 'ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว'])
                     ->withInput();
             }
         }
 
+        $oldStatus = $reservation->status;
         $reservation->update($data);
+
+        if ($oldStatus !== $data['status']) {
+            ReservationLog::create([
+                'reservation_id' => $reservation->id,
+                'old_status'     => $oldStatus,
+                'new_status'     => $data['status'],
+                'changed_by'     => Auth::id(),
+                'note'           => 'Admin แก้ไขสถานะ',
+            ]);
+        }
 
         admin_audit('reservation.update', $reservation, [
             'changed' => array_keys($data),
@@ -180,6 +192,14 @@ class ReservationController extends Controller
 
         $reservation->update(['status' => 'confirmed']);
 
+        ReservationLog::create([
+            'reservation_id' => $reservation->id,
+            'old_status'     => 'pending',
+            'new_status'     => 'confirmed',
+            'changed_by'     => Auth::id(),
+            'note'           => 'Admin ยืนยันการจอง',
+        ]);
+
         admin_audit('reservation.confirm', $reservation, ['status' => 'confirmed']);
 
         return back()->with('success', "ยืนยันการจอง #{$reservation->id} เรียบร้อยแล้ว");
@@ -194,19 +214,19 @@ class ReservationController extends Controller
 
     /**
      * ตรวจสอบ time overlap สำหรับ slot ที่ระบุ
-     * overlap เมื่อ: start_a < end_b AND end_a > start_b
+     * แต่ละการจองมีหน้าต่าง [reserve_start, reserve_start + 1 ชั่วโมง]
      *
      * @param int|null $excludeId  reservation id ที่ต้อง exclude (กรณี update)
      */
-    private function hasSlotConflict(int $slotId, string $start, string $end, ?int $excludeId = null): bool
+    private function hasSlotConflict(int $slotId, string $start, ?int $excludeId = null): bool
     {
+        $end = \Carbon\Carbon::parse($start)->addHour()->toDateTimeString();
+
         return Reservation::where('parking_slot_id', $slotId)
             ->whereIn('status', ['pending', 'confirmed'])
             ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
-            ->where(function ($q) use ($start, $end) {
-                $q->where('reserve_start', '<', $end)
-                  ->where('reserve_end', '>', $start);
-            })
+            ->where('reserve_start', '<', $end)
+            ->whereRaw("reserve_start + INTERVAL '1 hour' > ?", [$start])
             ->exists();
     }
 }

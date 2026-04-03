@@ -58,8 +58,8 @@ class DashboardController extends Controller
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->leftJoin('parking_slots as s', 's.id', '=', 'r.parking_slot_id')
             ->where('r.user_id', $userId)
-            ->where('r.reserve_end', '>', $now)
-            ->whereIn('r.status', ['pending', 'confirmed', 'reserved']) // ถ้าคุณมีสถานะจริงอื่น ปรับได้
+            ->whereIn('r.status', ['pending', 'confirmed'])
+            ->where('r.reserve_start', '>', $now->copy()->subHour())
             ->orderBy('r.reserve_start')
             ->select([
                 'r.id as reservation_id',
@@ -67,7 +67,6 @@ class DashboardController extends Controller
                 'lot.name as lot_name',
                 's.slot_number',
                 'r.reserve_start',
-                'r.reserve_end',
                 'r.reservation_fee',
                 'r.status',
             ])
@@ -91,7 +90,7 @@ class DashboardController extends Controller
             ->where('r.user_id', $userId)
             ->orderByDesc('r.created_at')
             ->limit(5)
-            ->select(['r.id', 'v.license_plate', 'lot.name as lot_name', 'r.reserve_start', 'r.reserve_end', 'r.status'])
+            ->select(['r.id', 'v.license_plate', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
             ->get();
 
         $recentHistory = DB::table('parking_logs as pl')
@@ -241,18 +240,6 @@ class DashboardController extends Controller
             ->select(['p.id as payment_id', 'v.license_plate', 'p.total_hours', 'p.total_amount'])
             ->get();
 
-        // Recent penalties
-        $recentPenalties = DB::table('penalties as pe')
-            ->join('parking_logs as pl', 'pl.id', '=', 'pe.parking_log_id')
-            ->join('vehicles as v', 'v.id', '=', 'pl.vehicle_id')
-            ->whereBetween('pe.created_at', [$from, $to])
-            ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
-            ->when($q !== '', fn($qq) => $qq->where('v.license_plate', 'ilike', "%{$q}%"))
-            ->orderByDesc('pe.created_at')
-            ->limit(8)
-            ->select(['v.license_plate', 'pe.reason', 'pe.amount'])
-            ->get();
-
         // Reservations
         $reservations = DB::table('reservations as r')
             ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
@@ -263,7 +250,7 @@ class DashboardController extends Controller
             ->when($q !== '', fn($qq) => $qq->where('v.license_plate', 'ilike', "%{$q}%"))
             ->orderByDesc('r.created_at')
             ->limit(8)
-            ->select(['v.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.reserve_end', 'r.status'])
+            ->select(['v.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
             ->get();
 
         // Recent history
@@ -294,7 +281,6 @@ class DashboardController extends Controller
             'lotsOverview',
             'latestScans',
             'unpaidPayments',
-            'recentPenalties',
             'reservations',
             'recentHistory',
             'slotsPreview'

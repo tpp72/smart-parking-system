@@ -22,8 +22,7 @@
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4 text-left">ทะเบียน</th>
                             <th class="py-3 pr-4 text-left">ลาน / ช่อง</th>
-                            <th class="py-3 pr-4 text-left">เริ่ม</th>
-                            <th class="py-3 pr-4 text-left">สิ้นสุด</th>
+                            <th class="py-3 pr-4 text-left">เวลาเริ่ม</th>
                             <th class="py-3 pr-4 text-center">สถานะ</th>
                         </tr>
                     </thead>
@@ -42,9 +41,6 @@
                                 <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">
                                     {{ \Carbon\Carbon::parse($r->reserve_start)->format('d/m/Y H:i') }}
                                 </td>
-                                <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">
-                                    {{ \Carbon\Carbon::parse($r->reserve_end)->format('d/m/Y H:i') }}
-                                </td>
                                 <td class="py-3 pr-4 text-center">
                                     @php
                                         $badgeClass = match($r->status) {
@@ -58,7 +54,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="py-10 text-center text-gray-400">
+                                <td colspan="4" class="py-10 text-center text-gray-400">
                                     ยังไม่มีการจอง —
                                     <a href="{{ route('user.reservations.create') }}" class="text-red-300 underline">
                                         จองเลย

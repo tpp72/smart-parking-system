@@ -176,33 +176,6 @@
                     </div>
                 </div>
 
-                {{-- Recent penalties --}}
-                <div class="sp-card rounded-2xl p-6 flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-orange-400"></span>
-                            <h2 class="font-extrabold text-base">ค่าปรับล่าสุด</h2>
-                        </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        @forelse($recentPenalties as $x)
-                            <div class="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                                <div>
-                                    <p class="font-bold text-sm">{{ $x->license_plate }}</p>
-                                    <p class="text-xs text-gray-500 truncate max-w-[140px]">{{ $x->reason }}</p>
-                                </div>
-                                <span class="text-orange-300 font-extrabold text-sm">฿{{ number_format((float)$x->amount, 2) }}</span>
-                            </div>
-                        @empty
-                            <div class="text-center py-6">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mx-auto text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <p class="text-gray-500 text-sm">ไม่มีค่าปรับล่าสุด</p>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-
                 {{-- Latest scans --}}
                 <div class="sp-card rounded-2xl p-6 flex flex-col gap-4">
                     <div class="flex items-center justify-between">

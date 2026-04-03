@@ -8,11 +8,6 @@ class ParkingLot extends Model
 {
     protected $guarded = [];
 
-    public function rates()
-    {
-        return $this->hasMany(ParkingRate::class);
-    }
-
     public function slots()
     {
         return $this->hasMany(ParkingSlot::class);
