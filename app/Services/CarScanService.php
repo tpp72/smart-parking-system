@@ -60,7 +60,7 @@ PROMPT;
             $this->apiKey
         );
 
-        $response = Http::timeout(30)->post($url, [
+        $response = Http::timeout(30)->withOptions(['verify' => false])->post($url, [
             'contents' => [
                 [
                     'parts' => [
