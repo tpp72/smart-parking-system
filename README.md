@@ -23,13 +23,13 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | PHP 8.4, Laravel 11 |
-| Frontend | Blade, Tailwind CSS, Alpine.js, Vite |
-| Database | PostgreSQL 15+ |
-| AI Vision | Google Gemini 2.5 Flash |
-| Auth | Laravel Breeze |
+| Layer     | Technology                           |
+| --------- | ------------------------------------ |
+| Backend   | PHP 8.4, Laravel 11                  |
+| Frontend  | Blade, Tailwind CSS, Alpine.js, Vite |
+| Database  | PostgreSQL 15+                       |
+| AI Vision | Google Gemini 2.5 Flash              |
+| Auth      | Laravel Breeze                       |
 
 ---
 
@@ -39,7 +39,7 @@
 - PostgreSQL 15+
 - Node.js 18+
 - Composer
-- Google Gemini API Key — ฟรีที่ [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- Google Gemini API Key [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ---
 
@@ -93,10 +93,10 @@ php artisan schedule:work
 
 ## Roles
 
-| Role | สิทธิ์ |
-|------|--------|
+| Role      | สิทธิ์                                                                |
+| --------- | --------------------------------------------------------------------- |
 | **admin** | จัดการทุกอย่าง: รถเข้า-ออก, การจอง, ชำระเงิน, ผู้ใช้, ลานจอด, AI สแกน |
-| **user** | จองที่จอด, ดูประวัติ, จัดการรถของตัวเอง, AI สแกนรถ |
+| **user**  | จองที่จอด, ดูประวัติ, จัดการรถของตัวเอง, AI สแกนรถ                    |
 
 ---
 
@@ -104,20 +104,20 @@ php artisan schedule:work
 
 อัปโหลดรูปรถ → **Google Gemini Vision API** วิเคราะห์ → ได้ผล:
 
-| Field | ตัวอย่าง |
-|-------|---------|
+| Field           | ตัวอย่าง   |
+| --------------- | ---------- |
 | `license_plate` | `5กก 6285` |
-| `color` | `เงิน` |
-| `brand` | `Honda` |
-| `confidence` | `95` |
+| `color`         | `เงิน`     |
+| `brand`         | `Honda`    |
+| `confidence`    | `95`       |
 
-Gemini models ที่ใช้ได้ (free tier):
+Gemini models ที่ใช้ได้:
 
-| Model | Free Quota | หมายเหตุ |
-|-------|-----------|---------|
-| `gemini-2.5-flash` | 1,500 req/วัน | แนะนำ |
-| `gemini-2.5-flash-lite` | 1,500 req/วัน | เร็วสุด |
-| `gemini-2.5-pro` | น้อยกว่า | แม่นสุด |
+| Model                   | Free Quota    | หมายเหตุ |
+| ----------------------- | ------------- | -------- |
+| `gemini-2.5-flash`      | 1,500 req/วัน | แนะนำ    |
+| `gemini-2.5-flash-lite` | 1,500 req/วัน | เร็วสุด  |
+| `gemini-2.5-pro`        | น้อยกว่า      | แม่นสุด  |
 
 ---
 
