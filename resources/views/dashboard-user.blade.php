@@ -86,8 +86,7 @@
                                 <div class="rounded-xl border sp-divider p-3">
                                     <p class="text-gray-300 text-xs">ช่วงเวลา</p>
                                     <p class="font-extrabold">
-                                        {{ $activeReservation->reserve_start }} →
-                                        {{ $activeReservation->reserve_end }}
+                                        {{ $activeReservation->reserve_start }}
                                     </p>
                                 </div>
                             </div>
