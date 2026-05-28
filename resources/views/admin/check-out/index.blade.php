@@ -32,6 +32,7 @@
                                 <th class="py-3 pr-4 text-left">รถ</th>
                                 <th class="py-3 pr-4 text-left">ลาน / ช่อง</th>
                                 <th class="py-3 pr-4 text-left">Check-In</th>
+                                <th class="py-3 pr-4 text-left">การจอง</th>
                                 <th class="py-3 pr-4 text-right">จอดมาแล้ว</th>
                                 <th class="py-3 pr-4 text-right">อัตรา/ชม.</th>
                                 <th class="py-3 pr-4 text-center">Action</th>
@@ -59,6 +60,16 @@
                                     </td>
                                     <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">
                                         {{ $log->check_in_time->format('d/m/Y H:i') }}
+                                    </td>
+                                    <td class="py-3 pr-4">
+                                        @if ($log->reservation)
+                                            <a href="{{ route('admin.reservations.edit', $log->reservation) }}"
+                                               class="sp-badge sp-badge-ok text-xs whitespace-nowrap">
+                                                #{{ $log->reservation->id }} จอง
+                                            </a>
+                                        @else
+                                            <span class="text-gray-500 text-xs">walk-in</span>
+                                        @endif
                                     </td>
                                     <td class="py-3 pr-4 text-right text-yellow-300 whitespace-nowrap">
                                         {{ $hoursElapsed }} ชม.

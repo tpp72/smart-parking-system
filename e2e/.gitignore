@@ -1,0 +1,8 @@
+# Auth state (contains session cookies — never commit)
+.auth/
+
+# Generated artifacts
+reports/
+screenshots/
+logs/
+playwright-output/

@@ -33,8 +33,9 @@
                 </form>
             </div>
 
-            <div class="sp-card rounded-2xl p-6 mt-6 overflow-x-auto">
-                <table class="w-full sp-table">
+            <div class="sp-card rounded-2xl mt-6 overflow-hidden">
+                <div class="overflow-x-auto p-6">
+                <table class="w-full sp-table min-w-[560px]">
                     <thead>
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4">ชื่อ</th>
@@ -80,7 +81,8 @@
                     </tbody>
                 </table>
 
-                <div class="mt-4">
+                </div>{{-- /overflow-x-auto --}}
+                <div class="px-6 py-4">
                     {{ $users->links('vendor.pagination.sp') }}
                 </div>
             </div>

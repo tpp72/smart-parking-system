@@ -4,6 +4,7 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
+use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
@@ -52,6 +53,42 @@ class ReservationController extends Controller
         $authUser = Auth::user();
         if (!$authUser->vehicles()->where('id', $data['vehicle_id'])->exists()) {
             abort(403, 'ไม่มีสิทธิ์จองด้วยรถนี้');
+        }
+
+        // ป้องกัน: รถคันนี้มีการจองที่ยัง active อยู่แล้ว
+        $hasActiveReservation = Reservation::where('vehicle_id', $data['vehicle_id'])
+            ->whereIn('status', Reservation::ACTIVE_STATUSES)
+            ->exists();
+
+        if ($hasActiveReservation) {
+            return back()
+                ->withErrors(['vehicle_id' => 'รถคันนี้มีการจองที่ยังดำเนินการอยู่ กรุณารอให้เสร็จสิ้นก่อน'])
+                ->withInput();
+        }
+
+        // ป้องกัน: user มีการจอง active อยู่แล้วในช่วงเวลาเดียวกัน (ต่างรถ)
+        $end = \Carbon\Carbon::parse($data['reserve_start'])->addHour()->toDateTimeString();
+        $hasUserConflict = Reservation::where('user_id', Auth::id())
+            ->whereIn('status', Reservation::ACTIVE_STATUSES)
+            ->where('reserve_start', '<', $end)
+            ->whereRaw("reserve_start + INTERVAL '1 hour' > ?", [$data['reserve_start']])
+            ->exists();
+
+        if ($hasUserConflict) {
+            return back()
+                ->withErrors(['reserve_start' => 'คุณมีการจองอื่นในช่วงเวลานี้อยู่แล้ว กรุณาเลือกเวลาอื่น'])
+                ->withInput();
+        }
+
+        // ป้องกัน: รถกำลังจอดอยู่ในระบบ
+        $isParked = ParkingLog::where('vehicle_id', $data['vehicle_id'])
+            ->whereNull('check_out_time')
+            ->exists();
+
+        if ($isParked) {
+            return back()
+                ->withErrors(['vehicle_id' => 'รถคันนี้กำลังจอดอยู่แล้ว ไม่สามารถจองได้ในขณะนี้'])
+                ->withInput();
         }
 
         if (!empty($data['parking_slot_id'])) {

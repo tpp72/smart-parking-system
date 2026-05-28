@@ -30,10 +30,8 @@
 
                     <select name="status" class="sp-select">
                         <option value="">ทุกสถานะ</option>
-                        {{-- ให้ตรงกับ controller --}}
-                        @foreach (['pending', 'confirmed', 'cancelled', 'expired'] as $st)
-                            <option value="{{ $st }}" @selected($status === $st)>{{ $st }}
-                            </option>
+                        @foreach (['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'] as $st)
+                            <option value="{{ $st }}" @selected($status === $st)>{{ $st }}</option>
                         @endforeach
                     </select>
 
@@ -47,8 +45,9 @@
                 </form>
             </div>
 
-            <div class="sp-card rounded-2xl p-6 mt-6 overflow-x-auto">
-                <table class="w-full sp-table">
+            <div class="sp-card rounded-2xl mt-6 overflow-hidden">
+                <div class="overflow-x-auto p-6">
+                <table class="w-full sp-table min-w-[640px]">
                     <thead>
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4">ทะเบียน</th>
@@ -77,11 +76,13 @@
                                 <td class="py-3 pr-4">
                                     @php
                                         $badge = match ($r->status) {
-                                            'confirmed' => 'sp-badge sp-badge-ok',
-                                            'pending' => 'sp-badge sp-badge-warn',
-                                            'cancelled' => 'sp-badge sp-badge-bad',
-                                            'expired' => 'sp-badge sp-badge-bad',
-                                            default => 'sp-badge sp-badge-warn',
+                                            'confirmed'  => 'sp-badge sp-badge-ok',
+                                            'checked_in' => 'sp-badge sp-badge-ok',
+                                            'completed'  => 'sp-badge sp-badge-ok',
+                                            'pending'    => 'sp-badge sp-badge-warn',
+                                            'cancelled'  => 'sp-badge sp-badge-bad',
+                                            'expired'    => 'sp-badge sp-badge-bad',
+                                            default      => 'sp-badge sp-badge-warn',
                                         };
                                     @endphp
 
@@ -119,7 +120,8 @@
                     </tbody>
                 </table>
 
-                <div class="mt-4">
+                </div>{{-- /overflow-x-auto --}}
+                <div class="px-6 py-4">
                     {{ $reservations->links('vendor.pagination.sp') }}
                 </div>
             </div>
