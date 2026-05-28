@@ -33,5 +33,8 @@ class ParkingLog extends Model
         return $this->hasOne(Payment::class);
     }
 
-
+    public function reservation()
+    {
+        return $this->belongsTo(Reservation::class);
+    }
 }

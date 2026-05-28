@@ -259,7 +259,7 @@
                     </button>
 
                     <p class="text-center text-xs text-gray-600">
-                        ระบบใช้ EasyOCR + OpenCV วิเคราะห์ทะเบียน สี และยี่ห้อรถโดยอัตโนมัติ
+                        ระบบใช้ Google Gemini Vision AI วิเคราะห์ทะเบียน สี และยี่ห้อรถโดยอัตโนมัติ
                     </p>
                 </form>
             </div>

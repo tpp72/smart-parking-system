@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\ParkingLog;
 use App\Models\Reservation;
+use App\Models\ReservationLog;
 use Illuminate\Support\Facades\DB;
 
 class CheckOutController extends Controller
@@ -17,6 +18,7 @@ class CheckOutController extends Controller
             'vehicle:id,license_plate,brand,color',
             'parkingLot:id,name,hourly_rate',
             'parkingSlot:id,slot_number',
+            'reservation:id,reserve_start,status',
         ])
             ->whereNull('check_out_time')
             ->orderBy('check_in_time')
@@ -40,7 +42,6 @@ class CheckOutController extends Controller
                 ->withErrors(['error' => 'มีการบันทึก payment สำหรับรายการนี้แล้ว']);
         }
 
-        // $log->check_in_time เป็น Carbon แล้ว (จาก $casts ใน ParkingLog)
         $checkOut    = now();
         $diffMinutes = (int) $log->check_in_time->diffInMinutes($checkOut);
         $totalHours  = max(1, (int) ceil($diffMinutes / 60));
@@ -64,12 +65,31 @@ class CheckOutController extends Controller
             if ($log->parkingSlot) {
                 $log->parkingSlot->update(['status' => 'available']);
             }
+
+            // ถ้า check-in มาจากการจอง → mark completed
+            if ($log->reservation_id) {
+                $reservation = Reservation::find($log->reservation_id);
+                if ($reservation && $reservation->status === 'checked_in') {
+                    $reservation->update([
+                        'status'       => 'completed',
+                        'completed_at' => $checkOut,
+                    ]);
+
+                    ReservationLog::create([
+                        'reservation_id' => $reservation->id,
+                        'old_status'     => 'checked_in',
+                        'new_status'     => 'completed',
+                        'changed_by'     => null,
+                        'note'           => 'Auto completed: รถออกจากลานแล้ว',
+                    ]);
+                }
+            }
         });
 
-        // expire reservations ของรถคันนี้ที่เกินเวลาเช็คอิน 1 ชั่วโมงแล้ว
+        // expire reservations ของรถคันนี้ที่เลย grace period แล้ว (ที่ยังไม่ได้ check-in)
         Reservation::where('vehicle_id', $log->vehicle_id)
             ->whereIn('status', ['pending', 'confirmed'])
-            ->where('reserve_start', '<=', now()->subHour())
+            ->where('reserve_start', '<=', now()->subMinutes(Reservation::gracePeriodMinutes()))
             ->update(['status' => 'expired']);
 
         $log->load('vehicle:id,license_plate', 'parkingSlot:id,slot_number');

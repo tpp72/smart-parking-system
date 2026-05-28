@@ -25,7 +25,7 @@
             </a>
 
             {{-- ── Quick Access (desktop) ───────────────────── --}}
-            <div class="hidden md:flex items-center gap-1 flex-1 px-4">
+            <div class="hidden lg:flex items-center gap-1 flex-1 px-4">
 
                 @if($isAdmin)
                     {{-- ── Admin Navbar: ปฏิบัติการประจำวันเท่านั้น ── --}}
@@ -101,7 +101,7 @@
             </div>
 
             {{-- ── Right: Bell + User Menu ──────────────────── --}}
-            <div class="hidden md:flex items-center gap-2 shrink-0">
+            <div class="hidden lg:flex items-center gap-2 shrink-0">
 
                 {{-- Bell --}}
                 @auth
@@ -164,9 +164,9 @@
                 </x-dropdown>
             </div>
 
-            {{-- ── Hamburger (mobile) ───────────────────────── --}}
+            {{-- ── Hamburger (mobile/tablet) ────────────────── --}}
             <button @click="open = !open"
-                class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-300 hover:text-white transition">
+                class="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-300 hover:text-white transition">
                 <svg class="w-5 h-5" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                     <path :class="{ 'hidden': open, 'block': !open }" class="block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     <path :class="{ 'hidden': !open, 'block': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -175,8 +175,8 @@
         </div>
     </div>
 
-    {{-- ── Mobile Menu ──────────────────────────────────────── --}}
-    <div x-show="open" x-cloak class="md:hidden border-t border-red-900/40 bg-black/90 backdrop-blur-md">
+    {{-- ── Mobile / Tablet Menu ────────────────────────────── --}}
+    <div x-show="open" x-cloak class="lg:hidden border-t border-red-900/40 bg-black/90 backdrop-blur-md">
         <div class="px-4 py-4 space-y-1">
 
             @if($isAdmin)

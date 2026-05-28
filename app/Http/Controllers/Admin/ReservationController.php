@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 
 class ReservationController extends Controller
 {
-    private array $statuses = ['pending', 'confirmed', 'cancelled', 'expired'];
+    private array $statuses = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
 
     public function index(Request $request)
     {
@@ -135,7 +135,7 @@ class ReservationController extends Controller
             ->orderBy('slot_number')
             ->get(['id', 'slot_number', 'parking_lot_id']);
 
-        $reservation->load(['user', 'vehicle', 'parkingLot', 'parkingSlot']);
+        $reservation->load(['user', 'vehicle', 'parkingLot', 'parkingSlot', 'parkingLog.vehicle', 'parkingLog.parkingSlot']);
 
         return view('admin.reservations.edit', compact('reservation', 'lots', 'slots', 'statuses'));
     }

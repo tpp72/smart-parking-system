@@ -44,9 +44,11 @@
                                 <td class="py-3 pr-4 text-center">
                                     @php
                                         $badgeClass = match($r->status) {
-                                            'confirmed' => 'sp-badge-ok',
-                                            'pending'   => 'sp-badge-warn',
-                                            default     => 'sp-badge-bad',
+                                            'confirmed'  => 'sp-badge-ok',
+                                            'checked_in' => 'sp-badge-ok',
+                                            'completed'  => 'sp-badge-ok',
+                                            'pending'    => 'sp-badge-warn',
+                                            default      => 'sp-badge-bad',
                                         };
                                     @endphp
                                     <span class="sp-badge {{ $badgeClass }}">{{ $r->status }}</span>

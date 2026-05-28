@@ -103,6 +103,62 @@
 
             </div>
 
+            {{-- Lifecycle timeline --}}
+            <div class="sp-card rounded-2xl p-6 mt-6">
+                <h2 class="text-lg font-bold text-gray-200 mb-4">Lifecycle Timeline</h2>
+                <div class="flex flex-wrap gap-3 text-sm">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-gray-400">จองเมื่อ</span>
+                        <span class="text-gray-200">{{ \Carbon\Carbon::parse($reservation->created_at)->format('d/m/Y H:i') }}</span>
+                    </div>
+                    <div class="text-gray-600 self-center">→</div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-gray-400">เริ่มเข้าจอด</span>
+                        <span class="text-gray-200">{{ \Carbon\Carbon::parse($reservation->reserve_start)->format('d/m/Y H:i') }}</span>
+                    </div>
+                    @if ($reservation->checked_in_at)
+                        <div class="text-gray-600 self-center">→</div>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-gray-400">Check-In</span>
+                            <span class="text-green-300">{{ \Carbon\Carbon::parse($reservation->checked_in_at)->format('d/m/Y H:i') }}</span>
+                        </div>
+                    @endif
+                    @if ($reservation->completed_at)
+                        <div class="text-gray-600 self-center">→</div>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-gray-400">Check-Out</span>
+                            <span class="text-green-300">{{ \Carbon\Carbon::parse($reservation->completed_at)->format('d/m/Y H:i') }}</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Linked ParkingLog --}}
+            @php $plog = $reservation->parkingLog; @endphp
+            @if ($plog)
+                <div class="sp-card rounded-2xl p-6 mt-6">
+                    <h2 class="text-lg font-bold text-gray-200 mb-4">Parking Log ที่เชื่อมอยู่</h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-400">ทะเบียน</p>
+                            <p class="font-bold text-red-300">{{ $plog->vehicle?->license_plate ?? '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">ช่องจอด</p>
+                            <p class="text-gray-200">{{ $plog->parkingSlot?->slot_number ?? '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Check-In</p>
+                            <p class="text-gray-200">{{ $plog->check_in_time?->format('d/m/Y H:i') ?? '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400">Check-Out</p>
+                            <p class="text-gray-200">{{ $plog->check_out_time?->format('d/m/Y H:i') ?? 'ยังจอดอยู่' }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
         </div>
     </div>
 </x-app-layout>
