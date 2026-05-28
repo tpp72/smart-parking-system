@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(\"C:\\\\Users\\\\nongt\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\\\python.exe\" scripts/detect_car.py \"storage/app/public/car-scans/wgExeQc1pXWio83vIhXp5fuduXuEhvZppuMHHYfd.jpg\")"
+      "Bash(\"C:\\\\Users\\\\nongt\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\\\python.exe\" scripts/detect_car.py \"storage/app/public/car-scans/wgExeQc1pXWio83vIhXp5fuduXuEhvZppuMHHYfd.jpg\")",
+      "PowerShell([System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) -split \";\" | Select-Object -Last 10)"
     ]
   }
 }
