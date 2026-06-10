@@ -54,7 +54,7 @@
             {{-- Table --}}
             <div class="sp-card rounded-2xl mt-6 overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full sp-table">
+                    <table class="w-full sp-table min-w-[500px]">
                         <thead>
                             <tr>
                                 <th class="px-5 py-4 text-left">ลานจอด</th>

@@ -43,8 +43,9 @@
                 </form>
             </div>
 
-            <div class="sp-card rounded-2xl p-6 mt-6 overflow-x-auto">
-                <table class="w-full sp-table">
+            <div class="sp-card rounded-2xl mt-6 overflow-hidden">
+                <div class="overflow-x-auto p-6">
+                <table class="w-full sp-table min-w-[680px]">
                     <thead>
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4">เวลา</th>
@@ -81,8 +82,9 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
 
-                <div class="mt-4">
+                <div class="mt-4 px-6 pb-6">
                     {{ $rows->links('vendor.pagination.sp') }}
                 </div>
             </div>

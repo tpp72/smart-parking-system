@@ -52,7 +52,7 @@
                             <tr class="border-b sp-divider">
                                 <td class="py-3 pr-4 font-extrabold">{{ $lot->name }}</td>
                                 <td class="py-3 pr-4 text-gray-300">
-                                    {{ $lot->owner?->name ?? '<span class="text-gray-600">ระบบ</span>' }}
+                                    {!! $lot->owner?->name ?? '<span class="text-gray-600">ระบบ</span>' !!}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $lot->total_slots }}</td>
                                 <td class="py-3 pr-4 font-bold text-red-200">

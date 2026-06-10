@@ -1,0 +1,206 @@
+/* ===== Light Theme — Smart Parking Hub ===== */
+/* ── Page Loader (light) ────────────────────────── */
+.light-theme #sp-page-loader {
+  background: #ede8e4;
+}
+.light-theme .sp-loader-ring {
+  border-color: rgba(100, 80, 70, 0.25);
+  border-top-color: #dc2626;
+}
+.light-theme .sp-loader-text {
+  color: #374151;
+}
+
+/* ใช้เมื่อ <html class="light-theme"> */
+
+.light-theme {
+  --sp-bg:            #ede8e4;
+  --sp-card:          rgba(232, 226, 220, 0.95);
+  --sp-border:        rgba(140, 20, 20, 0.35);
+  --sp-border-strong: rgba(180, 28, 28, 0.65);
+  --sp-red:           #dc2626;
+  --sp-red-dark:      #b91c1c;
+  color-scheme: light;
+}
+
+/* ── Background ──────────────────────────────────── */
+.light-theme .sp-bg {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(220,38,38,0.09), transparent 45%),
+    radial-gradient(circle at 80% 85%, rgba(220,38,38,0.06), transparent 45%),
+    #ede8e4;
+  color: #111827;
+}
+
+/* ── Card ────────────────────────────────────────── */
+.light-theme .sp-card {
+  background: rgba(232, 226, 220, 0.95);
+  border-color: rgba(140, 20, 20, 0.30);
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.10);
+}
+
+/* ── Divider ─────────────────────────────────────── */
+.light-theme .sp-divider { border-color: rgba(140, 20, 20, 0.28); }
+
+/* ── Glow (soften) ───────────────────────────────── */
+.light-theme .sp-glow-text { text-shadow: 0 0 6px rgba(220,38,38,0.35); }
+.light-theme .sp-glow-btn  { box-shadow: 0 0 8px rgba(220,38,38,0.30); }
+
+/* ── Buttons ─────────────────────────────────────── */
+.light-theme .sp-btn-outline {
+  border-color: rgba(180, 28, 28, 0.65);
+  color: #b91c1c;
+  background: transparent;
+}
+.light-theme .sp-btn-outline:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+.light-theme .sp-btn-danger {
+  border-color: rgba(200, 50, 50, 0.60);
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.09);
+}
+.light-theme .sp-btn-danger:hover { background: rgba(239,68,68,0.18); color: #7f1d1d; }
+
+.light-theme .sp-btn-success {
+  background: rgba(16,185,129,0.12);
+  border-color: rgba(4,120,87,0.50);
+  color: #065f46;
+}
+.light-theme .sp-btn-success:hover { background: rgba(16,185,129,0.25); color: #022c22; }
+
+/* ── Badges ──────────────────────────────────────── */
+.light-theme .sp-badge-ok   { background: rgba(16,185,129,0.10); color: #065f46; border-color: rgba(16,185,129,0.30); }
+.light-theme .sp-badge-bad  { background: rgba(239,68,68,0.08);  color: #7f1d1d; border-color: rgba(239,68,68,0.28); }
+.light-theme .sp-badge-warn { background: rgba(245,158,11,0.10); color: #78350f; border-color: rgba(245,158,11,0.30); }
+
+/* ── Table ───────────────────────────────────────── */
+.light-theme .sp-table th {
+  color: #4b5563;
+  border-bottom-color: rgba(140,20,20,0.28);
+}
+.light-theme .sp-table td { color: #1f2937; }
+.light-theme .sp-table tr:nth-child(even) { background: rgba(0,0,0,0.04); }
+.light-theme .sp-table tbody tr:hover { background: rgba(180,28,28,0.06); }
+
+/* ── Inputs / Selects ────────────────────────────── */
+.light-theme .sp-select {
+  background: rgba(220, 214, 208, 0.70);
+  border-color: rgba(160, 28, 28, 0.50);
+  color: #111827;
+}
+.light-theme .sp-select:focus {
+  border-color: rgba(180, 28, 28, 0.80);
+  box-shadow: 0 0 0 3px rgba(180, 28, 28, 0.12);
+}
+.light-theme .sp-select option { background: #e8e2dc; color: #111827; }
+
+/* ── Alerts ──────────────────────────────────────── */
+.light-theme .sp-alert-success {
+  background: rgba(16,185,129,0.08);
+  border-color: rgba(16,185,129,0.30);
+  color: #065f46;
+}
+.light-theme .sp-alert-error {
+  background: rgba(239,68,68,0.07);
+  border-color: rgba(239,68,68,0.28);
+  color: #7f1d1d;
+}
+.light-theme .sp-alert-warning {
+  background: rgba(245,158,11,0.08);
+  border-color: rgba(245,158,11,0.28);
+  color: #78350f;
+}
+
+/* ── Slot cards ──────────────────────────────────── */
+.light-theme .sp-slot-available { background: rgba(16,185,129,0.07);  border-color: rgba(16,185,129,0.25); }
+.light-theme .sp-slot-occupied  { background: rgba(239,68,68,0.07);   border-color: rgba(239,68,68,0.25); }
+.light-theme .sp-slot-reserved  { background: rgba(245,158,11,0.07);  border-color: rgba(245,158,11,0.25); }
+
+/* ── Form labels ─────────────────────────────────── */
+.light-theme .sp-form-label { color: #374151; }
+.light-theme .sp-form-hint  { color: #6b7280; }
+
+/* ── Empty state ─────────────────────────────────── */
+.light-theme .sp-empty { color: #9ca3af; }
+
+/* ── Nav bar ─────────────────────────────────────── */
+.light-theme nav {
+  background: rgba(225, 218, 212, 0.94) !important;
+  border-bottom-color: rgba(140, 20, 20, 0.35) !important;
+}
+
+/* Nav link text */
+.light-theme nav .text-gray-400 { color: #6b7280 !important; }
+.light-theme nav .hover\:text-white:hover { color: #111827 !important; }
+.light-theme nav .hover\:bg-white\/\[0\.06\]:hover { background: rgba(0,0,0,0.07) !important; }
+.light-theme nav .bg-red-600\/20 { background: rgba(180,28,28,0.14) !important; }
+.light-theme nav .text-red-200 { color: #991b1b !important; }
+.light-theme nav .ring-red-800\/60 { --tw-ring-color: rgba(140,20,20,0.45) !important; }
+
+/* Logo icon bg */
+.light-theme nav .bg-black\/60 { background: rgba(210,203,196,0.90) !important; border-color: rgba(140,20,20,0.40) !important; }
+
+/* Bell + settings button */
+.light-theme nav .border-red-900\/60 { border-color: rgba(140,20,20,0.40) !important; }
+.light-theme nav .bg-black\/40 { background: rgba(210,203,196,0.65) !important; }
+.light-theme nav .text-gray-300 { color: #374151 !important; }
+
+/* User dropdown trigger */
+.light-theme nav .bg-red-900\/40 { background: rgba(180,28,28,0.14) !important; }
+.light-theme nav .border-red-800\/60 { border-color: rgba(140,20,20,0.38) !important; }
+.light-theme nav .text-red-300 { color: #991b1b !important; }
+.light-theme nav .text-red-400 { color: #b91c1c !important; }
+.light-theme nav .text-red-500 { color: #dc2626 !important; }
+.light-theme nav .bg-red-900\/20 { background: rgba(180,28,28,0.10) !important; }
+.light-theme nav .text-gray-500 { color: #6b7280 !important; }
+
+/* Mobile menu */
+.light-theme nav .bg-black\/90 { background: rgba(225,218,212,0.97) !important; }
+.light-theme nav .border-red-900\/40 { border-color: rgba(140,20,20,0.28) !important; }
+.light-theme nav .bg-red-600\/15 { background: rgba(180,28,28,0.10) !important; }
+.light-theme nav .border-red-800\/40 { border-color: rgba(140,20,20,0.30) !important; }
+.light-theme nav .text-gray-600 { color: #6b7280 !important; }
+.light-theme nav .text-yellow-400 { color: #b45309 !important; }
+
+/* Dropdown panel */
+.light-theme .sp-dropdown-panel {
+  background: rgba(225, 218, 212, 0.98) !important;
+  border-color: rgba(140,20,20,0.30) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14) !important;
+}
+
+/* ── Tailwind text utilities — global override ───── */
+.light-theme .text-white   { color: #111827; }
+.light-theme .text-gray-200 { color: #374151; }
+.light-theme .text-gray-300 { color: #4b5563; }
+.light-theme .text-gray-400 { color: #6b7280; }
+.light-theme .text-gray-500 { color: #9ca3af; }
+
+/* Keep white text on red backgrounds */
+.light-theme .bg-red-600 .text-white,
+.light-theme .sp-btn-primary { color: #fff !important; }
+.light-theme .sp-badge-bad .text-white,
+.light-theme .bg-red-500 { color: #fff; }
+
+/* Inline form inputs (not sp-select) */
+.light-theme input[type="text"],
+.light-theme input[type="email"],
+.light-theme input[type="password"],
+.light-theme input[type="date"],
+.light-theme input[type="time"],
+.light-theme input[type="number"],
+.light-theme textarea,
+.light-theme select {
+  background: rgba(220, 214, 208, 0.70) !important;
+  color: #111827 !important;
+  border-color: rgba(160, 28, 28, 0.50) !important;
+}
+.light-theme input::placeholder,
+.light-theme textarea::placeholder { color: #9ca3af !important; }
+
+/* bg-black/40 general use (filter bars, inline inputs) */
+.light-theme .bg-black\/40:not(nav *) {
+  background: rgba(220, 214, 208, 0.70) !important;
+  color: #111827 !important;
+}
+.light-theme .placeholder-gray-400::placeholder { color: #9ca3af !important; }
