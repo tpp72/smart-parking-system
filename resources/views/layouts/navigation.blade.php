@@ -1,11 +1,21 @@
-<nav x-data="{ open: false }" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white">
+<nav x-data="{
+    open: false,
+    settingsOpen: false,
+    theme: localStorage.getItem('sp-theme') || 'dark',
+    setTheme(t) {
+        this.theme = t;
+        localStorage.setItem('sp-theme', t);
+        document.getElementById('html-root').classList.toggle('light-theme', t === 'light');
+        this.settingsOpen = false;
+    }
+}" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white">
     @php
         $isAdmin = auth()->check() && auth()->user()->role === 'admin';
         $isOwner = auth()->check() && auth()->user()->role === 'owner';
 
         /* ── Nav link helper ───────────────────────────────────── */
         $navClass = fn(string|array $route) =>
-            'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 '
+            'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-150 '
             . (request()->routeIs(is_array($route) ? $route : [$route])
                 ? 'bg-red-600/20 text-red-200 ring-1 ring-red-800/60'
                 : 'text-gray-400 hover:text-white hover:bg-white/[0.06]');
@@ -94,7 +104,7 @@
                     </a>
 
                     <a href="{{ route('user.reservations.create') }}"
-                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-150 bg-red-600 hover:bg-red-500 text-white sp-glow-btn">
+                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-150 bg-red-600 hover:bg-red-500 text-white sp-glow-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         จองที่จอด
                     </a>
@@ -126,7 +136,7 @@
                     <div class="w-px h-5 bg-white/10 mx-1"></div>
 
                     <a href="{{ route('owner.application.create') }}"
-                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10">
+                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-150 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>
                         เปิดลานจอด
                     </a>
@@ -154,6 +164,52 @@
                     @endif
                 </a>
                 @endauth
+
+                {{-- Settings --}}
+                <div class="relative" @click.outside="settingsOpen = false">
+                    <button @click="settingsOpen = !settingsOpen"
+                        :class="settingsOpen ? 'bg-red-600/20 text-white border-red-600/60' : 'text-gray-400 border-red-900/60 bg-black/40 hover:text-white hover:bg-white/[0.06]'"
+                        class="relative inline-flex items-center justify-center w-9 h-9 rounded-xl border transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </button>
+
+                    {{-- Settings Panel --}}
+                    <div x-show="settingsOpen"
+                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                        x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave-start="opacity-100 scale-100"
+                        x-transition:leave-end="opacity-0 scale-95"
+                        x-cloak
+                        class="sp-dropdown-panel absolute right-0 top-full mt-2 w-52 rounded-2xl border border-red-900/40 bg-black/90 backdrop-blur-md shadow-xl shadow-black/40 z-50 p-3">
+
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 mb-2">ธีม</p>
+
+                        <div class="flex gap-1.5">
+                            <button @click="setTheme('dark')"
+                                :class="theme === 'dark' ? 'bg-red-600 text-white sp-glow-btn' : 'border border-red-900/60 text-gray-400 hover:text-white hover:bg-white/[0.06]'"
+                                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                                </svg>
+                                Dark
+                            </button>
+                            <button @click="setTheme('light')"
+                                :class="theme === 'light' ? 'bg-red-600 text-white sp-glow-btn' : 'border border-red-900/60 text-gray-400 hover:text-white hover:bg-white/[0.06]'"
+                                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10A5 5 0 0012 7z"/>
+                                </svg>
+                                Light
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
 
                 {{-- User dropdown --}}
                 <x-dropdown align="right" width="48">

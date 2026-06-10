@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" id="html-root">
 
 <head>
     <meta charset="utf-8">
@@ -7,6 +7,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Smart Parking') }}</title>
+
+    <!-- Theme init: prevent flash of wrong theme -->
+    <script>if(localStorage.getItem('sp-theme')==='light')document.getElementById('html-root').classList.add('light-theme');</script>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -17,6 +20,10 @@
 </head>
 
 <body class="font-sans text-gray-200 antialiased bg-black relative overflow-hidden">
+    <div id="sp-page-loader">
+        <div class="sp-loader-ring"></div>
+        <span class="sp-loader-text">กำลังโหลดข้อมูล...</span>
+    </div>
 
     {{-- Red Glow Background --}}
     <div

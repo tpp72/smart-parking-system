@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" id="html-root">
 
 <head>
     <meta charset="utf-8">
@@ -15,6 +15,9 @@
         {{ $pageTitle ? $pageTitle . ' | ' . config('app.name') : config('app.name') }}
     </title>
 
+    <!-- Theme init: prevent flash of wrong theme -->
+    <script>if(localStorage.getItem('sp-theme')==='light')document.getElementById('html-root').classList.add('light-theme');</script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
@@ -24,6 +27,10 @@
 </head>
 
 <body class="font-sans antialiased">
+    <div id="sp-page-loader">
+        <div class="sp-loader-ring"></div>
+        <span class="sp-loader-text">กำลังโหลดข้อมูล...</span>
+    </div>
     <div class="min-h-screen sp-bg text-white">
         @include('layouts.navigation')
 

@@ -1,3 +1,36 @@
+/* ── Page Loader ──────────────────────────────────── */
+#sp-page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #050505;
+  transition: opacity 0.25s ease;
+}
+#sp-page-loader.sp-loader-out {
+  opacity: 0;
+  pointer-events: none;
+}
+.sp-loader-ring {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(120, 120, 120, 0.30);
+  border-top-color: #dc2626;
+  animation: sp-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+.sp-loader-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(229, 231, 235, 0.85);
+  letter-spacing: 0.02em;
+}
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
 :root {
   --sp-bg: #050505;
   --sp-card: rgba(17, 24, 39, 0.60);

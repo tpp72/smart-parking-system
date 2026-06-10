@@ -1,4 +1,7 @@
 @import "./theme-dark-red.css";
+@import "./theme-light-red.css";
+
+[x-cloak] { display: none !important; }
 
 @tailwind base;
 @tailwind components;
