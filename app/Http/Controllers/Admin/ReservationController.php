@@ -78,6 +78,19 @@ class ReservationController extends Controller
 
     public function store(Request $request)
     {
+        // Normalize reserve_start: accept UTC offset strings (e.g. from API clients) and
+        // convert to Asia/Bangkok local time so that after:now validation is consistent.
+        if ($request->has('reserve_start') && $request->input('reserve_start') !== '') {
+            try {
+                $normalized = \Carbon\Carbon::parse($request->input('reserve_start'), 'Asia/Bangkok')
+                    ->setTimezone('Asia/Bangkok')
+                    ->format('Y-m-d H:i:s');
+                $request->merge(['reserve_start' => $normalized]);
+            } catch (\Exception) {
+                // leave as-is — validation will catch the invalid format
+            }
+        }
+
         $data = $request->validate([
             'vehicle_id'      => ['required', 'exists:vehicles,id'],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
@@ -174,6 +187,14 @@ class ReservationController extends Controller
                 'changed_by'     => Auth::id(),
                 'note'           => 'Admin แก้ไขสถานะ',
             ]);
+
+            if ($data['status'] === 'cancelled') {
+                notify_user(
+                    $reservation->user_id,
+                    'การจองถูกยกเลิก',
+                    "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
+                );
+            }
         }
 
         admin_audit('reservation.update', $reservation, [
@@ -199,6 +220,12 @@ class ReservationController extends Controller
             'changed_by'     => Auth::id(),
             'note'           => 'Admin ยืนยันการจอง',
         ]);
+
+        notify_user(
+            $reservation->user_id,
+            'การจองได้รับการยืนยัน',
+            "การจอง #{$reservation->id} ของคุณได้รับการยืนยันแล้ว กรุณาเช็คอินภายในเวลาที่กำหนด"
+        );
 
         admin_audit('reservation.confirm', $reservation, ['status' => 'confirmed']);
 

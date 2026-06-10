@@ -37,3 +37,17 @@ setup('authenticate as user', async ({ page }) => {
   await page.context().storageState({ path: path.join(AUTH_DIR, 'user.json') });
   console.log('✓ User auth state saved');
 });
+
+// Save owner session ─────────────────────────────────────────────────────────
+setup('authenticate as owner', async ({ page }) => {
+  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  await page.locator('input[name="email"]').fill('owner@tester.com');
+  await page.locator('input[name="password"]').fill('Owner1234!');
+  await page.locator('button[type="submit"]').click();
+
+  await page.waitForURL('**/owner/dashboard', { timeout: 30_000 });
+  await expect(page).toHaveURL(/owner\/dashboard/);
+
+  await page.context().storageState({ path: path.join(AUTH_DIR, 'owner.json') });
+  console.log('✓ Owner auth state saved');
+});

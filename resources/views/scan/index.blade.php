@@ -162,6 +162,111 @@
                 @endif
             @endif
 
+            {{-- ── Reservation Match + Auto Check-In Result ────────── --}}
+            @if(session('scan_reservation_id') || (session('scan_result') && !session('scan_reservation_id')))
+                @php
+                    $matchedReservation = session('scan_reservation_id')
+                        ? \App\Models\Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'vehicle:id,license_plate', 'user:id,name'])
+                            ->find(session('scan_reservation_id'))
+                        : null;
+                    $checkIn = session('scan_check_in');
+                @endphp
+
+                {{-- Auto Check-In Result --}}
+                @if($checkIn !== null)
+                    @if($checkIn['success'])
+                        <div class="mb-5 rounded-2xl border border-green-500/60 bg-green-950/30 p-4 flex items-start gap-3">
+                            <div class="shrink-0 w-8 h-8 rounded-xl bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-extrabold text-green-300 text-sm">เช็คอินอัตโนมัติสำเร็จ</p>
+                                <p class="text-green-400 text-xs mt-0.5">
+                                    รถเข้าจอดที่ช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> เรียบร้อยแล้ว
+                                </p>
+                            </div>
+                        </div>
+                    @else
+                        <div class="mb-5 rounded-2xl border border-yellow-500/50 bg-yellow-950/20 p-4 flex items-start gap-3">
+                            <div class="shrink-0 w-8 h-8 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-extrabold text-yellow-300 text-sm">ไม่สามารถเช็คอินอัตโนมัติได้</p>
+                                <p class="text-yellow-400 text-xs mt-0.5">{{ $checkIn['error'] }}</p>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+
+                {{-- Reservation Info Card --}}
+                @if($matchedReservation)
+                    <div class="sp-card rounded-2xl p-5 mb-6 border
+                        @if($matchedReservation->status === 'checked_in') border-sky-500/30
+                        @elseif($matchedReservation->status === 'confirmed') border-green-500/30
+                        @else border-white/10 @endif">
+
+                        <div class="flex items-center gap-2 mb-4">
+                            <div class="w-7 h-7 rounded-lg
+                                @if($matchedReservation->status === 'checked_in') bg-sky-500/20 border border-sky-500/40
+                                @else bg-green-500/20 border border-green-500/40 @endif
+                                flex items-center justify-center shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 @if($matchedReservation->status === 'checked_in') text-sky-400 @else text-green-400 @endif" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-extrabold text-white text-sm">พบการจอง #{{ $matchedReservation->id }}</h3>
+                                <p class="text-xs text-gray-500">
+                                    @if($matchedReservation->status === 'confirmed')
+                                        <span class="text-green-400">● ยืนยันแล้ว</span>
+                                    @elseif($matchedReservation->status === 'checked_in')
+                                        <span class="text-sky-400">● เช็คอินแล้ว</span>
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                            <div>
+                                <dt class="text-gray-500">ผู้จอง</dt>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->user?->name ?? '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">ทะเบียน</dt>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->vehicle?->license_plate ?? '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">ลานจอด</dt>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->parkingLot?->name ?? '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">ช่องจอด</dt>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->parkingSlot?->slot_number ?? 'ยังไม่ระบุ' }}</dd>
+                            </div>
+                            <div class="col-span-2">
+                                <dt class="text-gray-500">เวลาจอง</dt>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->reserve_start?->format('d/m/Y H:i') }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                @elseif(session('scan_result') && !session('scan_reservation_id'))
+                    @php $scanForCheck = \App\Models\LicensePlateScan::find(session('scan_result')); @endphp
+                    @if($scanForCheck?->license_plate)
+                        <div class="mb-6 rounded-2xl border border-gray-700/50 bg-black/20 p-4 flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <p class="text-gray-500 text-sm">ไม่พบการจองที่ Active สำหรับทะเบียนนี้</p>
+                        </div>
+                    @endif
+                @endif
+            @endif
+
             {{-- ── Upload Form ─────────────────────────────────────── --}}
             <div class="sp-card rounded-2xl p-6"
                  x-data="{

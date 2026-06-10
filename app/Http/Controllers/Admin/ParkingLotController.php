@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class ParkingLotController extends Controller
@@ -12,7 +13,7 @@ class ParkingLotController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $lots = ParkingLot::query()
+        $lots = ParkingLot::with('owner:id,name')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('name', 'like', "%{$q}%")
                     ->orWhere('location', 'like', "%{$q}%");
@@ -26,7 +27,8 @@ class ParkingLotController extends Controller
 
     public function create()
     {
-        return view('admin.parking-lots.create');
+        $owners = User::where('role', 'owner')->orderBy('name')->get(['id', 'name']);
+        return view('admin.parking-lots.create', compact('owners'));
     }
 
     public function store(Request $request)
@@ -36,8 +38,11 @@ class ParkingLotController extends Controller
             'location'    => ['nullable', 'string'],
             'total_slots' => ['required', 'integer', 'min:0'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
+            'owner_id'    => ['nullable', 'exists:users,id'],
+            'is_active'   => ['boolean'],
         ]);
 
+        $data['is_active'] = $request->boolean('is_active', true);
         ParkingLot::create($data);
 
         return redirect()->route('admin.parking-lots.index')
@@ -46,7 +51,8 @@ class ParkingLotController extends Controller
 
     public function edit(ParkingLot $parking_lot)
     {
-        return view('admin.parking-lots.edit', compact('parking_lot'));
+        $owners = User::where('role', 'owner')->orderBy('name')->get(['id', 'name']);
+        return view('admin.parking-lots.edit', compact('parking_lot', 'owners'));
     }
 
     public function update(Request $request, ParkingLot $parking_lot)
@@ -56,8 +62,11 @@ class ParkingLotController extends Controller
             'location'    => ['nullable', 'string'],
             'total_slots' => ['required', 'integer', 'min:0'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
+            'owner_id'    => ['nullable', 'exists:users,id'],
+            'is_active'   => ['boolean'],
         ]);
 
+        $data['is_active'] = $request->boolean('is_active', true);
         $parking_lot->update($data);
 
         return redirect()->route('admin.parking-lots.index')

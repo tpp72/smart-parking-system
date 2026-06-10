@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    private array $roles = ['user', 'admin'];
+    private array $roles = ['user', 'owner', 'admin'];
 
     public function index(Request $request)
     {
@@ -46,9 +46,8 @@ class UserController extends Controller
             'role'  => ['required', Rule::in($this->roles)],
         ]);
 
-        // กัน admin เผลอปรับตัวเองเป็น user แล้วล็อกตัวเองออกจาก admin
         if ($request->user()->id === $user->id && $data['role'] !== 'admin') {
-            return back()->withErrors(['role' => 'ไม่สามารถเปลี่ยน role ของตัวเองจาก admin เป็น user ได้'])->withInput();
+            return back()->withErrors(['role' => 'ไม่สามารถเปลี่ยน role ของตัวเองออกจาก admin ได้'])->withInput();
         }
 
         $user->update($data);

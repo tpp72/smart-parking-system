@@ -22,7 +22,8 @@
     },
     "autoload": {
         "files": [
-            "app/Support/admin_audit.php"
+            "app/Support/admin_audit.php",
+            "app/Support/notify_user.php"
         ],
         "psr-4": {
             "App\\": "app/",

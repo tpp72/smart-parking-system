@@ -39,10 +39,10 @@
                     <thead>
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4 text-left">ชื่อ</th>
-                            <th class="py-3 pr-4 text-left">สถานที่</th>
-                            <th class="py-3 pr-4 text-left">จำนวนช่อง</th>
+                            <th class="py-3 pr-4 text-left">เจ้าของ</th>
+                            <th class="py-3 pr-4 text-left">ช่อง</th>
                             <th class="py-3 pr-4 text-left">เรท/ชม.</th>
-                            <th class="py-3 pr-4 text-left">อัปเดต</th>
+                            <th class="py-3 pr-4 text-center">สถานะ</th>
                             <th class="py-3 pr-4 text-right">จัดการ</th>
                         </tr>
                     </thead>
@@ -52,13 +52,19 @@
                             <tr class="border-b sp-divider">
                                 <td class="py-3 pr-4 font-extrabold">{{ $lot->name }}</td>
                                 <td class="py-3 pr-4 text-gray-300">
-                                    {{ $lot->location ? \Illuminate\Support\Str::limit($lot->location, 60) : '-' }}
+                                    {{ $lot->owner?->name ?? '<span class="text-gray-600">ระบบ</span>' }}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $lot->total_slots }}</td>
                                 <td class="py-3 pr-4 font-bold text-red-200">
                                     {{ number_format((float) $lot->hourly_rate, 2) }}
                                 </td>
-                                <td class="py-3 pr-4 text-gray-400">{{ $lot->updated_at?->format('Y-m-d H:i') }}</td>
+                                <td class="py-3 pr-4 text-center">
+                                    @if($lot->is_active)
+                                        <span class="sp-badge sp-badge-ok">เปิด</span>
+                                    @else
+                                        <span class="sp-badge sp-badge-danger">ปิด</span>
+                                    @endif
+                                </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex gap-2">
                                         <a href="{{ route('admin.parking-lots.edit', $lot) }}"
@@ -79,8 +85,8 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-gray-300">
-                                    ยังไม่มีลานจอด — กด “เพิ่มลานจอด” เพื่อเริ่มใช้งาน
+                                <td colspan=”6” class=”py-10 text-center text-gray-300”>
+                                    ยังไม่มีลานจอด — กด &ldquo;เพิ่มลานจอด&rdquo; เพื่อเริ่มใช้งาน
                                 </td>
                             </tr>
                         @endforelse

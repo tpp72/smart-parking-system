@@ -35,7 +35,6 @@ class ReservationTest extends TestCase
     {
         return array_merge([
             'reserve_start' => now()->addHours(2)->format('Y-m-d\TH:i'),
-            'reserve_end'   => now()->addHours(4)->format('Y-m-d\TH:i'),
         ], $override);
     }
 
@@ -74,22 +73,20 @@ class ReservationTest extends TestCase
         $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
         $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
 
-        // จองแรกอยู่ที่ +2h ถึง +4h
+        // จองแรกอยู่ที่ +2h (window +2h ถึง +3h)
         Reservation::factory()->create([
             'parking_slot_id' => $slot->id,
             'parking_lot_id'  => $lot->id,
             'status'          => 'confirmed',
             'reserve_start'   => now()->addHours(2),
-            'reserve_end'     => now()->addHours(4),
         ]);
 
-        // จองที่สอง: +3h ถึง +5h (ทับกัน)
+        // จองที่สอง: +2.5h (ทับกัน)
         $response = $this->postReservation($user, $this->payload([
             'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
-            'reserve_start'   => now()->addHours(3)->format('Y-m-d\TH:i'),
-            'reserve_end'     => now()->addHours(5)->format('Y-m-d\TH:i'),
+            'reserve_start'   => now()->addMinutes(150)->format('Y-m-d\TH:i'),
         ]));
 
         $response->assertSessionHasErrors('parking_slot_id');
@@ -105,22 +102,20 @@ class ReservationTest extends TestCase
         $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
         $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
 
-        // จองแรก +2h ถึง +4h
+        // จองแรก +2h (window: +2h to +3h)
         Reservation::factory()->create([
             'parking_slot_id' => $slot->id,
             'parking_lot_id'  => $lot->id,
             'status'          => 'confirmed',
             'reserve_start'   => now()->addHours(2),
-            'reserve_end'     => now()->addHours(4),
         ]);
 
-        // จองที่สอง: +5h ถึง +7h (ไม่ทับ)
+        // จองที่สอง: +4h ไม่ทับ (window: +4h to +5h)
         $response = $this->postReservation($user, $this->payload([
             'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
-            'reserve_start'   => now()->addHours(5)->format('Y-m-d\TH:i'),
-            'reserve_end'     => now()->addHours(7)->format('Y-m-d\TH:i'),
+            'reserve_start'   => now()->addHours(4)->format('Y-m-d\TH:i'),
         ]));
 
         $response->assertRedirect(route('user.reservations.index'));
@@ -140,9 +135,8 @@ class ReservationTest extends TestCase
         Reservation::factory()->create([
             'parking_slot_id' => $slot->id,
             'parking_lot_id'  => $lot->id,
-            'status'          => 'cancelled',  // ← cancel แล้ว
+            'status'          => 'cancelled',
             'reserve_start'   => now()->addHours(2),
-            'reserve_end'     => now()->addHours(4),
         ]);
 
         // จองเวลาเดียวกันได้ เพราะของเก่า cancel แล้ว
@@ -151,7 +145,6 @@ class ReservationTest extends TestCase
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->addHours(2)->format('Y-m-d\TH:i'),
-            'reserve_end'     => now()->addHours(4)->format('Y-m-d\TH:i'),
         ]));
 
         $response->assertRedirect(route('user.reservations.index'));
@@ -162,9 +155,9 @@ class ReservationTest extends TestCase
 
     public function test_user_cannot_reserve_other_users_vehicle(): void
     {
-        $user        = $this->user();
-        $otherUser   = $this->user();
-        $lot         = ParkingLot::factory()->create();
+        $user         = $this->user();
+        $otherUser    = $this->user();
+        $lot          = ParkingLot::factory()->create();
         $otherVehicle = Vehicle::factory()->create(['user_id' => $otherUser->id]);
 
         $response = $this->postReservation($user, $this->payload([
@@ -185,32 +178,30 @@ class ReservationTest extends TestCase
         $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
 
         $response = $this->postReservation($user, [
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'reserve_start'   => now()->subHour()->format('Y-m-d\TH:i'),
-            'reserve_end'     => now()->addHour()->format('Y-m-d\TH:i'),
+            'vehicle_id'    => $vehicle->id,
+            'parking_lot_id' => $lot->id,
+            'reserve_start' => now()->subHour()->format('Y-m-d\TH:i'),
         ]);
 
         $response->assertSessionHasErrors('reserve_start');
         $this->assertDatabaseCount('reservations', 0);
     }
 
-    // ─── [7] ห้ามให้ reserve_end < reserve_start ─────────────────────────────
+    // ─── [7] ห้ามจองล่วงหน้าเกิน 24 ชั่วโมง ────────────────────────────────
 
-    public function test_reservation_blocked_when_end_before_start(): void
+    public function test_reservation_blocked_when_start_time_more_than_24h_ahead(): void
     {
         $user    = $this->user();
         $lot     = ParkingLot::factory()->create();
         $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
 
         $response = $this->postReservation($user, [
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'reserve_start'   => now()->addHours(4)->format('Y-m-d\TH:i'),
-            'reserve_end'     => now()->addHours(2)->format('Y-m-d\TH:i'),
+            'vehicle_id'    => $vehicle->id,
+            'parking_lot_id' => $lot->id,
+            'reserve_start' => now()->addDays(2)->format('Y-m-d\TH:i'),
         ]);
 
-        $response->assertSessionHasErrors('reserve_end');
+        $response->assertSessionHasErrors('reserve_start');
         $this->assertDatabaseCount('reservations', 0);
     }
 }

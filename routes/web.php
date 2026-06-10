@@ -19,17 +19,28 @@ use App\Http\Controllers\Admin\VehicleController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\CarScanController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicationController;
+use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\Owner\ApplicationController as OwnerApplicationController;
+use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\ParkingLotController as OwnerParkingLotController;
+use App\Http\Controllers\Owner\ParkingSlotController as OwnerParkingSlotController;
+use App\Http\Controllers\Owner\ReservationController as OwnerReservationController;
+use App\Http\Controllers\Owner\RevenueController as OwnerRevenueController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-// Smart redirect: admin → admin.dashboard, user → user.dashboard
+// Smart redirect by role
 Route::get('/dashboard', function () {
     $role = request()->user()?->role;
     if ($role === 'admin') {
         return redirect()->route('admin.dashboard');
+    }
+    if ($role === 'owner') {
+        return redirect()->route('owner.dashboard');
     }
     return redirect()->route('user.dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -77,6 +88,54 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
     Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
     Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
+    // Owner Applications
+    Route::get('owner-applications', [AdminOwnerApplicationController::class, 'index'])->name('owner-applications.index');
+    Route::get('owner-applications/{ownerApplication}', [AdminOwnerApplicationController::class, 'show'])->name('owner-applications.show');
+    Route::post('owner-applications/{ownerApplication}/approve', [AdminOwnerApplicationController::class, 'approve'])->name('owner-applications.approve');
+    Route::post('owner-applications/{ownerApplication}/reject', [AdminOwnerApplicationController::class, 'reject'])->name('owner-applications.reject');
+});
+
+// ===== Public Marketplace =====
+Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
+
+// ===== Owner Routes — Dashboard + Application (all owners, including pending) =====
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'owner'])->group(function () {
+    Route::get('dashboard', [OwnerDashboardController::class, 'index'])->name('dashboard');
+
+    // Application status / edit / resubmit (any owner regardless of status)
+    Route::get('application', [OwnerApplicationController::class, 'show'])->name('application.show');
+    Route::get('application/edit', [OwnerApplicationController::class, 'edit'])->name('application.edit');
+    Route::put('application', [OwnerApplicationController::class, 'update'])->name('application.update');
+});
+
+// ===== Owner Routes — Management (approved owners only) =====
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'owner', 'owner.approved'])->group(function () {
+    // Parking Lots
+    Route::get('parking-lots', [OwnerParkingLotController::class, 'index'])->name('parking-lots.index');
+    Route::get('parking-lots/create', [OwnerParkingLotController::class, 'create'])->name('parking-lots.create');
+    Route::post('parking-lots', [OwnerParkingLotController::class, 'store'])->name('parking-lots.store');
+    Route::get('parking-lots/{parking_lot}/edit', [OwnerParkingLotController::class, 'edit'])->name('parking-lots.edit');
+    Route::patch('parking-lots/{parking_lot}', [OwnerParkingLotController::class, 'update'])->name('parking-lots.update');
+    Route::patch('parking-lots/{parking_lot}/toggle', [OwnerParkingLotController::class, 'toggle'])->name('parking-lots.toggle');
+    Route::delete('parking-lots/{parking_lot}', [OwnerParkingLotController::class, 'destroy'])->name('parking-lots.destroy');
+
+    // Parking Slots
+    Route::get('parking-slots/bulk', [OwnerParkingSlotController::class, 'bulkCreate'])->name('parking-slots.bulk.create');
+    Route::post('parking-slots/bulk', [OwnerParkingSlotController::class, 'bulkStore'])->name('parking-slots.bulk.store');
+    Route::resource('parking-slots', OwnerParkingSlotController::class)->except(['show']);
+
+    // Reservations (read-only + confirm)
+    Route::get('reservations', [OwnerReservationController::class, 'index'])->name('reservations.index');
+    Route::post('reservations/{reservation}/confirm', [OwnerReservationController::class, 'confirm'])->name('reservations.confirm');
+
+    // Revenue
+    Route::get('revenue', [OwnerRevenueController::class, 'index'])->name('revenue.index');
+});
+
+// ===== Owner Application — accessible to any authenticated user (to apply) =====
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset'])->group(function () {
+    Route::get('apply', [OwnerApplicationController::class, 'create'])->name('application.create');
+    Route::post('apply', [OwnerApplicationController::class, 'store'])->name('application.store');
 });
 
 // ===== User Routes (role: user เท่านั้น) =====

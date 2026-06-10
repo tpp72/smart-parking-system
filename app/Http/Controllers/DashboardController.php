@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OwnerApplication;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
@@ -275,6 +276,8 @@ class DashboardController extends Controller
             ->select(['s.slot_number', 's.status', 'lot.name as lot_name'])
             ->get();
 
+        $pendingApplications = OwnerApplication::where('status', 'pending')->count();
+
         return view('admin.dashboard', compact(
             'stats',
             'activeNow',
@@ -283,7 +286,8 @@ class DashboardController extends Controller
             'unpaidPayments',
             'reservations',
             'recentHistory',
-            'slotsPreview'
+            'slotsPreview',
+            'pendingApplications'
         ));
     }
 }
