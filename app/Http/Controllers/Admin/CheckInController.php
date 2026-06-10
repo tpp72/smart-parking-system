@@ -4,16 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
-use App\Models\ParkingLog;
-use App\Models\ParkingSlot;
-use App\Models\Reservation;
-use App\Models\ReservationLog;
 use App\Models\Vehicle;
+use App\Services\CheckInService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CheckInController extends Controller
 {
+    public function __construct(private CheckInService $checkInService) {}
+
     public function create()
     {
         $vehicles = Vehicle::with('user:id,name')
@@ -32,86 +30,25 @@ class CheckInController extends Controller
             'parking_lot_id' => ['required', 'exists:parking_lots,id'],
         ]);
 
-        // ตรวจสอบว่ารถคันนี้ยังอยู่ในระบบ (ยังไม่ check-out)
-        $alreadyIn = ParkingLog::where('vehicle_id', $data['vehicle_id'])
-            ->whereNull('check_out_time')
-            ->exists();
+        $result = $this->checkInService->checkIn($data['vehicle_id'], $data['parking_lot_id']);
 
-        if ($alreadyIn) {
-            return back()
-                ->withErrors(['vehicle_id' => 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out'])
-                ->withInput();
+        if (!$result['success']) {
+            $field = str_contains($result['error'], 'ช่องจอด') ? 'parking_lot_id' : 'vehicle_id';
+            return back()->withErrors([$field => $result['error']])->withInput();
         }
 
-        // ค้นหาการจองที่ confirmed และอยู่ในช่วง grace period
-        $reservation = Reservation::checkable()
-            ->where('vehicle_id', $data['vehicle_id'])
-            ->orderBy('reserve_start')
-            ->first();
+        $vehicle     = Vehicle::find($data['vehicle_id']);
+        $slot        = $result['slot'];
+        $reservation = $result['reservation'];
 
-        // ถ้ามีการจองแบบ specific lot ให้ใช้ lot นั้น ไม่งั้นใช้ที่ admin เลือก
-        $lotId = $reservation ? $reservation->parking_lot_id : $data['parking_lot_id'];
-
-        $slot     = null;
-        $errorMsg = null;
-        $log      = null;
-        $now      = now();
-
-        DB::transaction(function () use ($data, $reservation, $lotId, $now, &$slot, &$errorMsg, &$log) {
-            // ถ้ามีการจองที่ reserve specific slot ไว้ ลอง slot นั้นก่อน
-            if ($reservation && $reservation->parking_slot_id) {
-                $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
-                    ->where('status', 'available')
-                    ->lockForUpdate()
-                    ->first();
-            }
-
-            // ถ้าไม่มี reserved slot หรือถูกใช้ไปแล้ว หา slot ว่างใน lot
-            if (!$slot) {
-                $slot = ParkingSlot::where('parking_lot_id', $lotId)
-                    ->where('status', 'available')
-                    ->lockForUpdate()
-                    ->first();
-            }
-
-            if (!$slot) {
-                $errorMsg = 'ไม่มีช่องจอดว่างในลานที่เลือก';
-                return;
-            }
-
-            $log = ParkingLog::create([
-                'vehicle_id'      => $data['vehicle_id'],
-                'parking_lot_id'  => $slot->parking_lot_id,
-                'parking_slot_id' => $slot->id,
-                'check_in_time'   => $now,
-                'reservation_id'  => $reservation?->id,
-            ]);
-
-            $slot->update(['status' => 'occupied']);
-
-            if ($reservation) {
-                $reservation->update([
-                    'status'        => 'checked_in',
-                    'checked_in_at' => $now,
-                ]);
-
-                ReservationLog::create([
-                    'reservation_id' => $reservation->id,
-                    'old_status'     => 'confirmed',
-                    'new_status'     => 'checked_in',
-                    'changed_by'     => null,
-                    'note'           => "Auto check-in: รถเข้าจอดที่ช่อง {$slot->slot_number}",
-                ]);
-            }
-        });
-
-        if ($errorMsg) {
-            return back()
-                ->withErrors(['parking_lot_id' => $errorMsg])
-                ->withInput();
+        // Notify vehicle owner on successful check-in (when tied to a reservation)
+        if ($reservation) {
+            notify_user(
+                $reservation->user_id,
+                'เช็คอินสำเร็จ',
+                "รถทะเบียน {$vehicle->license_plate} เข้าจอดที่ช่อง {$slot->slot_number} แล้ว (การจอง #{$reservation->id})"
+            );
         }
-
-        $vehicle = Vehicle::find($data['vehicle_id']);
 
         $successMsg = "Check-In สำเร็จ! ทะเบียน {$vehicle->license_plate} → ช่อง {$slot->slot_number}";
         if ($reservation) {

@@ -92,7 +92,21 @@ class CheckOutController extends Controller
             ->where('reserve_start', '<=', now()->subMinutes(Reservation::gracePeriodMinutes()))
             ->update(['status' => 'expired']);
 
-        $log->load('vehicle:id,license_plate', 'parkingSlot:id,slot_number');
+        $log->load('vehicle:id,license_plate,user_id', 'parkingSlot:id,slot_number');
+
+        // Notify vehicle owner on check-out
+        if ($log->vehicle?->user_id) {
+            notify_user(
+                $log->vehicle->user_id,
+                'เช็คเอาท์เรียบร้อย',
+                sprintf(
+                    'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด %.2f บาท (รอชำระเงิน)',
+                    $log->vehicle->license_plate,
+                    $totalHours,
+                    $parkingFee,
+                )
+            );
+        }
 
         admin_audit('parking_log.check_out', $log, [
             'total_hours'  => $totalHours,

@@ -28,6 +28,7 @@ export const ADMIN_ROUTES = [
   '/admin/payments',
   '/admin/scan',
   '/admin/scan/history',
+  '/admin/owner-applications',
   '/profile',
   '/notifications',
 ];
@@ -44,8 +45,25 @@ export const USER_ROUTES = [
   '/notifications',
 ];
 
+export const OWNER_ROUTES = [
+  '/owner/dashboard',
+  '/owner/apply',
+  '/owner/application',
+  '/owner/parking-lots',
+  '/owner/parking-lots/create',
+  '/owner/parking-slots',
+  '/owner/parking-slots/create',
+  '/owner/parking-slots/bulk',
+  '/owner/reservations',
+  '/owner/revenue',
+  '/marketplace',
+  '/profile',
+  '/notifications',
+];
+
 export const ALL_ROUTES = {
   guest: GUEST_ROUTES,
   admin: ADMIN_ROUTES,
   user: USER_ROUTES,
+  owner: OWNER_ROUTES,
 };

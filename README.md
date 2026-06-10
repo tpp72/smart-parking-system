@@ -1,8 +1,8 @@
 # Smart Parking System
 
-ระบบจัดการลานจอดรถอัจฉริยะ พัฒนาด้วย **Laravel 11** + **Google Gemini Vision AI**
+ระบบจัดการลานจอดรถอัจฉริยะ พัฒนาด้วย **Laravel 12** + **Google Gemini Vision AI**
 
-![Laravel](https://img.shields.io/badge/Laravel-11-red)
+![Laravel](https://img.shields.io/badge/Laravel-12-red)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 ![Gemini](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-orange)
 ![Tests](https://img.shields.io/badge/E2E-Playwright-green)
@@ -56,16 +56,28 @@
 | **AI Car Scan** | อัปโหลดรูป → Gemini Vision → ได้ทะเบียน/สี/ยี่ห้อ พร้อม history |
 | **Notifications** | ดูและ mark read การแจ้งเตือน |
 
+### Owner Features
+
+| Feature | คำอธิบาย |
+|---|---|
+| **Owner Application** | สมัครเป็น owner ผ่าน `/owner/apply` — รอ admin อนุมัติ |
+| **Parking Lots** | สร้าง/จัดการลานจอดของตัวเอง |
+| **Parking Slots** | สร้างช่องจอดทีละตัว หรือ bulk create |
+| **Reservations** | ดูการจองทั้งหมดของลานตัวเอง, ยืนยันการจอง |
+| **Revenue** | ดูรายได้ของลานจอด |
+| **Marketplace** | ลานจอดจะแสดงใน Marketplace เมื่อ active |
+| **Notifications** | รับแจ้งเตือนการจอง |
+
 ### User Features
 
 | Feature | คำอธิบาย |
 |---|---|
 | **Dashboard** | สถานะการจอดปัจจุบัน, การจองที่รออยู่, ประวัติล่าสุด, ลานที่มีช่องว่าง |
-| **Reservations** | จองล่วงหน้า, ดูรายการจองทั้งหมด |
+| **Reservations** | จองล่วงหน้า (สูงสุด 24 ชม.), ดูรายการจองทั้งหมด |
 | **Vehicles** | เพิ่ม/ลบรถของตัวเอง |
 | **Parking Logs** | ดูประวัติการจอดของรถตัวเอง |
-| **AI Car Scan** | สแกนรถด้วย Gemini Vision (ฟีเจอร์เดียวกับ admin) |
-| **Notifications** | ดูและ mark read การแจ้งเตือน |
+| **AI Car Scan** | สแกนรถด้วย Gemini Vision — ระบบจับคู่การจองอัตโนมัติ + auto check-in |
+| **Notifications** | รับแจ้งเตือนทุก event: ยืนยัน, ยกเลิก, หมดอายุ, check-in, check-out |
 | **Profile** | แก้ไขชื่อ, อีเมล, เปลี่ยนรหัสผ่าน |
 
 ---
@@ -74,7 +86,7 @@
 
 | Layer | Technology |
 |---|---|
-| Backend | PHP 8.4, Laravel 11 |
+| Backend | PHP 8.4, Laravel 12 |
 | Frontend | Blade, Tailwind CSS, Alpine.js, Vite 7 |
 | Database | PostgreSQL 18 |
 | AI Vision | Google Gemini 2.5 Flash |
@@ -255,8 +267,9 @@ npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าส
 
 | Role | สิทธิ์ |
 |---|---|
-| **admin** | จัดการทุกอย่าง: ลานจอด, ช่องจอด, อุปกรณ์, ผู้ใช้, การจอง, check-in/out, payments, AI scan |
-| **user** | จองล่วงหน้า, ดูประวัติ, จัดการรถของตัวเอง, AI scan |
+| **admin** | จัดการทุกอย่าง: ลานจอด, ช่องจอด, อุปกรณ์, ผู้ใช้, การจอง, check-in/out, payments, AI scan, owner applications |
+| **owner** | จัดการลานจอดของตัวเอง, ยืนยันการจอง, ดูรายได้, Marketplace |
+| **user** | จองล่วงหน้า (ล่วงหน้าได้สูงสุด 24 ชม.), ดูประวัติ, จัดการรถของตัวเอง, AI scan |
 
 **หมายเหตุ:** Admin ไม่สามารถเปลี่ยน role ของตัวเองจาก admin → user ได้ (ป้องกัน lock-out ตัวเอง)
 
@@ -377,11 +390,12 @@ npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าส
 - ตั้งค่าได้ใน `.env`: `RESERVATION_GRACE_PERIOD=30`
 - ตั้งค่าใน `config/parking.php`
 
-**Scheduler** (`reservations:expire`) รันทุก 1 นาที:
-- หาการจองที่ `pending` หรือ `confirmed`
-- และ `reserve_start + grace_period ≤ now()`
-- อัปเดต → `expired` + บันทึก `ReservationLog` (old_status จริง ไม่ hardcode)
-- **ข้ามสถานะ `checked_in`** — รถเข้าแล้ว ไม่ expire
+**Scheduler** (`reservations:expire`) รันทุก 1 นาที — ใน DB transaction เดียว:
+1. หาการจองที่ `pending` หรือ `confirmed` และ `reserve_start + grace_period ≤ now()`
+2. อัปเดต → `expired` + บันทึก `ReservationLog`
+3. **คืน slot อัตโนมัติ:** ช่องจอดที่มีสถานะ `reserved` → `available`
+4. ส่ง notification แจ้ง user ทุกคนที่ถูก expire
+- **ข้ามสถานะ `checked_in`** — รถเข้าแล้ว ไม่ expire ไม่คืน slot
 
 ```bash
 # ทดสอบ scheduler แบบไม่แก้ข้อมูล
@@ -393,11 +407,20 @@ php artisan reservations:expire
 
 ---
 
-### AI Car Scan
+### AI Car Scan + Reservation Matching + Auto Check-In
+
+**ขั้นตอน:**
 
 1. อัปโหลดรูปรถ (jpg/jpeg/png, max **5 MB**)
-2. ส่งไปยัง **Google Gemini Vision API**
-3. ได้ผลลัพธ์:
+2. ส่งไปยัง **Google Gemini Vision API** → ได้ทะเบียน/สี/ยี่ห้อ
+3. ค้นหา `Vehicle` ที่ตรงกับทะเบียนในระบบ
+4. **Reservation Matching:** หาการจองสถานะ `confirmed` หรือ `checked_in` ของรถนี้
+5. **Auto Check-In:**
+   - ถ้าพบการจอง `confirmed` + อยู่ในช่วง check-in (± grace period) → `CheckInService.checkIn()` อัตโนมัติ
+   - ส่ง notification แจ้ง user เมื่อสำเร็จ
+   - ถ้าอยู่นอกช่วงเวลา → แสดงข้อความ "อยู่นอกช่วงเวลาเช็คอิน"
+6. แสดงผลบนหน้า scan: ทะเบียน, ยี่ห้อ, สี, รายละเอียดการจอง, ผลการ check-in
+7. บันทึกลง `license_plate_scans` (source: `manual_upload`)
 
 | Field | ตัวอย่าง |
 |---|---|
@@ -405,9 +428,6 @@ php artisan reservations:expire
 | `color` | `เงิน` |
 | `brand` | `Honda` |
 | `confidence` | `95` |
-
-4. บันทึกลง `license_plate_scans` (source: `manual_upload`)
-5. Admin: ดู scan history แบบ paginated + ค้นหาตามทะเบียน
 
 **Models ที่รองรับ:**
 
@@ -418,6 +438,32 @@ php artisan reservations:expire
 | `gemini-2.5-pro` | น้อยกว่า | แม่นสุด |
 
 เปลี่ยน model ได้ใน `.env`: `CARSCAN_MODEL=gemini-2.5-flash`
+
+---
+
+### Notification System
+
+ระบบส่ง in-app notification อัตโนมัติผ่าน `notify_user(int $userId, string $title, string $message)` helper ทุก event สำคัญ:
+
+| Event | ผู้รับ | หัวข้อ |
+|---|---|---|
+| Admin/Owner ยืนยันการจอง | User | การจองได้รับการยืนยัน |
+| Admin ยกเลิกการจอง | User | การจองถูกยกเลิก |
+| Scheduler expire การจอง | User | การจองหมดอายุ |
+| Auto check-in สำเร็จ (OCR) | User | เช็คอินสำเร็จ |
+| Check-out สำเร็จ | เจ้าของรถ | เช็คเอาท์เรียบร้อย |
+
+Notifications ดูได้ที่ `/notifications` (รองรับทุก role)
+
+---
+
+### Owner Application Workflow
+
+1. User ธรรมดาสมัครที่ `/owner/apply` (กรอก ชื่อธุรกิจ, ที่อยู่, เบอร์โทร, เหตุผล)
+2. Admin ตรวจสอบที่ `/admin/owner-applications`
+3. Admin กด **Approve** → role เปลี่ยนเป็น `owner` อัตโนมัติ
+4. Owner เข้า `/owner/dashboard` สร้างลานจอดและช่องจอด
+5. ลานจอดปรากฎใน Marketplace เมื่อ active
 
 ---
 
@@ -558,9 +604,18 @@ Reports สร้างที่ `e2e/reports/`:
 ### ผล E2E ล่าสุด
 
 ```
-✓ 10/10 tests passed
-✓ 0 bugs found
-✓ 26/26 routes — 100% coverage
+✓ ai-test.test.js    — route coverage, responsive, forms, nav integrity, loading speed
+✓ feature-tests.test.js — OCR scan, notifications, owner application, reservation lifecycle
+✓ 0 critical bugs found
+✓ 29/29 routes — 100% coverage (รวม /admin/owner-applications, /owner/apply, /owner/application)
+```
+
+### PHPUnit Tests
+
+```
+✓ 69 tests, all passing
+✓ ExpireReservationsTest (10), OcrCheckInTest (10), ReservationNotificationsTest (6)
+✓ ReservationTest (7), AuthenticationTest (4), + others
 ```
 
 ---
@@ -570,37 +625,48 @@ Reports สร้างที่ `e2e/reports/`:
 ```
 app/
 ├── Console/Commands/
-│   └── ExpireReservations.php     ← scheduler: auto-expire reservations
+│   └── ExpireReservations.php     ← scheduler: auto-expire + slot release + notifications
 ├── Http/
 │   ├── Controllers/
 │   │   ├── Admin/
-│   │   │   ├── CheckInController.php      ← manual check-in + reservation link
-│   │   │   ├── CheckOutController.php     ← checkout + fee + complete reservation
+│   │   │   ├── CheckInController.php        ← delegates to CheckInService
+│   │   │   ├── CheckOutController.php       ← checkout + fee + notification
+│   │   │   ├── OwnerApplicationController.php ← approve/reject owner applications
 │   │   │   ├── ParkingLotController.php
-│   │   │   ├── ParkingSlotController.php  ← single + bulk create
-│   │   │   ├── ReservationController.php  ← CRUD + confirm
+│   │   │   ├── ParkingSlotController.php    ← single + bulk create
+│   │   │   ├── ReservationController.php    ← CRUD + confirm + notification
 │   │   │   ├── ReservationLogController.php ← audit log + CSV export
-│   │   │   ├── AdminActionController.php  ← admin audit + CSV export
+│   │   │   ├── AdminActionController.php    ← admin audit + CSV export
 │   │   │   ├── PaymentController.php
-│   │   │   ├── UserController.php         ← user management + force reset
+│   │   │   ├── UserController.php           ← user management + force reset
 │   │   │   └── VehicleController.php
+│   │   ├── Owner/
+│   │   │   ├── ApplicationController.php    ← apply / edit / view status
+│   │   │   ├── DashboardController.php
+│   │   │   ├── ParkingLotController.php
+│   │   │   ├── ParkingSlotController.php
+│   │   │   ├── ReservationController.php    ← confirm + notification
+│   │   │   └── RevenueController.php
 │   │   ├── User/
-│   │   │   ├── ReservationController.php  ← create + duplicate guards
+│   │   │   ├── ReservationController.php    ← create + duplicate guards + 24h limit
 │   │   │   ├── VehicleController.php
 │   │   │   └── ParkingLogController.php
-│   │   ├── CarScanController.php          ← Gemini Vision AI
-│   │   ├── DashboardController.php        ← admin + user dashboards
+│   │   ├── CarScanController.php            ← OCR + reservation match + auto check-in
+│   │   ├── DashboardController.php          ← admin + user dashboards
 │   │   └── NotificationController.php
 │   └── Middleware/
 │       ├── AdminMiddleware.php
 │       ├── RoleMiddleware.php
 │       └── ForcePasswordReset.php
 ├── Models/
-│   ├── Reservation.php    ← ACTIVE_STATUSES, gracePeriodMinutes(), scopes
+│   ├── Reservation.php    ← ACTIVE_STATUSES, gracePeriodMinutes(), scopeCheckable()
 │   ├── ParkingLog.php     ← reservation() relation
 │   └── ...
-└── Services/
-    └── CarScanService.php ← Gemini Vision API logic
+├── Services/
+│   ├── CarScanService.php      ← Gemini Vision API + findMatchingReservation()
+│   └── CheckInService.php      ← reusable check-in transaction (lockForUpdate)
+└── Support/
+    └── notify_user.php         ← global helper: notify_user(userId, title, message)
 
 config/
 ├── parking.php    ← grace_period (RESERVATION_GRACE_PERIOD)

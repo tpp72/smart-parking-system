@@ -46,7 +46,17 @@ class ReservationController extends Controller
             'vehicle_id'      => ['required', 'exists:vehicles,id'],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
-            'reserve_start'   => ['required', 'date', 'after:now'],
+            'reserve_start'   => ['required', 'date', 'after:now', 'before:' . now()->addDay()->toDateTimeString()],
+        ], [
+            'vehicle_id.required'      => 'กรุณาเลือกรถ',
+            'vehicle_id.exists'        => 'ไม่พบรถที่เลือกในระบบ',
+            'parking_lot_id.required'  => 'กรุณาเลือกลานจอด',
+            'parking_lot_id.exists'    => 'ไม่พบลานจอดที่เลือกในระบบ',
+            'parking_slot_id.exists'   => 'ไม่พบช่องจอดที่เลือกในระบบ',
+            'reserve_start.required'   => 'กรุณาระบุวันและเวลาที่ต้องการจอง',
+            'reserve_start.date'       => 'รูปแบบวันที่/เวลาไม่ถูกต้อง',
+            'reserve_start.after'      => 'เวลาจองต้องเป็นเวลาในอนาคต',
+            'reserve_start.before'     => 'จองล่วงหน้าได้ไม่เกิน 1 วัน (24 ชั่วโมง)',
         ]);
 
         /** @var User $authUser */

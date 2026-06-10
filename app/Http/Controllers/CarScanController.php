@@ -3,17 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\LicensePlateScan;
+use App\Models\Reservation;
 use App\Services\CarScanService;
+use App\Services\CheckInService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class CarScanController extends Controller
 {
-    public function __construct(private CarScanService $scanService) {}
+    public function __construct(
+        private CarScanService  $scanService,
+        private CheckInService  $checkInService,
+    ) {}
 
     /* ─────────────────────────────────────────────────────────────
      | GET  /admin/scan   OR   /user/scan
-     | Show upload form (+ latest scan result if flashed in session)
      ─────────────────────────────────────────────────────────────*/
     public function create()
     {
@@ -22,7 +26,6 @@ class CarScanController extends Controller
 
     /* ─────────────────────────────────────────────────────────────
      | POST /admin/scan   OR   /user/scan
-     | Validate, call service, redirect with result
      ─────────────────────────────────────────────────────────────*/
     public function store(Request $request)
     {
@@ -32,7 +35,7 @@ class CarScanController extends Controller
                 'file',
                 'image',
                 'mimes:jpg,jpeg,png',
-                'max:5120',   // 5 MB
+                'max:5120',
             ],
         ], [
             'car_image.required' => 'กรุณาเลือกรูปภาพรถก่อน',
@@ -47,7 +50,54 @@ class CarScanController extends Controller
                 Auth::id()
             );
 
-            return redirect()->back()->with('scan_result', $scan->id);
+            $sessionData = ['scan_result' => $scan->id];
+
+            // ─── Reservation matching ───────────────────────────────────
+            if ($scan->license_plate) {
+                $reservation = $this->scanService->findMatchingReservation($scan->license_plate);
+
+                if ($reservation) {
+                    $sessionData['scan_reservation_id'] = $reservation->id;
+
+                    // ─── Auto check-in (only for confirmed + within window) ──
+                    if ($reservation->status === 'confirmed') {
+                        $isCheckable = Reservation::checkable()
+                            ->where('id', $reservation->id)
+                            ->exists();
+
+                        if ($isCheckable) {
+                            $result = $this->checkInService->checkIn(
+                                $reservation->vehicle_id,
+                                $reservation->parking_lot_id
+                            );
+
+                            $sessionData['scan_check_in'] = [
+                                'success' => $result['success'],
+                                'error'   => $result['error'],
+                                'slot'    => $result['slot']?->slot_number,
+                            ];
+
+                            if ($result['success']) {
+                                notify_user(
+                                    $reservation->user_id,
+                                    'เช็คอินอัตโนมัติสำเร็จ',
+                                    "ทะเบียน {$scan->license_plate} เช็คอินผ่านระบบสแกนรถ เข้าจอดที่ช่อง {$result['slot']->slot_number} แล้ว"
+                                );
+                            }
+                        } else {
+                            // Reservation found but outside check-in window
+                            $sessionData['scan_check_in'] = [
+                                'success' => false,
+                                'error'   => 'อยู่นอกช่วงเวลาเช็คอิน (เร็วเกินไปหรือเกินเวลากำหนด)',
+                                'slot'    => null,
+                            ];
+                        }
+                    }
+                    // status === 'checked_in': show info only, no action needed
+                }
+            }
+
+            return redirect()->back()->with($sessionData);
 
         } catch (\RuntimeException $e) {
             return redirect()->back()
@@ -58,7 +108,6 @@ class CarScanController extends Controller
 
     /* ─────────────────────────────────────────────────────────────
      | GET  /admin/scan/history
-     | Admin-only: paginated history of all manual scans
      ─────────────────────────────────────────────────────────────*/
     public function history(Request $request)
     {

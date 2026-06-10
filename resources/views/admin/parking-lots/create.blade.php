@@ -12,6 +12,7 @@
 
                 @include('admin.parking-lots.partials.form', [
                     'lot' => null,
+                    'owners' => $owners,
                     'submitLabel' => 'บันทึก',
                 ])
             </form>

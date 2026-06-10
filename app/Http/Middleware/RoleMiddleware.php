@@ -25,12 +25,14 @@ class RoleMiddleware
                 return response()->json(['message' => 'Forbidden'], 403);
             }
 
-            // admin พยายามเข้าหน้า user → ส่งไป admin dashboard
             if ($user?->role === 'admin') {
                 return redirect()->route('admin.dashboard');
             }
 
-            // user พยายามเข้าหน้า admin → 403
+            if ($user?->role === 'owner') {
+                return redirect()->route('owner.dashboard');
+            }
+
             abort(403, 'ไม่มีสิทธิ์เข้าถึงหน้านี้');
         }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\LicensePlateScan;
+use App\Models\Reservation;
 use App\Models\SuspiciousVehicle;
 use App\Models\Vehicle;
 use Illuminate\Http\UploadedFile;
@@ -163,5 +164,28 @@ PROMPT;
         ]);
 
         return $scan->load(['vehicle.user']);
+    }
+
+    /**
+     * Find an active reservation (confirmed or checked_in) for a given license plate.
+     * Returns the earliest upcoming reservation, or null if none found.
+     */
+    public function findMatchingReservation(string $licensePlate): ?Reservation
+    {
+        $plate = trim($licensePlate);
+        if ($plate === '') {
+            return null;
+        }
+
+        $vehicle = Vehicle::where('license_plate', $plate)->first();
+        if (!$vehicle) {
+            return null;
+        }
+
+        return Reservation::with(['vehicle', 'parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name'])
+            ->where('vehicle_id', $vehicle->id)
+            ->whereIn('status', ['confirmed', 'checked_in'])
+            ->orderBy('reserve_start')
+            ->first();
     }
 }
