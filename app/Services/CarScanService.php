@@ -2,33 +2,33 @@
 
 namespace App\Services;
 
+use Anthropic\Client;
 use App\Models\LicensePlateScan;
 use App\Models\Reservation;
 use App\Models\SuspiciousVehicle;
 use App\Models\Vehicle;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CarScanService
 {
-    private string $apiKey;
+    private Client $client;
     private string $model;
 
     public function __construct()
     {
-        $this->apiKey = config('carscan.gemini_api_key', '');
-        $this->model  = config('carscan.model', 'gemini-2.5-flash');
+        $this->client = new Client(apiKey: config('carscan.anthropic_api_key', ''));
+        $this->model  = config('carscan.model', 'claude-opus-4-8');
     }
 
     /**
-     * Send car image to Gemini Vision API and extract detection data.
+     * Send car image to Claude Vision API and extract detection data.
      * Returns: license_plate, color, brand, confidence
      */
     public function detect(string $absoluteImagePath): array
     {
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('GEMINI_API_KEY ยังไม่ได้ตั้งค่าใน .env');
+        if (empty(config('carscan.anthropic_api_key', ''))) {
+            throw new \RuntimeException('ANTHROPIC_API_KEY ยังไม่ได้ตั้งค่าใน .env');
         }
 
         $imageData = base64_encode(file_get_contents($absoluteImagePath));
@@ -55,44 +55,40 @@ class CarScanService
 - ตอบเป็น JSON เท่านั้น ไม่มี ```json ไม่มีคำอธิบายเพิ่ม
 PROMPT;
 
-        $url = sprintf(
-            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
-            $this->model,
-            $this->apiKey
-        );
-
-        $response = Http::timeout(30)->withOptions(['verify' => false])->post($url, [
-            'contents' => [
+        $message = $this->client->messages->create(
+            model: $this->model,
+            maxTokens: 1024,
+            messages: [
                 [
-                    'parts' => [
+                    'role'    => 'user',
+                    'content' => [
                         [
-                            'inlineData' => [
-                                'mimeType' => $mimeType,
-                                'data'     => $imageData,
+                            'type'   => 'image',
+                            'source' => [
+                                'type'      => 'base64',
+                                'mediaType' => $mimeType,
+                                'data'      => $imageData,
                             ],
                         ],
                         [
+                            'type' => 'text',
                             'text' => $prompt,
                         ],
                     ],
                 ],
             ],
-            'generationConfig' => [
-                'maxOutputTokens'  => 1024,
-                'temperature'      => 0.1,
-                'responseMimeType' => 'application/json',
-            ],
-        ]);
+        );
 
-        if ($response->failed()) {
-            $error = $response->json('error.message') ?? $response->body();
-            throw new \RuntimeException('Gemini API error: ' . $error);
+        $text = '';
+        foreach ($message->content as $block) {
+            if ($block->type === 'text') {
+                $text = $block->text;
+                break;
+            }
         }
 
-        $text = $response->json('candidates.0.content.parts.0.text', '');
-        Log::info('[CarScan] Gemini response: ' . substr($text, 0, 500));
+        Log::info('[CarScan] Claude response: ' . substr($text, 0, 500));
 
-        // Try direct JSON decode first (responseMimeType: application/json)
         $data = json_decode($text, true);
         if (is_array($data)) {
             return $data;
@@ -109,11 +105,11 @@ PROMPT;
             }
         }
 
-        throw new \RuntimeException('Gemini ตอบกลับรูปแบบไม่ถูกต้อง: ' . $text);
+        throw new \RuntimeException('Claude ตอบกลับรูปแบบไม่ถูกต้อง: ' . $text);
     }
 
     /**
-     * Store the uploaded image, call Gemini API, persist scan record.
+     * Store the uploaded image, call Claude Vision API, persist scan record.
      * Returns the saved LicensePlateScan model.
      */
     public function scanAndSave(UploadedFile $file, int $userId): LicensePlateScan
@@ -122,7 +118,7 @@ PROMPT;
         $storedPath   = $file->store('car-scans', 'public');
         $absolutePath = storage_path('app/public/' . $storedPath);
 
-        // 2. Run AI (Gemini Vision)
+        // 2. Run AI (Claude Vision)
         $result = $this->detect($absolutePath);
 
         $licensePlate = trim($result['license_plate'] ?? '');
@@ -144,13 +140,12 @@ PROMPT;
             }
         }
 
-        // 4. Check blacklist
+        // 4. Check blacklist (active entries only)
         $isSuspicious = $licensePlate !== ''
-            && SuspiciousVehicle::where('license_plate', $licensePlate)->exists();
+            && SuspiciousVehicle::active()->where('license_plate', $licensePlate)->exists();
 
         // 5. Persist scan record
         $scan = LicensePlateScan::create([
-            'device_id'     => null,
             'user_id'       => $userId,
             'vehicle_id'    => $vehicleId,
             'license_plate' => $licensePlate,

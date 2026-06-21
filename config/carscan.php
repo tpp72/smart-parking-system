@@ -3,17 +3,18 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Google Gemini API Key
+    | Anthropic API Key
     |--------------------------------------------------------------------------
-    | Used by CarScanService to call Gemini Vision API for car image analysis.
-    | Set via .env: GEMINI_API_KEY=AIza...
+    | Used by CarScanService to call Claude Vision API for car image analysis.
+    | Set via .env: ANTHROPIC_API_KEY=sk-ant-...
     */
-    'gemini_api_key' => env('GEMINI_API_KEY'),
+    'anthropic_api_key' => env('ANTHROPIC_API_KEY'),
 
     /*
     |--------------------------------------------------------------------------
-    | Gemini Model
+    | Claude Model
     |--------------------------------------------------------------------------
+    | Recommended: claude-haiku-4-5 (fast + cheap), claude-opus-4-8 (best accuracy)
     */
-    'model' => env('CARSCAN_MODEL', 'gemini-2.0-flash'),
+    'model' => env('CARSCAN_MODEL', 'claude-opus-4-8'),
 ];
