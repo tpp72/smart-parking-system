@@ -6,20 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('admin_actions', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+            $table->foreignId('admin_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('action');
+            $table->string('subject_type')->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
+            $table->json('meta')->nullable();
+            $table->string('ip_address', 64)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->timestamps(0);
+
+            $table->index(['action', 'created_at']);
+            $table->index(['subject_type', 'subject_id']);
+            $table->index(['admin_id', 'created_at']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('admin_actions');

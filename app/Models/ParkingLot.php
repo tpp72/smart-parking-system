@@ -16,11 +16,6 @@ class ParkingLot extends Model
         return $this->hasMany(ParkingSlot::class);
     }
 
-    public function devices()
-    {
-        return $this->hasMany(EntryExitDevice::class);
-    }
-
     public function parkingLogs()
     {
         return $this->hasMany(ParkingLog::class);
@@ -39,5 +34,10 @@ class ParkingLot extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeReservable($query)
+    {
+        return $query->where('reservations_enabled', true);
     }
 }

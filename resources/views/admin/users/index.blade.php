@@ -23,6 +23,7 @@
                     <select name="role" class="sp-select">
                         <option value="">ทุก role</option>
                         <option value="admin" @selected($role === 'admin')>admin</option>
+                        <option value="owner" @selected($role === 'owner')>owner</option>
                         <option value="user" @selected($role === 'user')>user</option>
                     </select>
 
@@ -54,6 +55,8 @@
                                 <td class="py-3 pr-4">
                                     @if ($u->role === 'admin')
                                         <span class="sp-badge sp-badge-warn">admin</span>
+                                    @elseif ($u->role === 'owner')
+                                        <span class="sp-badge sp-badge-owner">owner</span>
                                     @else
                                         <span class="sp-badge sp-badge-ok">user</span>
                                     @endif
@@ -69,6 +72,7 @@
                                 <td class="py-3 pr-4">
                                     <div class="flex justify-end">
                                         <a href="{{ route('admin.users.edit', $u) }}"
+                                            title="แก้ไข role / บังคับเปลี่ยนรหัสผ่าน"
                                             class="sp-btn sp-btn-outline">แก้ไข</a>
                                     </div>
                                 </td>

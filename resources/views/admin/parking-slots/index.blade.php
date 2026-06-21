@@ -84,11 +84,12 @@
                                     <td class="px-5 py-3 text-right">
                                         <div class="flex justify-end gap-2">
                                             <a href="{{ route('admin.parking-slots.edit', $slot) }}"
+                                                title="แก้ไขช่องจอด {{ $slot->slot_number }}"
                                                 class="sp-btn sp-btn-outline text-sm py-1.5 px-3">แก้ไข</a>
                                             <form method="POST" action="{{ route('admin.parking-slots.destroy', $slot) }}"
                                                 onsubmit="return confirm('ลบช่องจอด {{ $slot->slot_number }}? (ไม่สามารถกู้คืนได้)')">
                                                 @csrf @method('DELETE')
-                                                <button type="submit" class="sp-btn sp-btn-danger text-sm py-1.5 px-3">ลบ</button>
+                                                <button type="submit" title="ลบช่องจอด {{ $slot->slot_number }} (ถาวร)" class="sp-btn sp-btn-danger text-sm py-1.5 px-3">ลบ</button>
                                             </form>
                                         </div>
                                     </td>

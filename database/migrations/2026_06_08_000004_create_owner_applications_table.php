@@ -11,12 +11,15 @@ return new class extends Migration
         Schema::create('owner_applications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('business_name');
+            $table->string('applicant_type')->default('individual'); // individual | company
+            $table->string('business_name')->nullable();
             $table->string('contact_name');
             $table->string('phone', 20);
             $table->string('email');
             $table->string('parking_lot_name');
-            $table->text('address');
+            $table->string('address')->nullable();
+            $table->string('district')->nullable();
+            $table->string('province')->nullable();
             $table->text('description')->nullable();
             $table->unsignedInteger('estimated_slots')->default(0);
             $table->string('document_path')->nullable(); // uploaded image/doc

@@ -16,7 +16,7 @@
 
                 <div class="flex flex-wrap gap-3">
                     <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary sp-glow-btn">จองที่จอด</a>
-                    <a href="{{ route('user.vehicles.index') }}" class="sp-btn sp-btn-outline">รถของฉัน</a>
+                    <a href="{{ route('user.reservations.index') }}" class="sp-btn sp-btn-outline">การจองของฉัน</a>
                     <a href="{{ route('user.parking-logs.index') }}" class="sp-btn sp-btn-outline">ประวัติ</a>
                 </div>
             </div>
@@ -121,26 +121,6 @@
                         </div>
                     </div>
                 @endif
-            </div>
-
-            {{-- Quick stats (ลดให้เหลือเท่าที่ user เข้าใจ) --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">
-                <div class="sp-card rounded-2xl p-5">
-                    <p class="text-gray-300 text-sm">ช่องว่างตอนนี้</p>
-                    <p class="text-3xl font-extrabold mt-2">{{ $stats['slots_available'] ?? 0 }}</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5">
-                    <p class="text-gray-300 text-sm">จองอยู่</p>
-                    <p class="text-3xl font-extrabold mt-2">{{ $stats['slots_reserved'] ?? 0 }}</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5">
-                    <p class="text-gray-300 text-sm">ไม่ว่าง</p>
-                    <p class="text-3xl font-extrabold mt-2">{{ $stats['slots_occupied'] ?? 0 }}</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5">
-                    <p class="text-gray-300 text-sm">รถของฉัน</p>
-                    <p class="text-3xl font-extrabold mt-2">{{ $stats['my_vehicles'] ?? 0 }}</p>
-                </div>
             </div>
 
             {{-- Lots available (แนะนำให้ user เลือกง่าย) --}}

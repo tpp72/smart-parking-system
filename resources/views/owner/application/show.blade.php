@@ -4,7 +4,11 @@
 
             <div class="mb-6 flex items-center justify-between">
                 <h1 class="text-2xl font-extrabold tracking-tight sp-glow-text">สถานะคำขอ</h1>
-                <a href="{{ route('owner.dashboard') }}" class="sp-btn sp-btn-outline text-sm">← Dashboard</a>
+                @if(auth()->user()->role === 'owner')
+                    <a href="{{ route('owner.dashboard') }}" class="sp-btn sp-btn-outline text-sm">← Dashboard</a>
+                @else
+                    <a href="{{ route('user.dashboard') }}" class="sp-btn sp-btn-outline text-sm">← Dashboard</a>
+                @endif
             </div>
 
             @if(!$application)
@@ -68,7 +72,11 @@
                     <div><dt class="text-gray-400">อีเมล</dt><dd class="font-medium">{{ $application->email }}</dd></div>
                     <div><dt class="text-gray-400">ชื่อลานจอด</dt><dd class="font-medium">{{ $application->parking_lot_name }}</dd></div>
                     <div><dt class="text-gray-400">จำนวนช่องจอดประมาณ</dt><dd class="font-medium">{{ number_format($application->estimated_slots) }} ช่อง</dd></div>
+                    @if($application->address)
                     <div class="sm:col-span-2"><dt class="text-gray-400">ที่อยู่</dt><dd class="font-medium">{{ $application->address }}</dd></div>
+                    @endif
+                    <div><dt class="text-gray-400">เขต / อำเภอ</dt><dd class="font-medium">{{ $application->district ?? '-' }}</dd></div>
+                    <div><dt class="text-gray-400">จังหวัด</dt><dd class="font-medium">{{ $application->province ?? '-' }}</dd></div>
                     @if($application->description)
                     <div class="sm:col-span-2"><dt class="text-gray-400">รายละเอียดเพิ่มเติม</dt><dd class="font-medium">{{ $application->description }}</dd></div>
                     @endif

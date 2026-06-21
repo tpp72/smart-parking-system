@@ -47,10 +47,12 @@
                     <a href="{{ route('admin.parking-lots.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ลานจอด · Lots</a>
                     <a href="{{ route('admin.parking-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ประวัติจอด · Logs</a>
                     <a href="{{ route('admin.reservation-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Log การจอง</a>
-                    <a href="{{ route('admin.devices.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">อุปกรณ์ · Devices</a>
                     <a href="{{ route('admin.admin-actions.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Admin Log</a>
                     <a href="{{ route('admin.owner-applications.index') }}" class="text-xs {{ $pendingApplications > 0 ? 'text-yellow-400 border-yellow-500/40 hover:border-yellow-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
                         คำขอ Owner{{ $pendingApplications > 0 ? ' ('.$pendingApplications.')' : '' }}
+                    </a>
+                    <a href="{{ route('admin.suspicious-vehicles.index') }}" class="text-xs {{ ($stats['blacklist_active'] ?? 0) > 0 ? 'text-red-400 border-red-600/40 hover:border-red-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
+                        บัญชีดำ{{ ($stats['blacklist_active'] ?? 0) > 0 ? ' ('.$stats['blacklist_active'].')' : '' }}
                     </a>
                 </div>
             </div>
@@ -142,6 +144,94 @@
             </div>
 
             {{-- ══════════════════════════════════════════════════════
+                 Reservation Lifecycle Stats
+            ══════════════════════════════════════════════════════ --}}
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+
+                {{-- Checked In --}}
+                <div class="sp-card rounded-2xl p-5 border border-sky-600/25 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-sky-900/15 to-transparent pointer-events-none rounded-2xl"></div>
+                    <div class="flex items-center justify-between relative z-10">
+                        <div>
+                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">เช็คอินแล้ว</p>
+                            <p class="text-3xl font-extrabold mt-1 text-sky-300">{{ $stats['reservations_checked_in'] ?? 0 }}</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Checked In ({{ $range ?? 'today' }})</p>
+                        </div>
+                        <div class="w-9 h-9 rounded-xl bg-sky-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Completed --}}
+                <div class="sp-card rounded-2xl p-5 border border-emerald-600/25 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/15 to-transparent pointer-events-none rounded-2xl"></div>
+                    <div class="flex items-center justify-between relative z-10">
+                        <div>
+                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">เสร็จสมบูรณ์</p>
+                            <p class="text-3xl font-extrabold mt-1 text-emerald-300">{{ $stats['reservations_completed'] ?? 0 }}</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Completed ({{ $range ?? 'today' }})</p>
+                        </div>
+                        <div class="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Blacklist --}}
+                <div class="sp-card rounded-2xl p-5 border border-red-700/30 relative overflow-hidden col-span-2 lg:col-span-1">
+                    <div class="absolute inset-0 bg-gradient-to-br from-red-950/30 to-transparent pointer-events-none rounded-2xl"></div>
+                    <div class="flex items-center justify-between relative z-10">
+                        <div>
+                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">บัญชีดำ (ใช้งาน)</p>
+                            <p class="text-3xl font-extrabold mt-1 text-red-400">{{ $stats['blacklist_active'] ?? 0 }}</p>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                <a href="{{ route('admin.suspicious-vehicles.index') }}" class="hover:text-red-300 transition">จัดการบัญชีดำ →</a>
+                            </p>
+                        </div>
+                        <div class="w-9 h-9 rounded-xl bg-red-600/20 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            {{-- ══════════════════════════════════════════════════════
+                 Analytics Charts
+            ══════════════════════════════════════════════════════ --}}
+            <div>
+                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Analytics</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <x-dashboard-chart
+                        type="pie"
+                        title="สถานะการจอง"
+                        :labels="$chartReservationStatus['labels']"
+                        :datasets="$chartReservationStatus['datasets']"
+                    />
+                    <x-dashboard-chart
+                        type="bar"
+                        title="สถานะช่องจอด"
+                        :labels="$chartSlotOccupancy['labels']"
+                        :datasets="$chartSlotOccupancy['datasets']"
+                    />
+                    <x-dashboard-chart
+                        type="horizontalBar"
+                        title="ลานจอดยอดนิยม (Top 5)"
+                        :labels="$chartTopLots['labels']"
+                        :datasets="$chartTopLots['datasets']"
+                        height="240px"
+                    />
+                </div>
+            </div>
+
+            {{-- ══════════════════════════════════════════════════════
                  Mid Row: Unpaid + Penalties + Scans
             ══════════════════════════════════════════════════════ --}}
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -196,9 +286,9 @@
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between">
                                         <p class="font-bold text-sm {{ $s->is_suspicious ? 'text-red-300' : '' }}">{{ $s->license_plate }}</p>
-                                        <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-300">{{ $s->device_type }}</span>
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-300">{{ $s->source ?? 'scan' }}</span>
                                     </div>
-                                    <p class="text-xs text-gray-500 truncate">{{ $s->location }} · {{ $s->scan_time }}</p>
+                                    <p class="text-xs text-gray-500 truncate">{{ $s->scan_time }}</p>
                                 </div>
                             </div>
                         @empty

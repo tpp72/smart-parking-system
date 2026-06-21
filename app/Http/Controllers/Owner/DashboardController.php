@@ -121,11 +121,96 @@ class DashboardController extends Controller
             ->select(['pl.id as log_id', 'v.license_plate', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
             ->get();
 
+        // ── Chart data ─────────────────────────────────────────────────────
+        $statusKeys   = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
+        $statusColors = [
+            'rgba(250,204,21,0.85)',
+            'rgba(96,165,250,0.85)',
+            'rgba(52,211,153,0.85)',
+            'rgba(34,197,94,0.85)',
+            'rgba(239,68,68,0.85)',
+            'rgba(107,114,128,0.85)',
+        ];
+        $rawStatusCounts = DB::table('reservations')
+            ->whereIn('parking_lot_id', $lotIds)
+            ->selectRaw('status, COUNT(*) as count')
+            ->whereIn('status', $statusKeys)
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $chartReservationStatus = [
+            'labels'   => ['Pending', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'Expired'],
+            'datasets' => [[
+                'data'            => array_map(fn ($s) => (int) ($rawStatusCounts[$s] ?? 0), $statusKeys),
+                'backgroundColor' => $statusColors,
+                'borderColor'     => '#111827',
+                'borderWidth'     => 2,
+                'hoverOffset'     => 6,
+            ]],
+        ];
+
+        $rawRevenue = $lotIds->isNotEmpty()
+            ? DB::table('payments as p')
+                ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
+                ->whereIn('pl.parking_lot_id', $lotIds)
+                ->where('p.payment_status', 'paid')
+                ->where('p.created_at', '>=', now()->subMonths(11)->startOfMonth())
+                ->groupByRaw("TO_CHAR(p.created_at, 'YYYY-MM')")
+                ->selectRaw("TO_CHAR(p.created_at, 'YYYY-MM') as month_key, SUM(p.total_amount) as revenue")
+                ->pluck('revenue', 'month_key')
+                ->toArray()
+            : [];
+
+        $revLabels = [];
+        $revData   = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $month       = now()->subMonths($i);
+            $revLabels[] = $month->format('M Y');
+            $revData[]   = (float) ($rawRevenue[$month->format('Y-m')] ?? 0);
+        }
+
+        $chartRevenueTrend = [
+            'labels'   => $revLabels,
+            'datasets' => [[
+                'label'                => 'รายได้ (฿)',
+                'data'                 => $revData,
+                'borderColor'          => 'rgba(248,113,113,1)',
+                'backgroundColor'      => 'rgba(239,68,68,0.1)',
+                'tension'              => 0.35,
+                'fill'                 => true,
+                'pointBackgroundColor' => 'rgba(248,113,113,1)',
+                'pointRadius'          => 3,
+                'pointHoverRadius'     => 5,
+            ]],
+        ];
+
+        $chartSlotOccupancy = [
+            'labels'   => ['ว่าง', 'จอง', 'ใช้งาน'],
+            'datasets' => [[
+                'label'           => 'ช่องจอด',
+                'data'            => [
+                    $stats['slots_available'],
+                    $stats['slots_reserved'],
+                    $stats['slots_occupied'],
+                ],
+                'backgroundColor' => [
+                    'rgba(34,197,94,0.75)',
+                    'rgba(250,204,21,0.75)',
+                    'rgba(239,68,68,0.75)',
+                ],
+                'borderRadius'    => 6,
+                'borderWidth'     => 0,
+            ]],
+        ];
+
         return view('owner.dashboard', compact(
             'stats',
             'lotsOverview',
             'recentReservations',
-            'activeNow'
+            'activeNow',
+            'chartReservationStatus',
+            'chartRevenueTrend',
+            'chartSlotOccupancy',
         ) + ['ownerStatus' => 'approved', 'application' => null]);
     }
 }

@@ -91,7 +91,7 @@
                                                   action="{{ route('admin.payments.mark-paid', $payment) }}"
                                                   onsubmit="return confirm('ยืนยันรับชำระเงิน ฿{{ number_format((float)$payment->total_amount, 2) }} จากทะเบียน {{ $payment->parkingLog?->vehicle?->license_plate }}?')">
                                                 @csrf
-                                                <button type="submit" class="sp-btn sp-btn-success text-sm px-4 py-1.5">
+                                                <button type="submit" title="ยืนยันว่าลูกค้าชำระเงินแล้ว" class="sp-btn sp-btn-success text-sm px-4 py-1.5">
                                                     ✓ รับชำระแล้ว
                                                 </button>
                                             </form>

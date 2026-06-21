@@ -15,8 +15,14 @@ class ParkingLotController extends Controller
 
         $lots = ParkingLot::with('owner:id,name')
             ->when($q !== '', function ($query) use ($q) {
-                $query->where('name', 'like', "%{$q}%")
-                    ->orWhere('location', 'like', "%{$q}%");
+                $query->where(function ($qq) use ($q) {
+                    $qq->where('name', 'like', "%{$q}%")
+                        ->orWhere('location', 'like', "%{$q}%")
+                        ->orWhere('address', 'like', "%{$q}%")
+                        ->orWhere('district', 'like', "%{$q}%")
+                        ->orWhere('province', 'like', "%{$q}%")
+                        ->orWhere('landmark', 'like', "%{$q}%");
+                });
             })
             ->orderByDesc('id')
             ->paginate(10)
@@ -34,15 +40,21 @@ class ParkingLotController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'location'    => ['nullable', 'string'],
-            'total_slots' => ['required', 'integer', 'min:0'],
-            'hourly_rate' => ['required', 'numeric', 'min:0'],
-            'owner_id'    => ['nullable', 'exists:users,id'],
-            'is_active'   => ['boolean'],
+            'name'                 => ['required', 'string', 'max:255'],
+            'location'             => ['nullable', 'string'],
+            'address'              => ['nullable', 'string', 'max:500'],
+            'district'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', 'max:255'],
+            'landmark'             => ['nullable', 'string', 'max:500'],
+            'total_slots'          => ['required', 'integer', 'min:0'],
+            'hourly_rate'          => ['required', 'numeric', 'min:0'],
+            'owner_id'             => ['nullable', 'exists:users,id'],
+            'is_active'            => ['boolean'],
+            'reservations_enabled' => ['boolean'],
         ]);
 
-        $data['is_active'] = $request->boolean('is_active', true);
+        $data['is_active']            = $request->boolean('is_active', true);
+        $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
         ParkingLot::create($data);
 
         return redirect()->route('admin.parking-lots.index')
@@ -58,15 +70,21 @@ class ParkingLotController extends Controller
     public function update(Request $request, ParkingLot $parking_lot)
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'location'    => ['nullable', 'string'],
-            'total_slots' => ['required', 'integer', 'min:0'],
-            'hourly_rate' => ['required', 'numeric', 'min:0'],
-            'owner_id'    => ['nullable', 'exists:users,id'],
-            'is_active'   => ['boolean'],
+            'name'                 => ['required', 'string', 'max:255'],
+            'location'             => ['nullable', 'string'],
+            'address'              => ['nullable', 'string', 'max:500'],
+            'district'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', 'max:255'],
+            'landmark'             => ['nullable', 'string', 'max:500'],
+            'total_slots'          => ['required', 'integer', 'min:0'],
+            'hourly_rate'          => ['required', 'numeric', 'min:0'],
+            'owner_id'             => ['nullable', 'exists:users,id'],
+            'is_active'            => ['boolean'],
+            'reservations_enabled' => ['boolean'],
         ]);
 
-        $data['is_active'] = $request->boolean('is_active', true);
+        $data['is_active']            = $request->boolean('is_active', true);
+        $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
         $parking_lot->update($data);
 
         return redirect()->route('admin.parking-lots.index')

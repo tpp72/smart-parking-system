@@ -76,8 +76,16 @@
                     <div class="flex items-start justify-between gap-2">
                         <div>
                             <h2 class="font-extrabold text-white text-lg leading-tight">{{ $lot->name }}</h2>
-                            @if($lot->location)
-                                <p class="text-gray-400 text-xs mt-0.5">{{ \Illuminate\Support\Str::limit($lot->location, 70) }}</p>
+                            @php
+                                $addressLine = collect([$lot->address, $lot->district, $lot->province])->filter()->implode(', ');
+                            @endphp
+                            @if($addressLine)
+                                <p class="text-gray-300 text-xs mt-0.5">{{ $addressLine }}</p>
+                            @endif
+                            @if($lot->landmark)
+                                <p class="text-gray-500 text-xs">ใกล้ {{ $lot->landmark }}</p>
+                            @elseif($lot->location && !$addressLine)
+                                <p class="text-gray-400 text-xs mt-0.5">{{ \Illuminate\Support\Str::limit($lot->location, 60) }}</p>
                             @endif
                         </div>
                         @if($lot->available > 0)

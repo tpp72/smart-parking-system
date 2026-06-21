@@ -60,11 +60,13 @@
                                 </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex gap-2 justify-end flex-wrap">
-                                        <a href="{{ route('owner.parking-lots.edit', $lot->id) }}" class="sp-btn sp-btn-outline">แก้ไข</a>
+                                        <a href="{{ route('owner.parking-lots.edit', $lot->id) }}" title="แก้ไขข้อมูลลานจอด" class="sp-btn sp-btn-outline">แก้ไข</a>
 
                                         <form method="POST" action="{{ route('owner.parking-lots.toggle', $lot->id) }}">
                                             @csrf @method('PATCH')
-                                            <button type="submit" class="sp-btn sp-btn-outline">
+                                            <button type="submit"
+                                                title="{{ $lot->is_active ? 'ปิดรับรถชั่วคราว' : 'เปิดรับรถ' }}"
+                                                class="sp-btn sp-btn-outline">
                                                 {{ $lot->is_active ? 'ปิด' : 'เปิด' }}
                                             </button>
                                         </form>
@@ -72,7 +74,7 @@
                                         <form method="POST" action="{{ route('owner.parking-lots.destroy', $lot->id) }}"
                                             onsubmit="return confirm('ยืนยันลบลานจอดนี้?')">
                                             @csrf @method('DELETE')
-                                            <button type="submit" class="sp-btn sp-btn-danger">ลบ</button>
+                                            <button type="submit" title="ลบลานจอดนี้ (ถาวร)" class="sp-btn sp-btn-danger">ลบ</button>
                                         </form>
                                     </div>
                                 </td>

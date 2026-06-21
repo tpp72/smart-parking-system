@@ -6,28 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
+            $table->string('license_plate')->nullable();
+            $table->foreignId('vehicle_id')->nullable()->constrained('vehicles')->nullOnDelete();
             $table->foreignId('parking_lot_id')->constrained('parking_lots')->cascadeOnDelete();
             $table->foreignId('parking_slot_id')->nullable()->constrained('parking_slots')->nullOnDelete();
             $table->timestamp('reserve_start', 0);
-            $table->timestamp('reserve_end', 0);
+            $table->timestamp('checked_in_at', 0)->nullable();
+            $table->timestamp('completed_at', 0)->nullable();
             $table->decimal('reservation_fee', 8, 2)->default(0);
             $table->string('status')->default('pending');
             $table->timestamps(0);
+
+            $table->index('status');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('reservations');

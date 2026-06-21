@@ -19,11 +19,6 @@ return [
     'admin.parking-slots.edit'          => 'แก้ไขช่องจอด',
     'admin.parking-slots.bulk.create'   => 'เพิ่มช่องจอดหลายรายการ',
 
-    // Devices
-    'admin.devices.index'               => 'จัดการอุปกรณ์',
-    'admin.devices.create'              => 'เพิ่มอุปกรณ์',
-    'admin.devices.edit'                => 'แก้ไขอุปกรณ์',
-
     // Users
     'admin.users.index'                 => 'จัดการผู้ใช้งาน',
     'admin.users.edit'                  => 'แก้ไขผู้ใช้งาน',

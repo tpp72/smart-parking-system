@@ -117,6 +117,32 @@
                 </div>
             </div>
 
+            {{-- Analytics Charts --}}
+            <div>
+                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Analytics</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <x-dashboard-chart
+                        type="line"
+                        title="รายได้ 12 เดือนล่าสุด"
+                        :labels="$chartRevenueTrend['labels']"
+                        :datasets="$chartRevenueTrend['datasets']"
+                        height="220px"
+                    />
+                    <x-dashboard-chart
+                        type="pie"
+                        title="สถานะการจอง"
+                        :labels="$chartReservationStatus['labels']"
+                        :datasets="$chartReservationStatus['datasets']"
+                    />
+                    <x-dashboard-chart
+                        type="bar"
+                        title="สถานะช่องจอด"
+                        :labels="$chartSlotOccupancy['labels']"
+                        :datasets="$chartSlotOccupancy['datasets']"
+                    />
+                </div>
+            </div>
+
             {{-- Slot Status Bar --}}
             @if($stats['slots_total'] > 0)
             <div class="sp-card rounded-2xl p-5">
@@ -237,6 +263,59 @@
                     @endif
                 </div>
             </div>
+
+            {{-- ============================================================ --}}
+            {{--  Self-Demotion Section (แสดงเฉพาะ owner ที่ approved)       --}}
+            {{-- ============================================================ --}}
+            @if($ownerStatus === 'approved')
+            <div class="sp-card rounded-2xl p-6 border border-red-900/40"
+                 x-data="{ open: false, reason: '' }">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold text-gray-300">ลาออกจากการเป็นเจ้าของลานจอด</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">บัญชีจะเปลี่ยนกลับเป็น User — ลานจอดของคุณจะยังคงอยู่ในระบบ</p>
+                    </div>
+                    <button type="button" @click="open = true"
+                        title="ส่งคำร้องขอลาออกจาก Owner กลับเป็น User"
+                        class="sp-btn sp-btn-danger text-sm">
+                        ลาออกจาก Owner
+                    </button>
+                </div>
+
+                {{-- Modal --}}
+                <div x-show="open" x-cloak
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+                    @keydown.escape.window="open = false">
+                    <div class="sp-card rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-red-700/50"
+                        @click.stop>
+                        <h3 class="text-lg font-extrabold text-red-300 mb-2">ยืนยันการลาออกจาก Owner</h3>
+                        <p class="text-sm text-gray-400 mb-4">
+                            หลังจากนี้คุณจะไม่สามารถจัดการลานจอดได้ จนกว่าจะสมัคร Owner ใหม่อีกครั้ง
+                        </p>
+
+                        <form method="POST" action="{{ route('owner.demote-self') }}">
+                            @csrf
+                            <div class="mb-4">
+                                <label class="block text-sm text-red-300 font-semibold mb-1">
+                                    เหตุผลในการลาออก *
+                                </label>
+                                <textarea name="reason" x-model="reason" rows="3" required
+                                    class="w-full rounded-xl bg-black/40 border border-red-700/60 text-white focus:ring-0 focus:border-red-500 text-sm"
+                                    placeholder="โปรดระบุเหตุผล..."></textarea>
+                            </div>
+                            <div class="flex gap-3 justify-end">
+                                <button type="button" @click="open = false" class="sp-btn sp-btn-outline">ยกเลิก</button>
+                                <button type="submit" :disabled="reason.trim() === ''"
+                                    class="sp-btn sp-btn-danger"
+                                    :class="{ 'opacity-40 cursor-not-allowed': reason.trim() === '' }">
+                                    ยืนยันลาออก
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
 
             @endif {{-- end approved state --}}
 

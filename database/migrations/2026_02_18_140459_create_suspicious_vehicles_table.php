@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('suspicious_vehicles', function (Blueprint $table) {
@@ -17,14 +14,11 @@ return new class extends Migration
             $table->string('reason')->nullable();
             $table->string('level')->default('medium');
             $table->boolean('is_active')->default(true);
-
+            $table->foreignId('added_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps(0);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('suspicious_vehicles');

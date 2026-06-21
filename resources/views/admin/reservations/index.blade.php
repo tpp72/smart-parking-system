@@ -63,7 +63,9 @@
                     <tbody>
                         @forelse($reservations as $r)
                             <tr class="border-b sp-divider">
-                                <td class="py-3 pr-4 font-extrabold">{{ $r->vehicle?->license_plate ?? '-' }}</td>
+                                <td class="py-3 pr-4 font-extrabold tracking-wider">
+                                    {{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}
+                                </td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->user?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->parkingLot?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->parkingSlot?->slot_number ?? '-' }}</td>
@@ -96,6 +98,7 @@
                                             <form method="POST" action="{{ route('admin.reservations.confirm', $r) }}">
                                                 @csrf
                                                 <button type="submit"
+                                                    title="ยืนยันและอนุมัติการจองนี้"
                                                     class="sp-btn sp-btn-outline border-green-600/50 text-green-300 hover:bg-green-900/30">
                                                     ✓ ยืนยัน
                                                 </button>
@@ -107,7 +110,7 @@
                                             onsubmit="return confirm('ยืนยันลบ reservation นี้? (ลบถาวร)')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="sp-btn sp-btn-danger">ลบ</button>
+                                            <button type="submit" title="ลบ Reservation นี้ (ถาวร)" class="sp-btn sp-btn-danger">ลบ</button>
                                         </form>
                                     </div>
                                 </td>

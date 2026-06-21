@@ -7,7 +7,6 @@ use App\Http\Controllers\User\VehicleController as UserVehicleController;
 use App\Http\Controllers\User\ParkingLogController as UserParkingLogController;
 use App\Http\Controllers\Admin\ParkingLotController;
 use App\Http\Controllers\Admin\ParkingSlotController;
-use App\Http\Controllers\Admin\EntryExitDeviceController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\ReservationLogController;
@@ -17,6 +16,7 @@ use App\Http\Controllers\Admin\CheckOutController;
 use App\Http\Controllers\Admin\ParkingLogController;
 use App\Http\Controllers\Admin\VehicleController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\SuspiciousVehicleController;
 use App\Http\Controllers\CarScanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicationController;
@@ -54,8 +54,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::resource('parking-slots', ParkingSlotController::class)->except(['show']);
     Route::get('parking-slots/bulk', [ParkingSlotController::class, 'bulkCreate'])->name('parking-slots.bulk.create');
     Route::post('parking-slots/bulk', [ParkingSlotController::class, 'bulkStore'])->name('parking-slots.bulk.store');
-    // Entry and Exit Devices CRUD
-    Route::resource('devices', EntryExitDeviceController::class)->except(['show']);
     // Users CRUD
     Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
     Route::get('users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
@@ -88,6 +86,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
     Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
     Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
+    // Suspicious Vehicles (Blacklist)
+    Route::post('suspicious-vehicles/{suspiciousVehicle}/toggle', [SuspiciousVehicleController::class, 'toggle'])->name('suspicious-vehicles.toggle');
+    Route::resource('suspicious-vehicles', SuspiciousVehicleController::class)->except(['show']);
     // Owner Applications
     Route::get('owner-applications', [AdminOwnerApplicationController::class, 'index'])->name('owner-applications.index');
     Route::get('owner-applications/{ownerApplication}', [AdminOwnerApplicationController::class, 'show'])->name('owner-applications.show');
@@ -98,14 +99,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 // ===== Public Marketplace =====
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
 
-// ===== Owner Routes — Dashboard + Application (all owners, including pending) =====
+// ===== Owner Routes — Dashboard + Self-demotion (role: owner) =====
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'owner'])->group(function () {
     Route::get('dashboard', [OwnerDashboardController::class, 'index'])->name('dashboard');
-
-    // Application status / edit / resubmit (any owner regardless of status)
-    Route::get('application', [OwnerApplicationController::class, 'show'])->name('application.show');
-    Route::get('application/edit', [OwnerApplicationController::class, 'edit'])->name('application.edit');
-    Route::put('application', [OwnerApplicationController::class, 'update'])->name('application.update');
+    Route::post('demote-self', [OwnerApplicationController::class, 'demoteSelf'])->name('demote-self');
 });
 
 // ===== Owner Routes — Management (approved owners only) =====
@@ -132,10 +129,14 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     Route::get('revenue', [OwnerRevenueController::class, 'index'])->name('revenue.index');
 });
 
-// ===== Owner Application — accessible to any authenticated user (to apply) =====
+// ===== Owner Application — accessible to any authenticated user (apply + status) =====
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset'])->group(function () {
     Route::get('apply', [OwnerApplicationController::class, 'create'])->name('application.create');
     Route::post('apply', [OwnerApplicationController::class, 'store'])->name('application.store');
+    // Status/edit/resubmit accessible while role is still 'user' (pending state)
+    Route::get('application', [OwnerApplicationController::class, 'show'])->name('application.show');
+    Route::get('application/edit', [OwnerApplicationController::class, 'edit'])->name('application.edit');
+    Route::put('application', [OwnerApplicationController::class, 'update'])->name('application.update');
 });
 
 // ===== User Routes (role: user เท่านั้น) =====
@@ -146,11 +147,9 @@ Route::prefix('user')->name('user.')->middleware(['auth', 'verified', 'force.pas
     Route::get('reservations', [UserReservationController::class, 'index'])->name('reservations.index');
     Route::get('reservations/create', [UserReservationController::class, 'create'])->name('reservations.create');
     Route::post('reservations', [UserReservationController::class, 'store'])->name('reservations.store');
-    // รถของตัวเอง
-    Route::get('vehicles', [UserVehicleController::class, 'index'])->name('vehicles.index');
-    Route::get('vehicles/create', [UserVehicleController::class, 'create'])->name('vehicles.create');
-    Route::post('vehicles', [UserVehicleController::class, 'store'])->name('vehicles.store');
-    Route::delete('vehicles/{vehicle}', [UserVehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::get('reservations/{reservation}/edit', [UserReservationController::class, 'edit'])->name('reservations.edit');
+    Route::patch('reservations/{reservation}/plate', [UserReservationController::class, 'update'])->name('reservations.update-plate');
+    Route::post('reservations/{reservation}/cancel', [UserReservationController::class, 'cancel'])->name('reservations.cancel');
     // ประวัติการจอดของตัวเอง
     Route::get('parking-logs', [UserParkingLogController::class, 'index'])->name('parking-logs.index');
     // AI Car Scan (user)
