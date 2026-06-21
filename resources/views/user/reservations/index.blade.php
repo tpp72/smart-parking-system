@@ -4,7 +4,7 @@
 
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                    <h1 class="text-3xl font-extrabold sp-glow-text">การจองของฉัน (My Reservations)</h1>
+                    <h1 class="text-3xl font-extrabold sp-glow-text">การจองของฉัน</h1>
                     <p class="text-gray-300 mt-1">รายการจองที่จอดรถทั้งหมดของคุณ</p>
                 </div>
                 <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary">+ จองที่จอด</a>
@@ -16,21 +16,29 @@
                 </div>
             @endif
 
+            @if ($errors->has('error'))
+                <div class="sp-card rounded-2xl p-4 mb-6 border border-red-600/40">
+                    <p class="text-red-300 font-semibold">{{ $errors->first('error') }}</p>
+                </div>
+            @endif
+
             <div class="sp-card rounded-2xl p-6 overflow-x-auto">
                 <table class="w-full sp-table">
                     <thead>
                         <tr class="border-b sp-divider">
                             <th class="py-3 pr-4 text-left">ทะเบียน</th>
                             <th class="py-3 pr-4 text-left">ลาน / ช่อง</th>
-                            <th class="py-3 pr-4 text-left">เวลาเริ่ม</th>
+                            <th class="py-3 pr-4 text-left whitespace-nowrap">เวลาเริ่ม</th>
+                            <th class="py-3 pr-4 text-right whitespace-nowrap">มัดจำ</th>
                             <th class="py-3 pr-4 text-center">สถานะ</th>
+                            <th class="py-3 text-center">จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($reservations as $r)
                             <tr class="border-b sp-divider hover:bg-white/5 transition">
-                                <td class="py-3 pr-4 font-bold text-red-300">
-                                    {{ $r->vehicle?->license_plate ?? '-' }}
+                                <td class="py-3 pr-4 font-bold text-red-300 tracking-wider">
+                                    {{ $r->license_plate ?? '—' }}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300">
                                     {{ $r->parkingLot?->name ?? '-' }}
@@ -40,6 +48,13 @@
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">
                                     {{ \Carbon\Carbon::parse($r->reserve_start)->format('d/m/Y H:i') }}
+                                </td>
+                                <td class="py-3 pr-4 text-right whitespace-nowrap">
+                                    @if ($r->reservation_fee > 0)
+                                        <span class="text-yellow-300">฿{{ number_format($r->reservation_fee, 2) }}</span>
+                                    @else
+                                        <span class="text-gray-600">—</span>
+                                    @endif
                                 </td>
                                 <td class="py-3 pr-4 text-center">
                                     @php
@@ -53,10 +68,32 @@
                                     @endphp
                                     <span class="sp-badge {{ $badgeClass }}">{{ $r->status }}</span>
                                 </td>
+                                <td class="py-3 text-center">
+                                    <div class="flex gap-1.5 justify-center">
+                                        @if(in_array($r->status, ['pending', 'confirmed']))
+                                            <a href="{{ route('user.reservations.edit', $r) }}"
+                                               title="แก้ไขป้ายทะเบียน"
+                                               class="sp-btn sp-btn-outline text-xs px-2.5 py-1">แก้ไข</a>
+
+                                            <form method="POST"
+                                                  action="{{ route('user.reservations.cancel', $r) }}"
+                                                  onsubmit="return confirm('ยืนยันยกเลิกการจอง #{{ $r->id }} ?')">
+                                                @csrf
+                                                <button type="submit"
+                                                        title="ยกเลิกการจอง #{{ $r->id }}"
+                                                        class="sp-btn sp-btn-danger text-xs px-2.5 py-1">
+                                                    ยกเลิก
+                                                </button>
+                                            </form>
+                                        @else
+                                            <span class="text-gray-600 text-xs">—</span>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="py-10 text-center text-gray-400">
+                                <td colspan="6" class="py-10 text-center text-gray-400">
                                     ยังไม่มีการจอง —
                                     <a href="{{ route('user.reservations.create') }}" class="text-red-300 underline">
                                         จองเลย

@@ -73,11 +73,11 @@
                                 </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex gap-2 justify-end">
-                                        <a href="{{ route('owner.parking-slots.edit', $slot) }}" class="sp-btn sp-btn-outline">แก้ไข</a>
+                                        <a href="{{ route('owner.parking-slots.edit', $slot) }}" title="แก้ไขช่องจอด {{ $slot->slot_number }}" class="sp-btn sp-btn-outline">แก้ไข</a>
                                         <form method="POST" action="{{ route('owner.parking-slots.destroy', $slot) }}"
                                             onsubmit="return confirm('ยืนยันลบช่องจอดนี้?')">
                                             @csrf @method('DELETE')
-                                            <button type="submit" class="sp-btn sp-btn-danger">ลบ</button>
+                                            <button type="submit" title="ลบช่องจอด {{ $slot->slot_number }} (ถาวร)" class="sp-btn sp-btn-danger">ลบ</button>
                                         </form>
                                     </div>
                                 </td>

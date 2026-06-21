@@ -8,16 +8,16 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReservationController extends Controller
 {
     /** รายการการจองของ user ที่ login อยู่ */
     public function index()
     {
-        $reservations = Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'vehicle:id,license_plate'])
+        $reservations = Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number'])
             ->where('user_id', Auth::id())
             ->orderByDesc('reserve_start')
             ->paginate(10);
@@ -25,31 +25,28 @@ class ReservationController extends Controller
         return view('user.reservations.index', compact('reservations'));
     }
 
-    /** ฟอร์มสร้างการจอง (เฉพาะรถของตัวเอง) */
+    /** ฟอร์มสร้างการจอง — กรอกป้ายทะเบียนโดยตรง */
     public function create()
     {
-        /** @var User $authUser */
-        $authUser = Auth::user();
-        $vehicles = $authUser->vehicles()->orderBy('license_plate')->get(['id', 'license_plate', 'brand']);
-        $lots     = ParkingLot::orderBy('name')->get(['id', 'name', 'hourly_rate']);
-        $slots    = ParkingSlot::where('status', 'available')
+        $lots  = ParkingLot::reservable()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
+        $slots = ParkingSlot::where('status', 'available')
             ->orderBy('parking_lot_id')->orderBy('slot_number')
             ->get(['id', 'parking_lot_id', 'slot_number']);
 
-        return view('user.reservations.create', compact('vehicles', 'lots', 'slots'));
+        return view('user.reservations.create', compact('lots', 'slots'));
     }
 
     /** บันทึกการจอง */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'vehicle_id'      => ['required', 'exists:vehicles,id'],
+            'license_plate'   => ['required', 'string', 'max:20'],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
             'reserve_start'   => ['required', 'date', 'after:now', 'before:' . now()->addDay()->toDateTimeString()],
         ], [
-            'vehicle_id.required'      => 'กรุณาเลือกรถ',
-            'vehicle_id.exists'        => 'ไม่พบรถที่เลือกในระบบ',
+            'license_plate.required'   => 'กรุณากรอกป้ายทะเบียนรถ',
+            'license_plate.max'        => 'ป้ายทะเบียนต้องไม่เกิน 20 ตัวอักษร',
             'parking_lot_id.required'  => 'กรุณาเลือกลานจอด',
             'parking_lot_id.exists'    => 'ไม่พบลานจอดที่เลือกในระบบ',
             'parking_slot_id.exists'   => 'ไม่พบช่องจอดที่เลือกในระบบ',
@@ -59,45 +56,39 @@ class ReservationController extends Controller
             'reserve_start.before'     => 'จองล่วงหน้าได้ไม่เกิน 1 วัน (24 ชั่วโมง)',
         ]);
 
-        /** @var User $authUser */
-        $authUser = Auth::user();
-        if (!$authUser->vehicles()->where('id', $data['vehicle_id'])->exists()) {
-            abort(403, 'ไม่มีสิทธิ์จองด้วยรถนี้');
-        }
+        $plate = strtoupper(trim($data['license_plate']));
 
-        // ป้องกัน: รถคันนี้มีการจองที่ยัง active อยู่แล้ว
-        $hasActiveReservation = Reservation::where('vehicle_id', $data['vehicle_id'])
+        // ป้องกัน: ป้ายทะเบียนนี้มีการจองที่ยัง active อยู่แล้ว
+        if (Reservation::where('license_plate', $plate)
             ->whereIn('status', Reservation::ACTIVE_STATUSES)
-            ->exists();
-
-        if ($hasActiveReservation) {
+            ->exists()
+        ) {
             return back()
-                ->withErrors(['vehicle_id' => 'รถคันนี้มีการจองที่ยังดำเนินการอยู่ กรุณารอให้เสร็จสิ้นก่อน'])
+                ->withErrors(['license_plate' => 'ป้ายทะเบียนนี้มีการจองที่ยังดำเนินการอยู่ กรุณารอให้เสร็จสิ้นก่อน'])
                 ->withInput();
         }
 
-        // ป้องกัน: user มีการจอง active อยู่แล้วในช่วงเวลาเดียวกัน (ต่างรถ)
+        // ป้องกัน: user มีการจอง active อยู่แล้วในช่วงเวลาเดียวกัน
         $end = \Carbon\Carbon::parse($data['reserve_start'])->addHour()->toDateTimeString();
-        $hasUserConflict = Reservation::where('user_id', Auth::id())
+        if (Reservation::where('user_id', Auth::id())
             ->whereIn('status', Reservation::ACTIVE_STATUSES)
             ->where('reserve_start', '<', $end)
             ->whereRaw("reserve_start + INTERVAL '1 hour' > ?", [$data['reserve_start']])
-            ->exists();
-
-        if ($hasUserConflict) {
+            ->exists()
+        ) {
             return back()
                 ->withErrors(['reserve_start' => 'คุณมีการจองอื่นในช่วงเวลานี้อยู่แล้ว กรุณาเลือกเวลาอื่น'])
                 ->withInput();
         }
 
-        // ป้องกัน: รถกำลังจอดอยู่ในระบบ
-        $isParked = ParkingLog::where('vehicle_id', $data['vehicle_id'])
-            ->whereNull('check_out_time')
+        // ป้องกัน: รถกำลังจอดอยู่ในระบบ (ตรวจจาก vehicle.license_plate)
+        $isParked = ParkingLog::whereNull('check_out_time')
+            ->whereHas('vehicle', fn ($q) => $q->where('license_plate', $plate))
             ->exists();
 
         if ($isParked) {
             return back()
-                ->withErrors(['vehicle_id' => 'รถคันนี้กำลังจอดอยู่แล้ว ไม่สามารถจองได้ในขณะนี้'])
+                ->withErrors(['license_plate' => 'ป้ายทะเบียนนี้กำลังจอดอยู่แล้ว ไม่สามารถจองได้ในขณะนี้'])
                 ->withInput();
         }
 
@@ -116,13 +107,22 @@ class ReservationController extends Controller
             }
         }
 
+        $lot = ParkingLot::findOrFail($data['parking_lot_id']);
+
+        if (!$lot->reservations_enabled) {
+            return back()
+                ->withErrors(['parking_lot_id' => 'ลานจอดนี้ไม่รับจองล่วงหน้าในขณะนี้'])
+                ->withInput();
+        }
+
         $reservation = Reservation::create([
             'user_id'         => Auth::id(),
-            'vehicle_id'      => $data['vehicle_id'],
+            'license_plate'   => $plate,
+            'vehicle_id'      => null,
             'parking_lot_id'  => $data['parking_lot_id'],
             'parking_slot_id' => $data['parking_slot_id'] ?? null,
             'reserve_start'   => $data['reserve_start'],
-            'reservation_fee' => 0,
+            'reservation_fee' => $lot->hourly_rate,
             'status'          => 'pending',
         ]);
 
@@ -138,10 +138,109 @@ class ReservationController extends Controller
             ->with('success', 'ส่งคำขอจองสำเร็จ! รอ Admin ยืนยันการจอง');
     }
 
-    /**
-     * ตรวจสอบว่า slot นี้มีการจองที่ทับซ้อนกันอยู่หรือไม่
-     * หน้าต่างการจอง: [reserve_start, reserve_start + 1 ชั่วโมง]
-     */
+    /** ฟอร์มแก้ไขป้ายทะเบียน (ได้เฉพาะก่อน Check-In) */
+    public function edit(Reservation $reservation)
+    {
+        abort_unless($reservation->user_id === Auth::id(), 403);
+
+        if (!in_array($reservation->status, ['pending', 'confirmed'], true)) {
+            return redirect()->route('user.reservations.index')
+                ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
+        }
+
+        return view('user.reservations.edit', compact('reservation'));
+    }
+
+    /** บันทึกการแก้ไขป้ายทะเบียน */
+    public function update(Request $request, Reservation $reservation)
+    {
+        abort_unless($reservation->user_id === Auth::id(), 403);
+
+        if (!in_array($reservation->status, ['pending', 'confirmed'], true)) {
+            return redirect()->route('user.reservations.index')
+                ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
+        }
+
+        $data = $request->validate([
+            'license_plate' => ['required', 'string', 'max:20'],
+        ], [
+            'license_plate.required' => 'กรุณากรอกป้ายทะเบียนรถ',
+            'license_plate.max'      => 'ป้ายทะเบียนต้องไม่เกิน 20 ตัวอักษร',
+        ]);
+
+        $plate = strtoupper(trim($data['license_plate']));
+
+        // ถ้าไม่มีการเปลี่ยนแปลง ข้ามไปเลย
+        if ($plate === $reservation->license_plate) {
+            return redirect()->route('user.reservations.index')
+                ->with('success', 'ป้ายทะเบียนไม่มีการเปลี่ยนแปลง');
+        }
+
+        // ตรวจสอบว่าป้ายทะเบียนใหม่ไม่มีการจอง active อื่น
+        if (Reservation::where('license_plate', $plate)
+            ->where('id', '!=', $reservation->id)
+            ->whereIn('status', Reservation::ACTIVE_STATUSES)
+            ->exists()
+        ) {
+            return back()
+                ->withErrors(['license_plate' => 'ป้ายทะเบียนนี้มีการจองที่ยังดำเนินการอยู่'])
+                ->withInput();
+        }
+
+        $reservation->update(['license_plate' => $plate]);
+
+        ReservationLog::create([
+            'reservation_id' => $reservation->id,
+            'old_status'     => $reservation->status,
+            'new_status'     => $reservation->status,
+            'changed_by'     => Auth::id(),
+            'note'           => "User แก้ไขป้ายทะเบียนเป็น {$plate}",
+        ]);
+
+        return redirect()->route('user.reservations.index')
+            ->with('success', "อัปเดตป้ายทะเบียนเป็น {$plate} เรียบร้อยแล้ว");
+    }
+
+    /** ยกเลิกการจองที่เป็นของตัวเอง (เฉพาะ pending / confirmed) */
+    public function cancel(Reservation $reservation)
+    {
+        abort_unless($reservation->user_id === Auth::id(), 403);
+
+        if (!in_array($reservation->status, ['pending', 'confirmed'], true)) {
+            return redirect()->route('user.reservations.index')
+                ->withErrors(['error' => "ไม่สามารถยกเลิกการจองที่มีสถานะ \"{$reservation->status}\" ได้"]);
+        }
+
+        $oldStatus = $reservation->status;
+
+        DB::transaction(function () use ($reservation, $oldStatus) {
+            $reservation->update(['status' => 'cancelled']);
+
+            if ($reservation->parking_slot_id) {
+                ParkingSlot::where('id', $reservation->parking_slot_id)
+                    ->where('status', 'reserved')
+                    ->update(['status' => 'available']);
+            }
+
+            ReservationLog::create([
+                'reservation_id' => $reservation->id,
+                'old_status'     => $oldStatus,
+                'new_status'     => 'cancelled',
+                'changed_by'     => Auth::id(),
+                'note'           => 'User ยกเลิกการจอง',
+            ]);
+        });
+
+        notify_user(
+            Auth::id(),
+            'ยกเลิกการจองเรียบร้อยแล้ว',
+            "การจอง #{$reservation->id} ถูกยกเลิกเรียบร้อยแล้ว"
+        );
+
+        return redirect()->route('user.reservations.index')
+            ->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว");
+    }
+
     private function hasSlotConflict(int $slotId, string $start): bool
     {
         $end = \Carbon\Carbon::parse($start)->addHour()->toDateTimeString();

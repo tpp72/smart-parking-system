@@ -6,7 +6,7 @@
                 <div>
                     <h1 class="text-3xl font-extrabold sp-glow-text">แก้ไข Reservation</h1>
                     <p class="text-gray-300 mt-1">
-                        {{ $reservation->vehicle?->license_plate ?? '-' }} • {{ $reservation->user?->name ?? '-' }}
+                        {{ $reservation->license_plate ?? $reservation->vehicle?->license_plate ?? '-' }} • {{ $reservation->user?->name ?? '-' }}
                     </p>
                 </div>
                 <a href="{{ route('admin.reservations.index') }}" class="sp-btn sp-btn-outline">ย้อนกลับ</a>
@@ -24,6 +24,16 @@
                     @method('PATCH')
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm text-gray-200 mb-1">ป้ายทะเบียนรถ *</label>
+                            <input type="text" name="license_plate"
+                                value="{{ old('license_plate', $reservation->license_plate ?? $reservation->vehicle?->license_plate) }}"
+                                class="sp-select uppercase tracking-widest" maxlength="20" />
+                            @error('license_plate')
+                                <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div>
                             <label class="block text-sm text-gray-200 mb-1">ลานจอด *</label>
                             <select name="parking_lot_id" class="sp-select">

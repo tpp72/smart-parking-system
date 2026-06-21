@@ -40,21 +40,31 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $isDemoting = $user->role === 'owner' && $request->input('role') === 'user';
+
         $data = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'role'  => ['required', Rule::in($this->roles)],
+            'name'             => ['required', 'string', 'max:255'],
+            'email'            => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role'             => ['required', Rule::in($this->roles)],
+            'demotion_reason'  => $isDemoting ? ['required', 'string', 'max:1000'] : ['nullable'],
         ]);
 
         if ($request->user()->id === $user->id && $data['role'] !== 'admin') {
             return back()->withErrors(['role' => 'ไม่สามารถเปลี่ยน role ของตัวเองออกจาก admin ได้'])->withInput();
         }
 
-        $user->update($data);
-
-        admin_audit('user.update', $user, [
-            'changed' => array_keys($data),
+        $user->update([
+            'name'  => $data['name'],
+            'email' => $data['email'],
+            'role'  => $data['role'],
         ]);
+
+        $auditExtra = ['changed' => array_keys($data)];
+        if ($isDemoting) {
+            $auditExtra['demotion_reason'] = $data['demotion_reason'];
+        }
+
+        admin_audit('user.update', $user, $auditExtra);
 
         return redirect()->route('admin.users.edit', $user)->with('success', 'อัปเดตผู้ใช้เรียบร้อยแล้ว');
     }

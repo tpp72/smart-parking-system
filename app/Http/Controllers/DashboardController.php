@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OwnerApplication;
+use App\Models\SuspiciousVehicle;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
@@ -183,6 +184,17 @@ class DashboardController extends Controller
                 ->whereBetween('p.created_at', [$from, $to])
                 ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
                 ->count(),
+            'reservations_checked_in' => (int) DB::table('reservations')
+                ->where('status', 'checked_in')
+                ->whereBetween('checked_in_at', [$from, $to])
+                ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
+                ->count(),
+            'reservations_completed'  => (int) DB::table('reservations')
+                ->where('status', 'completed')
+                ->whereBetween('completed_at', [$from, $to])
+                ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
+                ->count(),
+            'blacklist_active' => (int) SuspiciousVehicle::active()->count(),
         ];
 
         // Active now
@@ -215,15 +227,16 @@ class DashboardController extends Controller
 
         // Latest scans
         $latestScans = DB::table('license_plate_scans as lps')
-            ->join('entry_exit_devices as d', 'd.id', '=', 'lps.device_id')
-            ->leftJoin('suspicious_vehicles as sv', 'sv.license_plate', '=', 'lps.license_plate')
+            ->leftJoin('suspicious_vehicles as sv', function ($join) {
+                $join->on('sv.license_plate', '=', 'lps.license_plate')
+                     ->where('sv.is_active', true);
+            })
             ->orderByDesc('lps.scan_time')
             ->limit(6)
             ->select([
                 'lps.license_plate',
                 'lps.scan_time',
-                'd.device_type',
-                'd.location',
+                'lps.source',
                 DB::raw("CASE WHEN sv.id IS NULL THEN false ELSE true END as is_suspicious"),
             ])
             ->get();
@@ -278,8 +291,74 @@ class DashboardController extends Controller
 
         $pendingApplications = OwnerApplication::where('status', 'pending')->count();
 
+        // ── Chart data ─────────────────────────────────────────────────────
+        $statusKeys   = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
+        $statusColors = [
+            'pending'    => 'rgba(250,204,21,0.85)',
+            'confirmed'  => 'rgba(96,165,250,0.85)',
+            'checked_in' => 'rgba(52,211,153,0.85)',
+            'completed'  => 'rgba(34,197,94,0.85)',
+            'cancelled'  => 'rgba(239,68,68,0.85)',
+            'expired'    => 'rgba(107,114,128,0.85)',
+        ];
+        $rawStatusCounts = DB::table('reservations')
+            ->selectRaw('status, COUNT(*) as count')
+            ->whereIn('status', $statusKeys)
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $chartReservationStatus = [
+            'labels'   => ['Pending', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'Expired'],
+            'datasets' => [[
+                'data'            => array_map(fn ($s) => (int) ($rawStatusCounts[$s] ?? 0), $statusKeys),
+                'backgroundColor' => array_values($statusColors),
+                'borderColor'     => '#111827',
+                'borderWidth'     => 2,
+                'hoverOffset'     => 6,
+            ]],
+        ];
+
+        $chartSlotOccupancy = [
+            'labels'   => ['ว่าง', 'จอง', 'ใช้งาน'],
+            'datasets' => [[
+                'label'           => 'ช่องจอด',
+                'data'            => [
+                    $stats['slots_available'],
+                    $stats['slots_reserved'],
+                    $stats['slots_occupied'],
+                ],
+                'backgroundColor' => [
+                    'rgba(34,197,94,0.75)',
+                    'rgba(250,204,21,0.75)',
+                    'rgba(239,68,68,0.75)',
+                ],
+                'borderRadius'    => 6,
+                'borderWidth'     => 0,
+            ]],
+        ];
+
+        $topLotsRaw = DB::table('reservations as r')
+            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
+            ->selectRaw('lot.name, COUNT(*) as reservation_count')
+            ->groupBy('lot.id', 'lot.name')
+            ->orderByDesc('reservation_count')
+            ->limit(5)
+            ->get();
+
+        $chartTopLots = [
+            'labels'   => $topLotsRaw->pluck('name')->toArray(),
+            'datasets' => [[
+                'label'           => 'การจอง',
+                'data'            => $topLotsRaw->pluck('reservation_count')->map(fn ($v) => (int) $v)->toArray(),
+                'backgroundColor' => 'rgba(96,165,250,0.75)',
+                'borderRadius'    => 6,
+                'borderWidth'     => 0,
+            ]],
+        ];
+
         return view('admin.dashboard', compact(
             'stats',
+            'range',
             'activeNow',
             'lotsOverview',
             'latestScans',
@@ -287,7 +366,10 @@ class DashboardController extends Controller
             'reservations',
             'recentHistory',
             'slotsPreview',
-            'pendingApplications'
+            'pendingApplications',
+            'chartReservationStatus',
+            'chartSlotOccupancy',
+            'chartTopLots'
         ));
     }
 }

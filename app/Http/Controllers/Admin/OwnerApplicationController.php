@@ -60,6 +60,7 @@ class OwnerApplicationController extends Controller
             ]);
 
             $ownerApplication->user->forceFill([
+                'role'         => 'owner',
                 'owner_status' => 'approved',
             ])->save();
         });
@@ -93,6 +94,7 @@ class OwnerApplicationController extends Controller
 
             $ownerApplication->user->forceFill([
                 'owner_status' => 'rejected',
+                // role stays 'user' — only becomes 'owner' upon approval
             ])->save();
         });
 

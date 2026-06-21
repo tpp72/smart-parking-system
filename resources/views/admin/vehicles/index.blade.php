@@ -55,6 +55,7 @@
                                 <td class="py-3 pr-4">
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('admin.vehicles.edit', $vehicle) }}"
+                                            title="แก้ไขข้อมูลรถ {{ $vehicle->license_plate }}"
                                             class="sp-btn sp-btn-outline text-sm">แก้ไข</a>
 
                                         <form method="POST"
@@ -62,7 +63,7 @@
                                             onsubmit="return confirm('ยืนยันลบรถ {{ $vehicle->license_plate }}? (ลบถาวร)')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="sp-btn sp-btn-danger text-sm">ลบ</button>
+                                            <button type="submit" title="ลบรถ {{ $vehicle->license_plate }} (ถาวร)" class="sp-btn sp-btn-danger text-sm">ลบ</button>
                                         </form>
                                     </div>
                                 </td>

@@ -68,6 +68,7 @@
                                 <td class="py-3 pr-4">
                                     <div class="flex gap-2">
                                         <a href="{{ route('admin.parking-lots.edit', $lot) }}"
+                                            title="แก้ไขข้อมูลลานจอด"
                                             class="sp-btn sp-btn-outline">
                                             แก้ไข
                                         </a>
@@ -76,7 +77,7 @@
                                             onsubmit="return confirm('ยืนยันลบลานจอดนี้? (ลบถาวร)')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="sp-btn sp-btn-danger">
+                                            <button type="submit" title="ลบลานจอดนี้ (ถาวร)" class="sp-btn sp-btn-danger">
                                                 ลบ
                                             </button>
                                         </form>

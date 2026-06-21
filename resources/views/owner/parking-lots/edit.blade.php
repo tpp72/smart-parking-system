@@ -28,7 +28,36 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm text-gray-200 mb-1">สถานที่ / ที่อยู่</label>
+                        <label class="block text-sm text-gray-200 mb-1">ที่อยู่ (เลขที่ / ถนน)</label>
+                        <input type="text" name="address" value="{{ old('address', $lot->address) }}"
+                            class="sp-select w-full" placeholder="เช่น 123/4 ถ.สุขุมวิท" />
+                        @error('address')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-200 mb-1">แขวง / ตำบล</label>
+                            <input type="text" name="district" value="{{ old('district', $lot->district) }}"
+                                class="sp-select w-full" placeholder="เช่น คลองเตย" />
+                            @error('district')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-200 mb-1">จังหวัด</label>
+                            <input type="text" name="province" value="{{ old('province', $lot->province) }}"
+                                class="sp-select w-full" placeholder="เช่น กรุงเทพมหานคร" />
+                            @error('province')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-200 mb-1">จุดสังเกต / ใกล้กับ</label>
+                        <input type="text" name="landmark" value="{{ old('landmark', $lot->landmark) }}"
+                            class="sp-select w-full" placeholder="เช่น ใกล้ BTS อโศก" />
+                        @error('landmark')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-200 mb-1">หมายเหตุสถานที่ (เพิ่มเติม)</label>
                         <textarea name="location" rows="2"
                             class="sp-select w-full">{{ old('location', $lot->location) }}</textarea>
                         @error('location')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
@@ -47,6 +76,16 @@
                                 min="0" class="sp-select w-full" />
                             @error('hourly_rate')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
                         </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <input type="hidden" name="reservations_enabled" value="0" />
+                        <input type="checkbox" name="reservations_enabled" value="1" id="reservations_enabled"
+                            @checked(old('reservations_enabled', $lot->reservations_enabled ?? true))
+                            class="w-4 h-4 rounded bg-black/40 border-gray-700 text-red-600 focus:ring-red-600" />
+                        <label for="reservations_enabled" class="text-sm text-gray-200">
+                            รับจองล่วงหน้า — ผู้ใช้สามารถจองช่องล่วงหน้าได้
+                        </label>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-2">

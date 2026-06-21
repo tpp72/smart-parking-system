@@ -48,18 +48,25 @@ class CheckOutController extends Controller
         $hourlyRate  = (float) $log->parkingLot->hourly_rate;
         $parkingFee  = round($totalHours * $hourlyRate, 2);
 
-        DB::transaction(function () use ($log, $checkOut, $totalHours, $hourlyRate, $parkingFee) {
+        // Apply reservation deposit as discount
+        $linkedReservation = $log->reservation_id
+            ? Reservation::find($log->reservation_id)
+            : null;
+        $deposit     = min((float) ($linkedReservation?->reservation_fee ?? 0), $parkingFee);
+        $totalAmount = round($parkingFee - $deposit, 2);
+
+        DB::transaction(function () use ($log, $checkOut, $totalHours, $hourlyRate, $parkingFee, $deposit, $totalAmount, $linkedReservation) {
             $log->update(['check_out_time' => $checkOut]);
 
             Payment::create([
                 'parking_log_id'       => $log->id,
-                'reservation_id'       => null,
+                'reservation_id'       => $log->reservation_id,
                 'total_hours'          => $totalHours,
                 'hourly_rate'          => $hourlyRate,
                 'parking_fee'          => $parkingFee,
-                'reservation_discount' => 0,
-                'total_amount'         => $parkingFee,
-                'payment_status'       => 'unpaid',
+                'reservation_discount' => $deposit,
+                'total_amount'         => $totalAmount,
+                'payment_status'       => $totalAmount <= 0 ? 'paid' : 'unpaid',
             ]);
 
             if ($log->parkingSlot) {
@@ -67,22 +74,19 @@ class CheckOutController extends Controller
             }
 
             // ถ้า check-in มาจากการจอง → mark completed
-            if ($log->reservation_id) {
-                $reservation = Reservation::find($log->reservation_id);
-                if ($reservation && $reservation->status === 'checked_in') {
-                    $reservation->update([
-                        'status'       => 'completed',
-                        'completed_at' => $checkOut,
-                    ]);
+            if ($linkedReservation && $linkedReservation->status === 'checked_in') {
+                $linkedReservation->update([
+                    'status'       => 'completed',
+                    'completed_at' => $checkOut,
+                ]);
 
-                    ReservationLog::create([
-                        'reservation_id' => $reservation->id,
-                        'old_status'     => 'checked_in',
-                        'new_status'     => 'completed',
-                        'changed_by'     => null,
-                        'note'           => 'Auto completed: รถออกจากลานแล้ว',
-                    ]);
-                }
+                ReservationLog::create([
+                    'reservation_id' => $linkedReservation->id,
+                    'old_status'     => 'checked_in',
+                    'new_status'     => 'completed',
+                    'changed_by'     => null,
+                    'note'           => 'Auto completed: รถออกจากลานแล้ว',
+                ]);
             }
         });
 
@@ -96,29 +100,39 @@ class CheckOutController extends Controller
 
         // Notify vehicle owner on check-out
         if ($log->vehicle?->user_id) {
-            notify_user(
-                $log->vehicle->user_id,
-                'เช็คเอาท์เรียบร้อย',
-                sprintf(
-                    'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด %.2f บาท (รอชำระเงิน)',
+            $msg = $deposit > 0
+                ? sprintf(
+                    'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด ฿%.2f | มัดจำ -฿%.2f | คงเหลือ ฿%.2f %s',
                     $log->vehicle->license_plate,
                     $totalHours,
                     $parkingFee,
+                    $deposit,
+                    $totalAmount,
+                    $totalAmount <= 0 ? '(ชำระแล้ว)' : '(รอชำระเงิน)',
                 )
-            );
+                : sprintf(
+                    'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด ฿%.2f (รอชำระเงิน)',
+                    $log->vehicle->license_plate,
+                    $totalHours,
+                    $parkingFee,
+                );
+            notify_user($log->vehicle->user_id, 'เช็คเอาท์เรียบร้อย', $msg);
         }
 
         admin_audit('parking_log.check_out', $log, [
-            'total_hours'  => $totalHours,
-            'total_amount' => $parkingFee,
+            'total_hours'          => $totalHours,
+            'parking_fee'          => $parkingFee,
+            'reservation_discount' => $deposit,
+            'total_amount'         => $totalAmount,
         ]);
 
         return redirect()->route('admin.check-out.index')
             ->with('success', sprintf(
-                'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด %.2f บาท',
+                'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
                 $log->vehicle->license_plate,
                 $totalHours,
                 $parkingFee,
+                $totalAmount,
             ));
     }
 }

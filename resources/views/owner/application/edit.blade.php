@@ -67,8 +67,25 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">ที่อยู่ / สถานที่ <span class="text-red-400">*</span></label>
-                        <textarea name="address" rows="3" class="sp-input w-full resize-none" required>{{ old('address', $application->address) }}</textarea>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">ที่อยู่ (เลขที่ / ถนน / อาคาร)</label>
+                        <input type="text" name="address" value="{{ old('address', $application->address) }}"
+                            class="sp-input w-full" placeholder="เช่น 123/45 ถนนสุขุมวิท">
+                        @error('address')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">แขวง / ตำบล / เขต / อำเภอ <span class="text-red-400">*</span></label>
+                            <input type="text" name="district" value="{{ old('district', $application->district) }}"
+                                class="sp-input w-full" placeholder="เช่น คลองเตย" required>
+                            @error('district')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">จังหวัด <span class="text-red-400">*</span></label>
+                            <input type="text" name="province" value="{{ old('province', $application->province) }}"
+                                class="sp-input w-full" placeholder="เช่น กรุงเทพมหานคร" required>
+                            @error('province')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
+                        </div>
                     </div>
 
                     <div>
@@ -97,7 +114,7 @@
 
                 <div class="flex gap-3">
                     <button type="submit" class="sp-btn sp-btn-primary flex-1">ส่งคำขอใหม่</button>
-                    <a href="{{ route('owner.application.show') }}" class="sp-btn sp-btn-outline">ยกเลิก</a>
+                    <a href="{{ route('owner.application.show') }}" class="sp-btn sp-btn-outline">← กลับ</a>
                 </div>
             </form>
 

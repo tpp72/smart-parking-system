@@ -84,6 +84,7 @@
                                             onsubmit="return confirm('ยืนยัน Check-Out ทะเบียน {{ $log->vehicle->license_plate }}?')">
                                             @csrf
                                             <button type="submit"
+                                                title="บันทึกเวลาออกและคำนวณค่าจอด"
                                                 class="sp-btn sp-btn-outline text-sm px-4 py-1">
                                                 Check-Out
                                             </button>

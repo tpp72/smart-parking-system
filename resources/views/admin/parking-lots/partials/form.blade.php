@@ -11,13 +11,52 @@
             @enderror
         </div>
 
-        <div>
-            <label class="block text-sm text-gray-200 mb-1">สถานที่</label>
-            <textarea name="location" rows="3"
-                class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600">{{ old('location', $lot?->location) }}</textarea>
-            @error('location')
-                <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
-            @enderror
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+                <label class="block text-sm text-gray-200 mb-1">ที่อยู่ (เลขที่ / ถนน)</label>
+                <input name="address" value="{{ old('address', $lot?->address) }}"
+                    class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600"
+                    placeholder="เช่น 123/4 ถ.สุขุมวิท" />
+                @error('address')
+                    <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label class="block text-sm text-gray-200 mb-1">แขวง / ตำบล</label>
+                <input name="district" value="{{ old('district', $lot?->district) }}"
+                    class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600"
+                    placeholder="เช่น คลองเตย" />
+                @error('district')
+                    <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label class="block text-sm text-gray-200 mb-1">จังหวัด</label>
+                <input name="province" value="{{ old('province', $lot?->province) }}"
+                    class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600"
+                    placeholder="เช่น กรุงเทพมหานคร" />
+                @error('province')
+                    <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-sm text-gray-200 mb-1">จุดสังเกต / ใกล้กับ</label>
+                <input name="landmark" value="{{ old('landmark', $lot?->landmark) }}"
+                    class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600"
+                    placeholder="เช่น ใกล้ BTS อโศก, ห้าง Terminal 21" />
+                @error('landmark')
+                    <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-sm text-gray-200 mb-1">หมายเหตุสถานที่ (เพิ่มเติม)</label>
+                <textarea name="location" rows="2"
+                    class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600"
+                    placeholder="คำอธิบายเพิ่มเติม เช่น ทางเข้าด้านหลังอาคาร">{{ old('location', $lot?->location) }}</textarea>
+                @error('location')
+                    <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
     </div>
 </div>
@@ -64,6 +103,14 @@
                 @checked(old('is_active', $lot?->is_active ?? true))
                 class="w-4 h-4 rounded border-red-900/60 bg-black/40 text-red-600 focus:ring-red-600" />
             <label for="is_active" class="text-sm text-gray-200">เปิดใช้งาน (แสดงในตลาด)</label>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+            <input type="hidden" name="reservations_enabled" value="0" />
+            <input type="checkbox" name="reservations_enabled" value="1" id="reservations_enabled"
+                @checked(old('reservations_enabled', $lot?->reservations_enabled ?? true))
+                class="w-4 h-4 rounded border-red-900/60 bg-black/40 text-red-600 focus:ring-red-600" />
+            <label for="reservations_enabled" class="text-sm text-gray-200">รับจองล่วงหน้า (Reservations)</label>
         </div>
     </div>
 

@@ -69,9 +69,10 @@
 .light-theme .sp-btn-success:hover { background: rgba(16,185,129,0.25); color: #022c22; }
 
 /* ── Badges ──────────────────────────────────────── */
-.light-theme .sp-badge-ok   { background: rgba(16,185,129,0.10); color: #065f46; border-color: rgba(16,185,129,0.30); }
-.light-theme .sp-badge-bad  { background: rgba(239,68,68,0.08);  color: #7f1d1d; border-color: rgba(239,68,68,0.28); }
-.light-theme .sp-badge-warn { background: rgba(245,158,11,0.10); color: #78350f; border-color: rgba(245,158,11,0.30); }
+.light-theme .sp-badge-ok    { background: rgba(16,185,129,0.10);  color: #065f46; border-color: rgba(16,185,129,0.30); }
+.light-theme .sp-badge-bad   { background: rgba(239,68,68,0.08);   color: #7f1d1d; border-color: rgba(239,68,68,0.28); }
+.light-theme .sp-badge-warn  { background: rgba(245,158,11,0.10);  color: #78350f; border-color: rgba(245,158,11,0.30); }
+.light-theme .sp-badge-owner { background: rgba(139,92,246,0.10);  color: #4c1d95; border-color: rgba(139,92,246,0.30); }
 
 /* ── Table ───────────────────────────────────────── */
 .light-theme .sp-table th {
@@ -81,6 +82,18 @@
 .light-theme .sp-table td { color: #1f2937; }
 .light-theme .sp-table tr:nth-child(even) { background: rgba(0,0,0,0.04); }
 .light-theme .sp-table tbody tr:hover { background: rgba(180,28,28,0.06); }
+
+/* ── sp-input ────────────────────────────────────── */
+.light-theme .sp-input {
+  background-color: rgba(220, 214, 208, 0.70) !important;
+  color: #111827 !important;
+  border-color: rgba(160, 28, 28, 0.50) !important;
+}
+.light-theme .sp-input:focus {
+  border-color: rgba(180, 28, 28, 0.80) !important;
+  box-shadow: 0 0 0 3px rgba(180, 28, 28, 0.12) !important;
+}
+.light-theme .sp-input::placeholder { color: #9ca3af !important; }
 
 /* ── Inputs / Selects ────────────────────────────── */
 .light-theme .sp-select {
@@ -191,9 +204,17 @@
 .light-theme input[type="number"],
 .light-theme textarea,
 .light-theme select {
-  background: rgba(220, 214, 208, 0.70) !important;
+  background-color: rgba(220, 214, 208, 0.70) !important;
   color: #111827 !important;
   border-color: rgba(160, 28, 28, 0.50) !important;
+}
+.light-theme input[type="checkbox"] {
+  background-color: #ffffff !important;
+  border-color: rgba(160, 28, 28, 0.65) !important;
+}
+.light-theme input[type="checkbox"]:checked {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
 }
 .light-theme input::placeholder,
 .light-theme textarea::placeholder { color: #9ca3af !important; }
@@ -204,3 +225,62 @@
   color: #111827 !important;
 }
 .light-theme .placeholder-gray-400::placeholder { color: #9ca3af !important; }
+
+/* ── Guest layout (auth pages) ───────────────────────── */
+.light-theme body.sp-bg {
+  color: #111827;
+}
+.light-theme .sp-guest-icon {
+  background: rgba(220, 214, 208, 0.90);
+  border-color: rgba(160, 28, 28, 0.50);
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.20);
+}
+.light-theme .sp-guest-card {
+  background: rgba(232, 226, 220, 0.97);
+  border-color: rgba(140, 20, 20, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+.light-theme .sp-guest-toggle {
+  border-color: rgba(140, 20, 20, 0.40);
+  background: rgba(210, 203, 196, 0.65);
+  color: #374151;
+}
+.light-theme .sp-guest-toggle:hover {
+  border-color: rgba(180, 28, 28, 0.65);
+  color: #111827;
+  background: rgba(200, 193, 186, 0.80);
+}
+
+/* ── Welcome page ─────────────────────────────────── */
+.light-theme .bg-animated {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(220,38,38,0.10), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(220,38,38,0.07), transparent 40%),
+    #ede8e4;
+  color: #111827;
+}
+
+/* soften glow on light bg */
+.light-theme .glow-text { text-shadow: 0 0 6px rgba(220,38,38,0.35); color: #111827; }
+.light-theme .glow-btn  { box-shadow: 0 0 8px rgba(220,38,38,0.28); }
+
+/* feature cards */
+.light-theme .welcome-card {
+  background: rgba(210, 200, 194, 0.85);
+}
+.light-theme .welcome-card:hover { border-color: rgba(180,28,28,0.60) !important; }
+
+/* always keep white text on red backgrounds */
+.light-theme .bg-red-600,
+.light-theme .bg-red-700 { color: #fff !important; }
+
+/* theme toggle button on welcome page */
+.light-theme nav button.inline-flex {
+  border-color: rgba(140,20,20,0.40) !important;
+  background: rgba(210,203,196,0.65) !important;
+  color: #374151 !important;
+}
+.light-theme nav button.inline-flex:hover {
+  border-color: rgba(180,28,28,0.65) !important;
+  color: #111827 !important;
+}

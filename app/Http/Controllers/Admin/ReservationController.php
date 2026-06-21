@@ -10,6 +10,7 @@ use App\Models\ReservationLog;
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ReservationController extends Controller
@@ -177,24 +178,37 @@ class ReservationController extends Controller
         }
 
         $oldStatus = $reservation->status;
-        $reservation->update($data);
+        $oldSlotId = $reservation->parking_slot_id;
 
-        if ($oldStatus !== $data['status']) {
-            ReservationLog::create([
-                'reservation_id' => $reservation->id,
-                'old_status'     => $oldStatus,
-                'new_status'     => $data['status'],
-                'changed_by'     => Auth::id(),
-                'note'           => 'Admin แก้ไขสถานะ',
-            ]);
+        DB::transaction(function () use ($reservation, $data, $oldStatus, $oldSlotId) {
+            $reservation->update($data);
 
-            if ($data['status'] === 'cancelled') {
-                notify_user(
-                    $reservation->user_id,
-                    'การจองถูกยกเลิก',
-                    "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
-                );
+            if ($data['status'] === 'cancelled'
+                && in_array($oldStatus, ['pending', 'confirmed'], true)
+                && $oldSlotId
+            ) {
+                ParkingSlot::where('id', $oldSlotId)
+                    ->where('status', 'reserved')
+                    ->update(['status' => 'available']);
             }
+
+            if ($oldStatus !== $data['status']) {
+                ReservationLog::create([
+                    'reservation_id' => $reservation->id,
+                    'old_status'     => $oldStatus,
+                    'new_status'     => $data['status'],
+                    'changed_by'     => Auth::id(),
+                    'note'           => 'Admin แก้ไขสถานะ',
+                ]);
+            }
+        });
+
+        if ($oldStatus !== $data['status'] && $data['status'] === 'cancelled') {
+            notify_user(
+                $reservation->user_id,
+                'การจองถูกยกเลิก',
+                "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
+            );
         }
 
         admin_audit('reservation.update', $reservation, [
@@ -211,15 +225,36 @@ class ReservationController extends Controller
             return back()->withErrors(['error' => "ไม่สามารถยืนยันได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
         }
 
-        $reservation->update(['status' => 'confirmed']);
+        $slotError = null;
 
-        ReservationLog::create([
-            'reservation_id' => $reservation->id,
-            'old_status'     => 'pending',
-            'new_status'     => 'confirmed',
-            'changed_by'     => Auth::id(),
-            'note'           => 'Admin ยืนยันการจอง',
-        ]);
+        DB::transaction(function () use ($reservation, &$slotError) {
+            if ($reservation->parking_slot_id) {
+                $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$slot || $slot->status !== 'available') {
+                    $slotError = "ช่องจอดที่จองไว้ไม่พร้อมใช้งาน (สถานะ: {$slot?->status})";
+                    return;
+                }
+
+                $slot->update(['status' => 'reserved']);
+            }
+
+            $reservation->update(['status' => 'confirmed']);
+
+            ReservationLog::create([
+                'reservation_id' => $reservation->id,
+                'old_status'     => 'pending',
+                'new_status'     => 'confirmed',
+                'changed_by'     => Auth::id(),
+                'note'           => 'Admin ยืนยันการจอง',
+            ]);
+        });
+
+        if ($slotError) {
+            return back()->withErrors(['error' => $slotError]);
+        }
 
         notify_user(
             $reservation->user_id,

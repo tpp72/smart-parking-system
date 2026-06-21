@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
+use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReservationController extends Controller
 {
@@ -57,15 +59,36 @@ class ReservationController extends Controller
             return back()->withErrors(['error' => "ไม่สามารถยืนยันได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
         }
 
-        $reservation->update(['status' => 'confirmed']);
+        $slotError = null;
 
-        ReservationLog::create([
-            'reservation_id' => $reservation->id,
-            'old_status'     => 'pending',
-            'new_status'     => 'confirmed',
-            'changed_by'     => Auth::id(),
-            'note'           => 'เจ้าของลานจอดยืนยันการจอง',
-        ]);
+        DB::transaction(function () use ($reservation, &$slotError) {
+            if ($reservation->parking_slot_id) {
+                $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$slot || $slot->status !== 'available') {
+                    $slotError = "ช่องจอดที่จองไว้ไม่พร้อมใช้งาน (สถานะ: {$slot?->status})";
+                    return;
+                }
+
+                $slot->update(['status' => 'reserved']);
+            }
+
+            $reservation->update(['status' => 'confirmed']);
+
+            ReservationLog::create([
+                'reservation_id' => $reservation->id,
+                'old_status'     => 'pending',
+                'new_status'     => 'confirmed',
+                'changed_by'     => Auth::id(),
+                'note'           => 'เจ้าของลานจอดยืนยันการจอง',
+            ]);
+        });
+
+        if ($slotError) {
+            return back()->withErrors(['error' => $slotError]);
+        }
 
         notify_user(
             $reservation->user_id,

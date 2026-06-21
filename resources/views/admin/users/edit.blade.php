@@ -17,7 +17,8 @@
             @endif
 
             {{-- Card: ข้อมูลผู้ใช้ --}}
-            <div class="sp-card rounded-2xl p-6 mt-6">
+            <div class="sp-card rounded-2xl p-6 mt-6"
+                 x-data="{ role: '{{ old('role', $user->role) }}', origRole: '{{ $user->role }}' }">
                 <h2 class="text-xl font-extrabold mb-4">ข้อมูลผู้ใช้</h2>
 
                 <form method="POST" action="{{ route('admin.users.update', $user) }}" class="space-y-4">
@@ -43,14 +44,27 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm text-gray-200 mb-1">role</label>
-                        <select name="role" class="sp-select">
+                        <label class="block text-sm text-gray-200 mb-1">Role</label>
+                        <select name="role" class="sp-select" x-model="role">
                             @foreach ($roles as $r)
-                                <option value="{{ $r }}" @selected(old('role', $user->role) === $r)>{{ $r }}
-                                </option>
+                                <option value="{{ $r }}" @selected(old('role', $user->role) === $r)>{{ $r }}</option>
                             @endforeach
                         </select>
                         @error('role')
+                            <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- เหตุผล (บังคับเฉพาะเมื่อปลด owner → user) --}}
+                    <div x-show="origRole === 'owner' && role === 'user'" x-cloak>
+                        <label class="block text-sm text-red-300 mb-1 font-semibold">
+                            เหตุผลในการปลด Owner *
+                        </label>
+                        <textarea name="demotion_reason" rows="2"
+                            :required="origRole === 'owner' && role === 'user'"
+                            class="w-full rounded-xl bg-black/40 border border-red-700/60 text-white focus:ring-0 focus:border-red-500 text-sm"
+                            placeholder="ระบุเหตุผลที่ปลด Owner กลับเป็น User...">{{ old('demotion_reason') }}</textarea>
+                        @error('demotion_reason')
                             <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
                         @enderror
                     </div>

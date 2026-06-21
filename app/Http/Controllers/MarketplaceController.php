@@ -19,11 +19,16 @@ class MarketplaceController extends Controller
             ->where('lot.is_active', true)
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
                 $qq->where('lot.name', 'like', "%{$q}%")
-                    ->orWhere('lot.location', 'like', "%{$q}%");
+                    ->orWhere('lot.location', 'like', "%{$q}%")
+                    ->orWhere('lot.address', 'like', "%{$q}%")
+                    ->orWhere('lot.district', 'like', "%{$q}%")
+                    ->orWhere('lot.province', 'like', "%{$q}%")
+                    ->orWhere('lot.landmark', 'like', "%{$q}%");
             }))
-            ->groupBy('lot.id', 'lot.name', 'lot.location', 'lot.total_slots', 'lot.hourly_rate', 'lot.owner_id', 'u.name')
+            ->groupBy('lot.id', 'lot.name', 'lot.location', 'lot.address', 'lot.district', 'lot.province', 'lot.landmark', 'lot.total_slots', 'lot.hourly_rate', 'lot.owner_id', 'u.name')
             ->selectRaw("
-                lot.id, lot.name, lot.location, lot.total_slots, lot.hourly_rate,
+                lot.id, lot.name, lot.location, lot.address, lot.district, lot.province, lot.landmark,
+                lot.total_slots, lot.hourly_rate,
                 u.name as owner_name,
                 SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END) as available,
                 SUM(CASE WHEN s.status='occupied' THEN 1 ELSE 0 END) as occupied,

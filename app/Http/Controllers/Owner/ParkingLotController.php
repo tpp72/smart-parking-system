@@ -24,7 +24,11 @@ class ParkingLotController extends Controller
             ->where('owner_id', Auth::id())
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
                 $qq->where('name', 'like', "%{$q}%")
-                    ->orWhere('location', 'like', "%{$q}%");
+                    ->orWhere('location', 'like', "%{$q}%")
+                    ->orWhere('address', 'like', "%{$q}%")
+                    ->orWhere('district', 'like', "%{$q}%")
+                    ->orWhere('province', 'like', "%{$q}%")
+                    ->orWhere('landmark', 'like', "%{$q}%");
             }))
             ->withCount(['slots', 'reservations'])
             ->orderByDesc('id')
@@ -42,14 +46,20 @@ class ParkingLotController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'location'    => ['nullable', 'string'],
-            'total_slots' => ['required', 'integer', 'min:0'],
-            'hourly_rate' => ['required', 'numeric', 'min:0'],
+            'name'                 => ['required', 'string', 'max:255'],
+            'location'             => ['nullable', 'string'],
+            'address'              => ['nullable', 'string', 'max:500'],
+            'district'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', 'max:255'],
+            'landmark'             => ['nullable', 'string', 'max:500'],
+            'total_slots'          => ['required', 'integer', 'min:0'],
+            'hourly_rate'          => ['required', 'numeric', 'min:0'],
+            'reservations_enabled' => ['boolean'],
         ]);
 
-        $data['owner_id'] = Auth::id();
-        $data['is_active'] = true;
+        $data['owner_id']             = Auth::id();
+        $data['is_active']            = true;
+        $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
         ParkingLot::create($data);
 
@@ -68,12 +78,18 @@ class ParkingLotController extends Controller
         $lot = $this->ownedLot($parking_lot);
 
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'location'    => ['nullable', 'string'],
-            'total_slots' => ['required', 'integer', 'min:0'],
-            'hourly_rate' => ['required', 'numeric', 'min:0'],
+            'name'                 => ['required', 'string', 'max:255'],
+            'location'             => ['nullable', 'string'],
+            'address'              => ['nullable', 'string', 'max:500'],
+            'district'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', 'max:255'],
+            'landmark'             => ['nullable', 'string', 'max:500'],
+            'total_slots'          => ['required', 'integer', 'min:0'],
+            'hourly_rate'          => ['required', 'numeric', 'min:0'],
+            'reservations_enabled' => ['boolean'],
         ]);
 
+        $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
         $lot->update($data);
 
         return redirect()->route('owner.parking-lots.index')

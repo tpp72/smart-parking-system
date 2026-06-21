@@ -1,13 +1,12 @@
 <nav x-data="{
     open: false,
-    settingsOpen: false,
     theme: localStorage.getItem('sp-theme') || 'dark',
     setTheme(t) {
         this.theme = t;
         localStorage.setItem('sp-theme', t);
         document.getElementById('html-root').classList.toggle('light-theme', t === 'light');
-        this.settingsOpen = false;
-    }
+    },
+    toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark'); }
 }" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white">
     @php
         $isAdmin = auth()->check() && auth()->user()->role === 'admin';
@@ -72,6 +71,11 @@
                         AI สแกน
                     </a>
 
+                    <a href="{{ route('admin.suspicious-vehicles.index') }}" class="{{ $navClass('admin.suspicious-vehicles.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        บัญชีดำ
+                    </a>
+
                 @elseif($isOwner)
                     {{-- ── Owner Navbar ── --}}
                     <a href="{{ route('owner.dashboard') }}" class="{{ $navClass('owner.dashboard') }}">
@@ -116,11 +120,6 @@
                         การจองของฉัน
                     </a>
 
-                    <a href="{{ route('user.vehicles.index') }}" class="{{ $navClass('user.vehicles.*') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg>
-                        รถของฉัน
-                    </a>
-
                     <a href="{{ route('user.parking-logs.index') }}" class="{{ $navClass('user.parking-logs.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         ประวัติ
@@ -153,6 +152,7 @@
                         ->where('is_read', false)->count();
                 @endphp
                 <a href="{{ route('notifications.index') }}"
+                   title="การแจ้งเตือน"
                    class="relative inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-400 hover:text-white hover:bg-white/[0.06] transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -165,51 +165,30 @@
                 </a>
                 @endauth
 
-                {{-- Settings --}}
-                <div class="relative" @click.outside="settingsOpen = false">
-                    <button @click="settingsOpen = !settingsOpen"
-                        :class="settingsOpen ? 'bg-red-600/20 text-white border-red-600/60' : 'text-gray-400 border-red-900/60 bg-black/40 hover:text-white hover:bg-white/[0.06]'"
-                        class="relative inline-flex items-center justify-center w-9 h-9 rounded-xl border transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                    </button>
-
-                    {{-- Settings Panel --}}
-                    <div x-show="settingsOpen"
-                        x-transition:enter="transition ease-out duration-150"
-                        x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
-                        x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                        x-transition:leave="transition ease-in duration-100"
-                        x-transition:leave-start="opacity-100 scale-100"
-                        x-transition:leave-end="opacity-0 scale-95"
-                        x-cloak
-                        class="sp-dropdown-panel absolute right-0 top-full mt-2 w-52 rounded-2xl border border-red-900/40 bg-black/90 backdrop-blur-md shadow-xl shadow-black/40 z-50 p-3">
-
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 mb-2">ธีม</p>
-
-                        <div class="flex gap-1.5">
-                            <button @click="setTheme('dark')"
-                                :class="theme === 'dark' ? 'bg-red-600 text-white sp-glow-btn' : 'border border-red-900/60 text-gray-400 hover:text-white hover:bg-white/[0.06]'"
-                                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all duration-150">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                                </svg>
-                                Dark
-                            </button>
-                            <button @click="setTheme('light')"
-                                :class="theme === 'light' ? 'bg-red-600 text-white sp-glow-btn' : 'border border-red-900/60 text-gray-400 hover:text-white hover:bg-white/[0.06]'"
-                                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all duration-150">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10A5 5 0 0012 7z"/>
-                                </svg>
-                                Light
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
+                {{-- Theme Toggle --}}
+                <button @click="toggleTheme()"
+                    :title="theme === 'light' ? 'เปลี่ยนเป็น Dark Mode' : 'เปลี่ยนเป็น Light Mode'"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-400 hover:text-white hover:bg-white/[0.06] transition">
+                    {{-- Sun (light mode active) --}}
+                    <svg x-show="theme === 'light'" x-cloak xmlns="http://www.w3.org/2000/svg"
+                        class="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>
+                        <line x1="12" y1="2"  x2="12" y2="4"  stroke-linecap="round"/>
+                        <line x1="12" y1="20" x2="12" y2="22" stroke-linecap="round"/>
+                        <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"  stroke-linecap="round"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-linecap="round"/>
+                        <line x1="2"  y1="12" x2="4"  y2="12" stroke-linecap="round"/>
+                        <line x1="20" y1="12" x2="22" y2="12" stroke-linecap="round"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round"/>
+                        <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"  stroke-linecap="round"/>
+                    </svg>
+                    {{-- Moon (dark mode active) --}}
+                    <svg x-show="theme === 'dark'" x-cloak xmlns="http://www.w3.org/2000/svg"
+                        class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+                    </svg>
+                </button>
 
                 {{-- User dropdown --}}
                 <x-dropdown align="right" width="48">
@@ -220,8 +199,12 @@
                                 {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
                             </span>
                             <span class="hidden lg:inline font-semibold max-w-[100px] truncate">{{ Auth::user()->name }}</span>
-                            <span class="text-[10px] px-1.5 py-0.5 rounded-md border border-red-900/60 text-red-400 bg-red-900/20 font-bold uppercase">
-                                {{ Auth::user()->role }}
+                            @php $navRole = Auth::user()->role; @endphp
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-md border font-bold uppercase
+                                {{ $navRole === 'admin'  ? 'border-yellow-700/60 text-yellow-400 bg-yellow-900/20' : '' }}
+                                {{ $navRole === 'owner'  ? 'border-purple-700/60 text-purple-400 bg-purple-900/20' : '' }}
+                                {{ $navRole === 'user'   ? 'border-green-700/60  text-green-400  bg-green-900/20'  : '' }}">
+                                {{ $navRole }}
                             </span>
                             <svg class="w-3.5 h-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -253,14 +236,39 @@
                 </x-dropdown>
             </div>
 
-            {{-- ── Hamburger (mobile/tablet) ────────────────── --}}
-            <button @click="open = !open"
-                class="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-300 hover:text-white transition">
-                <svg class="w-5 h-5" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                    <path :class="{ 'hidden': open, 'block': !open }" class="block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    <path :class="{ 'hidden': !open, 'block': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+            {{-- ── Mobile: Theme Toggle + Hamburger ────────── --}}
+            <div class="lg:hidden flex items-center gap-2">
+                <button @click="toggleTheme()"
+                    :title="theme === 'light' ? 'เปลี่ยนเป็น Dark Mode' : 'เปลี่ยนเป็น Light Mode'"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-300 hover:text-white transition">
+                    <svg x-show="theme === 'light'" x-cloak xmlns="http://www.w3.org/2000/svg"
+                        class="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>
+                        <line x1="12" y1="2"  x2="12" y2="4"  stroke-linecap="round"/>
+                        <line x1="12" y1="20" x2="12" y2="22" stroke-linecap="round"/>
+                        <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"  stroke-linecap="round"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-linecap="round"/>
+                        <line x1="2"  y1="12" x2="4"  y2="12" stroke-linecap="round"/>
+                        <line x1="20" y1="12" x2="22" y2="12" stroke-linecap="round"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round"/>
+                        <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"  stroke-linecap="round"/>
+                    </svg>
+                    <svg x-show="theme === 'dark'" x-cloak xmlns="http://www.w3.org/2000/svg"
+                        class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+                    </svg>
+                </button>
+
+                <button @click="open = !open"
+                    :title="open ? 'ปิดเมนู' : 'เปิดเมนู'"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-900/60 bg-black/40 text-gray-300 hover:text-white transition">
+                    <svg class="w-5 h-5" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                        <path :class="{ 'hidden': open, 'block': !open }" class="block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path :class="{ 'hidden': !open, 'block': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -280,6 +288,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ชำระเงิน</a>
                 <a href="{{ route('admin.scan.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.scan.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg> AI สแกน</a>
+                <a href="{{ route('admin.suspicious-vehicles.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.suspicious-vehicles.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg> บัญชีดำ</a>
 
                 <div class="border-t border-red-900/30 mt-2 pt-2">
                 <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">จัดการ</p>
@@ -313,8 +323,6 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg> จองที่จอด</a>
                 <a href="{{ route('user.reservations.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.reservations.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg> การจองของฉัน</a>
-                <a href="{{ route('user.vehicles.index') }}"   class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.vehicles.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg> รถของฉัน</a>
                 <a href="{{ route('user.parking-logs.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.parking-logs.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ประวัติ</a>
                 <a href="{{ route('user.scan.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('user.scan.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">

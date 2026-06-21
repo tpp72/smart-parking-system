@@ -54,13 +54,18 @@ class ApplicationController extends Controller
             return redirect()->route('owner.application.show');
         }
 
+        $isCompany = $request->input('applicant_type') === 'company';
+
         $data = $request->validate([
-            'business_name'    => ['required', 'string', 'max:255'],
+            'applicant_type'   => ['required', 'in:individual,company'],
+            'business_name'    => $isCompany ? ['required', 'string', 'max:255'] : ['nullable', 'string', 'max:255'],
             'contact_name'     => ['required', 'string', 'max:255'],
             'phone'            => ['required', 'string', 'max:20'],
             'email'            => ['required', 'email', 'max:255'],
             'parking_lot_name' => ['required', 'string', 'max:255'],
-            'address'          => ['required', 'string'],
+            'address'          => ['nullable', 'string', 'max:500'],
+            'district'         => ['required', 'string', 'max:100'],
+            'province'         => ['required', 'string', 'max:100'],
             'description'      => ['nullable', 'string'],
             'estimated_slots'  => ['required', 'integer', 'min:1', 'max:10000'],
             'document'         => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -75,23 +80,23 @@ class ApplicationController extends Controller
         DB::transaction(function () use ($user, $data, $documentPath) {
             OwnerApplication::create([
                 'user_id'          => $user->id,
-                'business_name'    => $data['business_name'],
+                'applicant_type'   => $data['applicant_type'],
+                'business_name'    => $data['business_name'] ?? null,
                 'contact_name'     => $data['contact_name'],
                 'phone'            => $data['phone'],
                 'email'            => $data['email'],
                 'parking_lot_name' => $data['parking_lot_name'],
-                'address'          => $data['address'],
+                'address'          => $data['address'] ?? null,
+                'district'         => $data['district'],
+                'province'         => $data['province'],
                 'description'      => $data['description'] ?? null,
                 'estimated_slots'  => $data['estimated_slots'],
                 'document_path'    => $documentPath,
                 'status'           => 'pending',
             ]);
 
-            // Promote to owner role with pending status
-            $user->forceFill([
-                'role'         => 'owner',
-                'owner_status' => 'pending',
-            ])->save();
+            // Role stays 'user' — only set owner_status to 'pending'
+            $user->forceFill(['owner_status' => 'pending'])->save();
         });
 
         // Notify the user
@@ -133,6 +138,38 @@ class ApplicationController extends Controller
         return view('owner.application.edit', compact('application', 'user'));
     }
 
+    public function demoteSelf(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'owner') {
+            return redirect()->route('owner.dashboard');
+        }
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($user) {
+            $user->forceFill([
+                'role'         => 'user',
+                'owner_status' => null,
+            ])->save();
+        });
+
+        notify_user($user->id, 'ลาออกจากการเป็นเจ้าของลานจอดแล้ว',
+            'บัญชีของคุณได้เปลี่ยนกลับเป็น User เรียบร้อย');
+
+        $adminIds = User::where('role', 'admin')->pluck('id');
+        foreach ($adminIds as $adminId) {
+            notify_user($adminId, 'Owner ลาออกเอง',
+                "{$user->name} ({$user->email}) ส่งคำร้องปลดตัวเองกลับเป็น User เหตุผล: {$data['reason']}");
+        }
+
+        return redirect()->route('user.dashboard')
+            ->with('success', 'ลาออกจากการเป็นเจ้าของลานจอดเรียบร้อยแล้ว บัญชีของคุณกลับเป็น User แล้ว');
+    }
+
     public function update(Request $request)
     {
         $user = Auth::user();
@@ -142,13 +179,18 @@ class ApplicationController extends Controller
             return redirect()->route('owner.application.show');
         }
 
+        $isCompany = $request->input('applicant_type') === 'company';
+
         $data = $request->validate([
-            'business_name'    => ['required', 'string', 'max:255'],
+            'applicant_type'   => ['required', 'in:individual,company'],
+            'business_name'    => $isCompany ? ['required', 'string', 'max:255'] : ['nullable', 'string', 'max:255'],
             'contact_name'     => ['required', 'string', 'max:255'],
             'phone'            => ['required', 'string', 'max:20'],
             'email'            => ['required', 'email', 'max:255'],
             'parking_lot_name' => ['required', 'string', 'max:255'],
-            'address'          => ['required', 'string'],
+            'address'          => ['nullable', 'string', 'max:500'],
+            'district'         => ['required', 'string', 'max:100'],
+            'province'         => ['required', 'string', 'max:100'],
             'description'      => ['nullable', 'string'],
             'estimated_slots'  => ['required', 'integer', 'min:1', 'max:10000'],
             'document'         => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -156,7 +198,6 @@ class ApplicationController extends Controller
 
         $documentPath = $application->document_path;
         if ($request->hasFile('document')) {
-            // Remove old file
             if ($documentPath) {
                 Storage::disk('public')->delete($documentPath);
             }
@@ -165,12 +206,15 @@ class ApplicationController extends Controller
 
         DB::transaction(function () use ($user, $application, $data, $documentPath) {
             $application->update([
-                'business_name'    => $data['business_name'],
+                'applicant_type'   => $data['applicant_type'],
+                'business_name'    => $data['business_name'] ?? null,
                 'contact_name'     => $data['contact_name'],
                 'phone'            => $data['phone'],
                 'email'            => $data['email'],
                 'parking_lot_name' => $data['parking_lot_name'],
-                'address'          => $data['address'],
+                'address'          => $data['address'] ?? null,
+                'district'         => $data['district'],
+                'province'         => $data['province'],
                 'description'      => $data['description'] ?? null,
                 'estimated_slots'  => $data['estimated_slots'],
                 'document_path'    => $documentPath,

@@ -14,11 +14,6 @@ class LicensePlateScan extends Model
         'confidence'   => 'float',
     ];
 
-    public function device()
-    {
-        return $this->belongsTo(EntryExitDevice::class, 'device_id');
-    }
-
     public function user()
     {
         return $this->belongsTo(User::class);

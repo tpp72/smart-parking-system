@@ -6,6 +6,7 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
+use App\Models\Vehicle;
 use Illuminate\Support\Facades\DB;
 
 class CheckInService
@@ -25,9 +26,16 @@ class CheckInService
             return $this->fail('รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
         }
 
-        // Find checkable reservation (confirmed + within grace window)
+        // Find checkable reservation: match by license_plate (new) or vehicle_id (legacy)
+        $plate = Vehicle::where('id', $vehicleId)->value('license_plate');
+
         $reservation = Reservation::checkable()
-            ->where('vehicle_id', $vehicleId)
+            ->where(function ($q) use ($vehicleId, $plate) {
+                $q->where('vehicle_id', $vehicleId);
+                if ($plate) {
+                    $q->orWhere('license_plate', $plate);
+                }
+            })
             ->orderBy('reserve_start')
             ->first();
 
@@ -38,10 +46,10 @@ class CheckInService
         $now   = now();
 
         DB::transaction(function () use ($vehicleId, $reservation, $lotId, $now, &$slot, &$error, &$log) {
-            // Try the specifically reserved slot first
+            // Try the specifically reserved slot first (may be 'reserved' after confirm or 'available' for legacy)
             if ($reservation?->parking_slot_id) {
                 $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
-                    ->where('status', 'available')
+                    ->whereIn('status', ['available', 'reserved'])
                     ->lockForUpdate()
                     ->first();
             }
@@ -70,6 +78,8 @@ class CheckInService
             $slot->update(['status' => 'occupied']);
 
             if ($reservation) {
+                $oldStatus = $reservation->status;
+
                 $reservation->update([
                     'status'        => 'checked_in',
                     'checked_in_at' => $now,
@@ -77,7 +87,7 @@ class CheckInService
 
                 ReservationLog::create([
                     'reservation_id' => $reservation->id,
-                    'old_status'     => 'confirmed',
+                    'old_status'     => $oldStatus,
                     'new_status'     => 'checked_in',
                     'changed_by'     => null,
                     'note'           => "Auto check-in: รถเข้าจอดที่ช่อง {$slot->slot_number}",
