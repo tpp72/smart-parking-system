@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use Anthropic\Client;
+use Anthropic\RequestOptions;
 use App\Models\LicensePlateScan;
 use App\Models\Reservation;
 use App\Models\SuspiciousVehicle;
 use App\Models\Vehicle;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
@@ -17,8 +19,14 @@ class CarScanService
 
     public function __construct()
     {
-        $this->client = new Client(apiKey: config('carscan.anthropic_api_key', ''));
-        $this->model  = config('carscan.model', 'claude-opus-4-8');
+        // Windows local dev: disable SSL verify (CA bundle not configured)
+        $guzzle = new GuzzleClient(['verify' => false]);
+
+        $this->client = new Client(
+            apiKey: config('carscan.anthropic_api_key', ''),
+            requestOptions: RequestOptions::with(transporter: $guzzle),
+        );
+        $this->model = config('carscan.model', 'claude-opus-4-8');
     }
 
     /**
@@ -43,14 +51,29 @@ class CarScanService
 
 {
   "license_plate": "ป้ายทะเบียนรถ เช่น กข 1234 หรือ 5กก 6285 ถ้าไม่เห็นให้ใส่ค่าว่าง",
-  "color": "สีตัวถังรถหลักเป็นภาษาไทย เช่น ขาว ดำ แดง น้ำเงิน เทา เงิน เขียว ส้ม เหลือง ม่วง",
+  "color": "เลือกจากรายการด้านล่างเท่านั้น ห้ามตอบนอกรายการ",
   "brand": "ยี่ห้อรถ เช่น Toyota Honda Mazda Isuzu Ford Mitsubishi Nissan Suzuki Hyundai KIA ถ้าไม่แน่ใจให้ใส่ null",
   "confidence": ตัวเลข 0-100 บอกความมั่นใจในการอ่านป้ายทะเบียน
 }
 
+รายการสีที่ใช้ได้ (เลือก 1 สีเท่านั้น ห้ามตอบนอกรายการ):
+- ขาว = ขาวทุกเฉด
+- ดำ = ดำทุกเฉด
+- เทา = เทาทุกเฉด
+- เงิน = เงินทุกเฉด
+- ทอง = ทองทุกเฉด รวม แชมเปญ เบจ ครีม บรอนซ์ gold metallic
+- น้ำตาล = น้ำตาลทุกเฉด รวม กาแฟ ช็อกโกแลต
+- แดง = แดงทุกเฉด รวม เบอร์กันดี ไวน์แดง
+- ส้ม = ส้มทุกเฉด
+- เหลือง = เหลืองทุกเฉด
+- เขียว = เขียวทุกเฉด
+- น้ำเงิน = น้ำเงินและฟ้าทุกเฉด รวม กรมท่า ฟ้าอ่อน
+- ม่วง = ม่วงทุกเฉด
+- ชมพู = ชมพูทุกเฉด
+
 หลักเกณฑ์:
 - license_plate: อ่านตัวอักษรและเลขไทย/อังกฤษบนป้ายทะเบียนให้ครบ รูปแบบ "กข 1234" หรือ "5กก 6285"
-- color: ดูสีตัวถังรถ ไม่ใช่สีกระจกหรือล้อ
+- color: ดูสีตัวถังรถเท่านั้น ไม่ใช่สีกระจก หลังคา หรือล้อ เลือกจากรายการด้านบนเท่านั้น
 - brand: ดูจากโลโก้หน้ารถหรือรูปทรง
 - ตอบเป็น JSON เท่านั้น ไม่มี ```json ไม่มีคำอธิบายเพิ่ม
 PROMPT;

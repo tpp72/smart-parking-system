@@ -83,24 +83,21 @@
                                 <p class="text-xs text-gray-500 mb-1">สีรถ</p>
                                 <div class="flex items-center gap-2">
                                     @php
-                                        // Gemini returns Thai color names — map directly
+                                        // Claude returns Thai color names — map directly
                                         $colorMap = [
-                                            'ขาว'     => '#f8fafc',
+                                            'ขาว'     => '#f1f5f9',
                                             'ดำ'      => '#1e1e1e',
-                                            'เงิน'    => '#c0c0c0',
                                             'เทา'     => '#9ca3af',
-                                            'แดง'     => '#ef4444',
-                                            'น้ำเงิน' => '#3b82f6',
-                                            'เขียว'   => '#22c55e',
-                                            'เหลือง'  => '#eab308',
-                                            'ส้ม'     => '#f97316',
+                                            'เงิน'    => '#c0c0c0',
+                                            'ทอง'     => '#c8a96e',
                                             'น้ำตาล'  => '#92400e',
-                                            'ชมพู'    => '#ec4899',
+                                            'แดง'     => '#ef4444',
+                                            'ส้ม'     => '#f97316',
+                                            'เหลือง'  => '#eab308',
+                                            'เขียว'   => '#22c55e',
+                                            'น้ำเงิน' => '#3b82f6',
                                             'ม่วง'    => '#9333ea',
-                                            'ทอง'     => '#d97706',
-                                            'ครีม'    => '#fef3c7',
-                                            'ฟ้า'     => '#60a5fa',
-                                            'เบจ'     => '#d4b896',
+                                            'ชมพู'    => '#ec4899',
                                         ];
                                         $colorLabel = $scan->color ?? '';
                                         $colorHex   = $colorMap[$colorLabel] ?? null;
@@ -254,16 +251,6 @@
                             </div>
                         </dl>
                     </div>
-                @elseif(session('scan_result') && !session('scan_reservation_id'))
-                    @php $scanForCheck = \App\Models\LicensePlateScan::find(session('scan_result')); @endphp
-                    @if($scanForCheck?->license_plate)
-                        <div class="mb-6 rounded-2xl border border-gray-700/50 bg-black/20 p-4 flex items-center gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                            <p class="text-gray-500 text-sm">ไม่พบการจองที่ Active สำหรับทะเบียนนี้</p>
-                        </div>
-                    @endif
                 @endif
             @endif
 
@@ -364,7 +351,7 @@
                     </button>
 
                     <p class="text-center text-xs text-gray-600">
-                        ระบบใช้ Google Gemini Vision AI วิเคราะห์ทะเบียน สี และยี่ห้อรถโดยอัตโนมัติ
+                        ระบบใช้ Claude Vision AI วิเคราะห์ทะเบียน สี และยี่ห้อรถโดยอัตโนมัติ
                     </p>
                 </form>
             </div>
