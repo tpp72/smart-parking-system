@@ -1,51 +1,50 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
+use App\Models\ParkingLog;
 use App\Models\ParkingLot;
 use App\Models\Payment;
-use App\Models\ParkingLog;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CheckOutController extends Controller
 {
-    /** แสดงรายการรถที่กำลังจอดอยู่ (check_out_time IS NULL) — เฉพาะลานที่ไม่มีเจ้าของ */
+    /** แสดงรายการรถที่กำลังจอดอยู่ในลานของ owner คนนี้ */
     public function index()
     {
+        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id');
+
         $logs = ParkingLog::with([
             'vehicle:id,license_plate,brand,color',
             'parkingLot:id,name,hourly_rate',
             'parkingSlot:id,slot_number',
             'reservation:id,reserve_start,status',
         ])
-            ->whereHas('parkingLot', fn($q) => $q->whereNull('owner_id'))
+            ->whereIn('parking_lot_id', $ownedLotIds)
             ->whereNull('check_out_time')
             ->orderBy('check_in_time')
             ->paginate(20);
 
-        return view('admin.check-out.index', compact('logs'));
+        return view('owner.check-out.index', compact('logs'));
     }
 
     /** ทำ Check-Out: คำนวณเงิน + บันทึก payment + คืน slot */
     public function store(ParkingLog $log)
     {
-        abort_if(
-            ParkingLot::where('id', $log->parking_lot_id)->whereNotNull('owner_id')->exists(),
-            403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้'
-        );
+        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id');
+        abort_unless($ownedLotIds->contains($log->parking_lot_id), 403, 'ไม่มีสิทธิ์จัดการลานจอดนี้');
 
-        // [1] ห้าม check-out ซ้ำ
         if ($log->check_out_time !== null) {
-            return redirect()->route('admin.check-out.index')
+            return redirect()->route('owner.check-out.index')
                 ->withErrors(['error' => "ทะเบียน {$log->vehicle->license_plate} Check-Out ไปแล้ว"]);
         }
 
-        // [2] ห้าม check-out ถ้ามี payment อยู่แล้ว (กัน double-submit)
         if ($log->payment()->exists()) {
-            return redirect()->route('admin.check-out.index')
+            return redirect()->route('owner.check-out.index')
                 ->withErrors(['error' => 'มีการบันทึก payment สำหรับรายการนี้แล้ว']);
         }
 
@@ -55,7 +54,6 @@ class CheckOutController extends Controller
         $hourlyRate  = (float) $log->parkingLot->hourly_rate;
         $parkingFee  = round($totalHours * $hourlyRate, 2);
 
-        // Apply reservation deposit as discount
         $linkedReservation = $log->reservation_id
             ? Reservation::find($log->reservation_id)
             : null;
@@ -80,7 +78,6 @@ class CheckOutController extends Controller
                 $log->parkingSlot->update(['status' => 'available']);
             }
 
-            // ถ้า check-in มาจากการจอง → mark completed
             if ($linkedReservation && $linkedReservation->status === 'checked_in') {
                 $linkedReservation->update([
                     'status'       => 'completed',
@@ -97,7 +94,6 @@ class CheckOutController extends Controller
             }
         });
 
-        // expire reservations ของรถคันนี้ที่เลย grace period แล้ว (ที่ยังไม่ได้ check-in)
         Reservation::where('vehicle_id', $log->vehicle_id)
             ->whereIn('status', ['pending', 'confirmed'])
             ->where('reserve_start', '<=', now()->subMinutes(Reservation::gracePeriodMinutes()))
@@ -105,7 +101,6 @@ class CheckOutController extends Controller
 
         $log->load('vehicle:id,license_plate,user_id', 'parkingSlot:id,slot_number');
 
-        // Notify vehicle owner on check-out
         if ($log->vehicle?->user_id) {
             $msg = $deposit > 0
                 ? sprintf(
@@ -126,14 +121,7 @@ class CheckOutController extends Controller
             notify_user($log->vehicle->user_id, 'เช็คเอาท์เรียบร้อย', $msg);
         }
 
-        admin_audit('parking_log.check_out', $log, [
-            'total_hours'          => $totalHours,
-            'parking_fee'          => $parkingFee,
-            'reservation_discount' => $deposit,
-            'total_amount'         => $totalAmount,
-        ]);
-
-        return redirect()->route('admin.check-out.index')
+        return redirect()->route('owner.check-out.index')
             ->with('success', sprintf(
                 'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
                 $log->vehicle->license_plate,

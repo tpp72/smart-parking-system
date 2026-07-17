@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
 use App\Models\Vehicle;
 use App\Services\CheckInService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CheckInController extends Controller
 {
@@ -18,20 +19,25 @@ class CheckInController extends Controller
             ->orderBy('license_plate')
             ->get(['id', 'license_plate', 'brand', 'color', 'user_id']);
 
-        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
+        $lots = ParkingLot::ownedBy(Auth::id())->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.check-in.create', compact('vehicles', 'lots'));
+        return view('owner.check-in.create', compact('vehicles', 'lots'));
     }
 
     public function store(Request $request)
     {
+        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id')->all();
+
         $data = $request->validate([
             'vehicle_id'     => ['required', 'exists:vehicles,id'],
-            'parking_lot_id' => ['required', 'exists:parking_lots,id'],
+            'parking_lot_id' => ['required', 'exists:parking_lots,id', function ($attr, $value, $fail) use ($ownedLotIds) {
+                if (!in_array((int) $value, $ownedLotIds, true)) {
+                    $fail('ไม่มีสิทธิ์ทำ Check-In ให้ลานจอดนี้');
+                }
+            }],
         ]);
 
-        $allowedLotIds = ParkingLot::unowned()->pluck('id')->all();
-        $result = $this->checkInService->checkIn($data['vehicle_id'], $data['parking_lot_id'], $allowedLotIds);
+        $result = $this->checkInService->checkIn($data['vehicle_id'], $data['parking_lot_id'], $ownedLotIds);
 
         if (!$result['success']) {
             $field = str_contains($result['error'], 'ช่องจอด') ? 'parking_lot_id' : 'vehicle_id';
@@ -42,7 +48,6 @@ class CheckInController extends Controller
         $slot        = $result['slot'];
         $reservation = $result['reservation'];
 
-        // Notify vehicle owner on successful check-in (when tied to a reservation)
         if ($reservation) {
             notify_user(
                 $reservation->user_id,
@@ -56,12 +61,6 @@ class CheckInController extends Controller
             $successMsg .= " (การจอง #{$reservation->id})";
         }
 
-        admin_audit('parking_log.check_in', $vehicle, [
-            'parking_lot_id'  => $slot->parking_lot_id,
-            'parking_slot_id' => $slot->id,
-            'reservation_id'  => $reservation?->id,
-        ]);
-
-        return redirect()->route('admin.check-in.create')->with('success', $successMsg);
+        return redirect()->route('owner.check-in.create')->with('success', $successMsg);
     }
 }

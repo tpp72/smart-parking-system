@@ -40,4 +40,16 @@ class ParkingLot extends Model
     {
         return $query->where('reservations_enabled', true);
     }
+
+    /** ลานจอดที่ยังไม่มีเจ้าของ — อยู่ในความดูแลของ Admin */
+    public function scopeUnowned($query)
+    {
+        return $query->whereNull('owner_id');
+    }
+
+    /** ลานจอดของ owner คนที่ระบุ */
+    public function scopeOwnedBy($query, int $ownerId)
+    {
+        return $query->where('owner_id', $ownerId);
+    }
 }

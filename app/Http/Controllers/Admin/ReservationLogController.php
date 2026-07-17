@@ -19,8 +19,10 @@ class ReservationLogController extends Controller
 
         $base = DB::table('reservation_logs as rl')
             ->join('reservations as r', 'r.id', '=', 'rl.reservation_id')
+            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->join('users as u', 'u.id', '=', 'rl.changed_by')
             ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
+            ->whereNull('lot.owner_id')
             ->select([
                 'rl.id',
                 'rl.reservation_id',
@@ -70,8 +72,10 @@ class ReservationLogController extends Controller
 
         $query = DB::table('reservation_logs as rl')
             ->join('reservations as r', 'r.id', '=', 'rl.reservation_id')
+            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->join('users as u', 'u.id', '=', 'rl.changed_by')
             ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
+            ->whereNull('lot.owner_id')
             ->select([
                 'rl.id',
                 'rl.reservation_id',

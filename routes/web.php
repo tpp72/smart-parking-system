@@ -22,9 +22,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicationController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\Owner\ApplicationController as OwnerApplicationController;
+use App\Http\Controllers\Owner\CheckInController as OwnerCheckInController;
+use App\Http\Controllers\Owner\CheckOutController as OwnerCheckOutController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\ParkingLogController as OwnerParkingLogController;
 use App\Http\Controllers\Owner\ParkingLotController as OwnerParkingLotController;
 use App\Http\Controllers\Owner\ParkingSlotController as OwnerParkingSlotController;
+use App\Http\Controllers\Owner\PaymentController as OwnerPaymentController;
 use App\Http\Controllers\Owner\ReservationController as OwnerReservationController;
 use App\Http\Controllers\Owner\RevenueController as OwnerRevenueController;
 use Illuminate\Support\Facades\Route;
@@ -56,10 +60,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::post('parking-slots/bulk', [ParkingSlotController::class, 'bulkStore'])->name('parking-slots.bulk.store');
     // Users CRUD
     Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::get('users/create', [AdminUserController::class, 'create'])->name('users.create');
+    Route::post('users', [AdminUserController::class, 'store'])->name('users.store');
     Route::get('users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
     Route::patch('users/{user}', [AdminUserController::class, 'update'])->name('users.update');
     // ตั้งรหัสชั่วคราว + force reset
     Route::patch('users/{user}/force-reset', [AdminUserController::class, 'forceReset'])->name('users.force-reset');
+    // ลบผู้ใช้ (owner จะลบลานจอดของตัวเองไปด้วย + ยกเลิกการจองที่ค้างอยู่)
+    Route::delete('users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
     // Reservation CRUD
     Route::resource('reservations', ReservationController::class)->except(['show']);
     Route::post('reservations/{reservation}/confirm', [ReservationController::class, 'confirm'])->name('reservations.confirm');
@@ -124,6 +132,18 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     // Reservations (read-only + confirm)
     Route::get('reservations', [OwnerReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations/{reservation}/confirm', [OwnerReservationController::class, 'confirm'])->name('reservations.confirm');
+
+    // Manual Check-In
+    Route::get('check-in', [OwnerCheckInController::class, 'create'])->name('check-in.create');
+    Route::post('check-in', [OwnerCheckInController::class, 'store'])->name('check-in.store');
+    // Manual Check-Out
+    Route::get('check-out', [OwnerCheckOutController::class, 'index'])->name('check-out.index');
+    Route::post('check-out/{log}', [OwnerCheckOutController::class, 'store'])->name('check-out.store');
+    // Payments
+    Route::get('payments', [OwnerPaymentController::class, 'index'])->name('payments.index');
+    Route::post('payments/{payment}/mark-paid', [OwnerPaymentController::class, 'markPaid'])->name('payments.mark-paid');
+    // Parking Log History
+    Route::get('parking-logs', [OwnerParkingLogController::class, 'index'])->name('parking-logs.index');
 
     // Revenue
     Route::get('revenue', [OwnerRevenueController::class, 'index'])->name('revenue.index');

@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLog;
+use App\Models\ParkingLot;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ParkingLogController extends Controller
 {
@@ -14,13 +16,15 @@ class ParkingLogController extends Controller
         $from = $request->query('from');
         $to   = $request->query('to');
 
+        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id');
+
         $logs = ParkingLog::query()
             ->with([
                 'vehicle:id,license_plate,brand,color',
                 'parkingLot:id,name',
                 'parkingSlot:id,slot_number',
             ])
-            ->whereHas('parkingLot', fn($q) => $q->whereNull('owner_id'))
+            ->whereIn('parking_lot_id', $ownedLotIds)
             ->when($q !== '', fn($query) =>
                 $query->whereHas('vehicle', fn($v) =>
                     $v->where('license_plate', 'ilike', "%{$q}%")
@@ -36,6 +40,6 @@ class ParkingLogController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.parking-logs.index', compact('logs', 'q', 'from', 'to'));
+        return view('owner.parking-logs.index', compact('logs', 'q', 'from', 'to'));
     }
 }
