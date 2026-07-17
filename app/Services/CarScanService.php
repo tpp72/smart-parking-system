@@ -152,7 +152,7 @@ PROMPT;
         // 3. Match vehicle in DB
         $vehicleId = null;
         if ($licensePlate !== '') {
-            $vehicle   = Vehicle::where('license_plate', $licensePlate)->first();
+            $vehicle   = $this->platePrefixMatch(Vehicle::query(), $licensePlate)->first();
             $vehicleId = $vehicle?->id;
 
             if ($vehicle) {
@@ -165,7 +165,7 @@ PROMPT;
 
         // 4. Check blacklist (active entries only)
         $isSuspicious = $licensePlate !== ''
-            && SuspiciousVehicle::active()->where('license_plate', $licensePlate)->exists();
+            && $this->platePrefixMatch(SuspiciousVehicle::active(), $licensePlate)->exists();
 
         // 5. Persist scan record
         $scan = LicensePlateScan::create([
@@ -195,15 +195,32 @@ PROMPT;
             return null;
         }
 
-        $vehicle = Vehicle::where('license_plate', $plate)->first();
-        if (!$vehicle) {
-            return null;
-        }
+        // จับคู่ด้วยป้ายทะเบียนที่กรอกตอนจองโดยตรง (flow หลัก) หรือผ่าน vehicle_id (legacy/admin check-in)
+        $vehicle = $this->platePrefixMatch(Vehicle::query(), $plate)->first();
 
         return Reservation::with(['vehicle', 'parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name'])
-            ->where('vehicle_id', $vehicle->id)
+            ->where(function ($q) use ($plate, $vehicle) {
+                $q->where('license_plate', $plate)
+                    ->orWhere('license_plate', 'like', $plate . ' %');
+                if ($vehicle) {
+                    $q->orWhere('vehicle_id', $vehicle->id);
+                }
+            })
             ->whereIn('status', ['confirmed', 'checked_in'])
             ->orderBy('reserve_start')
             ->first();
+    }
+
+    /**
+     * เทียบป้ายทะเบียนแบบ "ขึ้นต้นด้วย" แทน exact match — เพราะ Claude Vision อ่านได้แค่ตัวเลขทะเบียน
+     * (เช่น "กพ 961") โดยไม่มีจังหวัดต่อท้าย ในขณะที่ข้อมูลที่เก็บจริงในระบบ (Vehicle/Reservation/
+     * SuspiciousVehicle) อาจมีจังหวัดต่อท้ายด้วย (เช่น "กพ 961 กาญจนบุรี")
+     */
+    private function platePrefixMatch($query, string $plate)
+    {
+        return $query->where(function ($q) use ($plate) {
+            $q->where('license_plate', $plate)
+                ->orWhere('license_plate', 'like', $plate . ' %');
+        });
     }
 }
