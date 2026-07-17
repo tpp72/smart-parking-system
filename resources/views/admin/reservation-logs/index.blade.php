@@ -48,11 +48,11 @@
                 <table class="w-full sp-table">
                     <thead>
                         <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4">เวลา</th>
-                            <th class="py-3 pr-4">Reservation</th>
-                            <th class="py-3 pr-4">ทะเบียน</th>
-                            <th class="py-3 pr-4">old → new</th>
-                            <th class="py-3 pr-4">เปลี่ยนโดย</th>
+                            <th class="py-3 pr-4 text-left">เวลา</th>
+                            <th class="py-3 pr-4 text-left">Reservation</th>
+                            <th class="py-3 pr-4 text-left">ทะเบียน</th>
+                            <th class="py-3 pr-4 text-left">old → new</th>
+                            <th class="py-3 pr-4 text-left">เปลี่ยนโดย</th>
                         </tr>
                     </thead>
                     <tbody>

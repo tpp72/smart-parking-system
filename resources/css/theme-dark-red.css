@@ -84,6 +84,7 @@
   font-size: 0.75rem;
   font-weight: 800;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .sp-badge-ok    { background: rgba(16,185,129,0.12);  color: rgb(167,243,208); border-color: rgba(16,185,129,0.35); }
@@ -91,7 +92,7 @@
 .sp-badge-warn  { background: rgba(245,158,11,0.12);  color: rgb(253,230,138); border-color: rgba(245,158,11,0.35); }
 .sp-badge-owner { background: rgba(139,92,246,0.15);  color: rgb(216,180,254); border-color: rgba(139,92,246,0.40); }
 
-.sp-table th { text-align: left; font-size: 0.875rem; font-weight: 800; color: rgb(229,231,235); }
+.sp-table th { font-size: 0.875rem; font-weight: 800; color: rgb(229,231,235); }
 .sp-table td { font-size: 0.875rem; color: rgb(229,231,235); }
 .sp-table tr:nth-child(even) { background: rgba(255,255,255,0.05); }
 .sp-glow-text { text-shadow: 0 0 8px #dc2626, 0 0 18px rgba(220,38,38,.45); }

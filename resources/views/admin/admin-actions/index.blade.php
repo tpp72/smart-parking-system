@@ -48,12 +48,12 @@
                 <table class="w-full sp-table min-w-[680px]">
                     <thead>
                         <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4">เวลา</th>
-                            <th class="py-3 pr-4">admin</th>
-                            <th class="py-3 pr-4">action</th>
-                            <th class="py-3 pr-4">subject</th>
-                            <th class="py-3 pr-4">ip</th>
-                            <th class="py-3 pr-4">meta</th>
+                            <th class="py-3 pr-4 text-left">เวลา</th>
+                            <th class="py-3 pr-4 text-left">admin</th>
+                            <th class="py-3 pr-4 text-left">action</th>
+                            <th class="py-3 pr-4 text-left">subject</th>
+                            <th class="py-3 pr-4 text-left">ip</th>
+                            <th class="py-3 pr-4 text-left">meta</th>
                         </tr>
                     </thead>
                     <tbody>
