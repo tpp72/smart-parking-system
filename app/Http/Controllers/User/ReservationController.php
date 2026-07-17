@@ -11,6 +11,7 @@ use App\Models\ReservationLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ReservationController extends Controller
 {
@@ -40,13 +41,16 @@ class ReservationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'license_plate'   => ['required', 'string', 'max:20'],
+            'plate_number'    => ['required', 'string', 'max:15'],
+            'plate_province'  => ['required', 'string', Rule::in(config('thai_provinces'))],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
             'reserve_start'   => ['required', 'date', 'after:now', 'before:' . now()->addDay()->toDateTimeString()],
         ], [
-            'license_plate.required'   => 'กรุณากรอกป้ายทะเบียนรถ',
-            'license_plate.max'        => 'ป้ายทะเบียนต้องไม่เกิน 20 ตัวอักษร',
+            'plate_number.required'    => 'กรุณากรอกเลขทะเบียนรถ',
+            'plate_number.max'         => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
+            'plate_province.required'  => 'กรุณาเลือกจังหวัด',
+            'plate_province.in'        => 'กรุณาเลือกจังหวัดจากรายการ',
             'parking_lot_id.required'  => 'กรุณาเลือกลานจอด',
             'parking_lot_id.exists'    => 'ไม่พบลานจอดที่เลือกในระบบ',
             'parking_slot_id.exists'   => 'ไม่พบช่องจอดที่เลือกในระบบ',
@@ -56,7 +60,7 @@ class ReservationController extends Controller
             'reserve_start.before'     => 'จองล่วงหน้าได้ไม่เกิน 1 วัน (24 ชั่วโมง)',
         ]);
 
-        $plate = strtoupper(trim($data['license_plate']));
+        $plate = strtoupper(trim($data['plate_number'])) . ' ' . $data['plate_province'];
 
         // ป้องกัน: ป้ายทะเบียนนี้มีการจองที่ยัง active อยู่แล้ว
         if (Reservation::where('license_plate', $plate)
@@ -148,7 +152,9 @@ class ReservationController extends Controller
                 ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
         }
 
-        return view('user.reservations.edit', compact('reservation'));
+        [$plateNumber, $plateProvince] = $this->splitPlate($reservation->license_plate);
+
+        return view('user.reservations.edit', compact('reservation', 'plateNumber', 'plateProvince'));
     }
 
     /** บันทึกการแก้ไขป้ายทะเบียน */
@@ -162,13 +168,16 @@ class ReservationController extends Controller
         }
 
         $data = $request->validate([
-            'license_plate' => ['required', 'string', 'max:20'],
+            'plate_number'   => ['required', 'string', 'max:15'],
+            'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
         ], [
-            'license_plate.required' => 'กรุณากรอกป้ายทะเบียนรถ',
-            'license_plate.max'      => 'ป้ายทะเบียนต้องไม่เกิน 20 ตัวอักษร',
+            'plate_number.required'   => 'กรุณากรอกเลขทะเบียนรถ',
+            'plate_number.max'        => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
+            'plate_province.required' => 'กรุณาเลือกจังหวัด',
+            'plate_province.in'       => 'กรุณาเลือกจังหวัดจากรายการ',
         ]);
 
-        $plate = strtoupper(trim($data['license_plate']));
+        $plate = strtoupper(trim($data['plate_number'])) . ' ' . $data['plate_province'];
 
         // ถ้าไม่มีการเปลี่ยนแปลง ข้ามไปเลย
         if ($plate === $reservation->license_plate) {
@@ -239,6 +248,28 @@ class ReservationController extends Controller
 
         return redirect()->route('user.reservations.index')
             ->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว");
+    }
+
+    /**
+     * แยกป้ายทะเบียนที่เก็บเป็นสตริงเดียว (เช่น "กข 1234 กรุงเทพมหานคร") ออกเป็น [เลขทะเบียน, จังหวัด]
+     * สำหรับ pre-fill ฟอร์มแก้ไข — ถ้าคำสุดท้ายไม่ตรงกับจังหวัดใดเลย (ข้อมูลเก่าที่ไม่มีจังหวัด) จะคืนจังหวัดว่าง
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function splitPlate(?string $plate): array
+    {
+        $plate = trim((string) $plate);
+        $provinces = config('thai_provinces');
+
+        $lastSpace = strrpos($plate, ' ');
+        if ($lastSpace !== false) {
+            $possibleProvince = substr($plate, $lastSpace + 1);
+            if (in_array($possibleProvince, $provinces, true)) {
+                return [trim(substr($plate, 0, $lastSpace)), $possibleProvince];
+            }
+        }
+
+        return [$plate, ''];
     }
 
     private function hasSlotConflict(int $slotId, string $start): bool

@@ -29,7 +29,7 @@
             {{-- ── Result Card (shown after successful scan) ────────── --}}
             @if(session('scan_result'))
                 @php
-                    $scan = \App\Models\LicensePlateScan::with('vehicle.user')->find(session('scan_result'));
+                    $scan = \App\Models\LicensePlateScan::find(session('scan_result'));
                 @endphp
                 @if($scan)
                     {{-- Blacklist Alert --}}
@@ -131,30 +131,6 @@
                             </div>
                         @endif
 
-                        {{-- Matched Vehicle --}}
-                        @if($scan->vehicle)
-                            <div class="mt-4 rounded-xl border border-green-800/40 bg-green-950/20 p-3 flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/>
-                                </svg>
-                                <div class="text-sm">
-                                    <span class="text-green-300 font-bold">พบในระบบ</span>
-                                    <span class="text-gray-400 mx-1">—</span>
-                                    <span class="text-white font-semibold">{{ $scan->vehicle->license_plate }}</span>
-                                    @if($scan->vehicle->user)
-                                        <span class="text-gray-500 text-xs ml-1">({{ $scan->vehicle->user->name }})</span>
-                                    @endif
-                                </div>
-                            </div>
-                        @else
-                            <div class="mt-4 rounded-xl border border-yellow-800/40 bg-yellow-950/20 p-3 flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <p class="text-yellow-300 text-sm">ไม่พบทะเบียนนี้ในระบบ</p>
-                            </div>
-                        @endif
                     </div>
                 @endif
             @endif
@@ -235,7 +211,7 @@
                             </div>
                             <div>
                                 <dt class="text-gray-500">ทะเบียน</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->vehicle?->license_plate ?? '—' }}</dd>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->license_plate ?? $matchedReservation->vehicle?->license_plate ?? '—' }}</dd>
                             </div>
                             <div>
                                 <dt class="text-gray-500">ลานจอด</dt>

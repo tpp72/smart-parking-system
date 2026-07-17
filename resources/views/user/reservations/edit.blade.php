@@ -48,14 +48,30 @@
                         @method('PATCH')
 
                         <div>
-                            <x-input-label for="license_plate" value="ป้ายทะเบียนรถ" />
-                            <x-text-input id="license_plate" name="license_plate" type="text"
-                                class="mt-1 block w-full uppercase tracking-widest @error('license_plate') border-red-500 @enderror"
-                                value="{{ old('license_plate', $reservation->license_plate) }}"
-                                placeholder="เช่น กข 1234"
-                                maxlength="20"
-                                autocomplete="off" />
-                            <x-input-error :messages="$errors->get('license_plate')" class="mt-2" />
+                            <x-input-label value="ป้ายทะเบียนรถ" />
+                            <div class="grid grid-cols-2 gap-3 mt-1">
+                                <div>
+                                    <x-text-input id="plate_number" name="plate_number" type="text"
+                                        class="block w-full uppercase tracking-widest @error('plate_number') border-red-500 @enderror"
+                                        value="{{ old('plate_number', $plateNumber) }}"
+                                        placeholder="เช่น กข 1234"
+                                        maxlength="15"
+                                        autocomplete="off" />
+                                    <x-input-error :messages="$errors->get('plate_number')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <select id="plate_province" name="plate_province"
+                                        class="sp-select w-full @error('plate_province') border-red-500 @enderror">
+                                        <option value="">-- จังหวัด --</option>
+                                        @foreach (config('thai_provinces') as $province)
+                                            <option value="{{ $province }}" @selected(old('plate_province', $plateProvince) === $province)>
+                                                {{ $province }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('plate_province')" class="mt-2" />
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex gap-3 pt-1">

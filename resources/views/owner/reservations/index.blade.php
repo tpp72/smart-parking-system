@@ -22,8 +22,9 @@
 
             {{-- Filters --}}
             <div class="sp-card rounded-2xl p-5 mt-2 mb-6">
-                <form method="GET" class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <input name="q" value="{{ $q }}" placeholder="ค้นหาทะเบียน/ชื่อ..." class="sp-select col-span-2 md:col-span-1" />
+                <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <input name="q" value="{{ $q }}" placeholder="ค้นหาทะเบียน/ชื่อ..."
+                        class="md:col-span-2 w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600" />
 
                     <select name="lot_id" class="sp-select">
                         <option value="">ทุกลาน</option>
@@ -39,14 +40,12 @@
                         @endforeach
                     </select>
 
-                    <div class="flex gap-2">
-                        <input type="date" name="from" value="{{ $from }}" class="sp-select flex-1" />
-                        <input type="date" name="to" value="{{ $to }}" class="sp-select flex-1" />
-                    </div>
+                    <input type="date" name="from" value="{{ $from }}" class="sp-select" />
+                    <input type="date" name="to" value="{{ $to }}" class="sp-select" />
 
-                    <div class="flex gap-2 col-span-2 md:col-span-1">
-                        <button type="submit" class="sp-btn sp-btn-outline flex-1">ค้นหา</button>
-                        <a href="{{ route('owner.reservations.index') }}" class="sp-btn sp-btn-outline flex-1">ล้าง</a>
+                    <div class="flex gap-2 md:col-span-6">
+                        <button type="submit" class="sp-btn sp-btn-outline">ค้นหา</button>
+                        <a href="{{ route('owner.reservations.index') }}" class="sp-btn sp-btn-outline">ล้าง</a>
                     </div>
                 </form>
             </div>
@@ -68,7 +67,7 @@
                         @forelse($reservations as $r)
                             <tr class="border-b sp-divider text-sm">
                                 <td class="py-3 pr-4 text-gray-400">{{ $r->id }}</td>
-                                <td class="py-3 pr-4 font-bold text-red-300">{{ $r->vehicle?->license_plate ?? '-' }}</td>
+                                <td class="py-3 pr-4 font-bold text-red-300">{{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->user?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-300">
                                     {{ $r->parkingLot?->name ?? '-' }}
