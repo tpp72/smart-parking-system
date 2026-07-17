@@ -49,13 +49,13 @@
                                             <span class="text-gray-600">—</span>
                                         @endif
                                     </td>
-                                    <td class="px-5 py-4">
+                                    <td class="px-5 py-4 whitespace-nowrap">
                                         @if($log->payment_status === 'paid')
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">ชำระแล้ว</span>
+                                            <span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 whitespace-nowrap">ชำระแล้ว</span>
                                         @elseif($log->payment_status === 'unpaid')
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">ค้างชำระ</span>
+                                            <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 whitespace-nowrap">ค้างชำระ</span>
                                         @elseif(!$log->check_out_time)
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">active</span>
+                                            <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 whitespace-nowrap">active</span>
                                         @else
                                             <span class="text-xs text-gray-500">—</span>
                                         @endif

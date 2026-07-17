@@ -157,11 +157,11 @@
                     <table class="w-full sp-table">
                         <thead>
                             <tr class="border-b sp-divider">
-                                <th class="py-3 pr-4">ทะเบียน</th>
-                                <th class="py-3 pr-4">ลาน</th>
-                                <th class="py-3 pr-4">เข้า</th>
-                                <th class="py-3 pr-4">ออก</th>
-                                <th class="py-3"></th>
+                                <th class="py-3 pr-4 text-left">ทะเบียน</th>
+                                <th class="py-3 pr-4 text-left">ลาน</th>
+                                <th class="py-3 pr-4 text-left">เข้า</th>
+                                <th class="py-3 pr-4 text-left">ออก</th>
+                                <th class="py-3 text-left"></th>
                             </tr>
                         </thead>
                         <tbody>

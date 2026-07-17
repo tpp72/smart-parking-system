@@ -10,6 +10,12 @@ export default defineConfig({
     ],
 
     server: {
+        // ผูก dev server กับ IPv4 loopback ตรงๆ — ป้องกันปัญหา Windows/Chrome ที่ Vite
+        // bind แค่ [::1] (IPv6) แล้ว browser ต่อ HMR websocket ไม่สำเร็จ ทำให้หน้าเว็บโหลดค้าง/หมุนตลอด
+        host: '127.0.0.1',
+        hmr: {
+            host: '127.0.0.1',
+        },
         watch: {
             // Keep Vite's hot-reload watcher away from every directory and file
             // type that Playwright generates during test runs.  Without these

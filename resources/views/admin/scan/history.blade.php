@@ -35,15 +35,15 @@
                     <table class="w-full sp-table">
                         <thead>
                             <tr>
-                                <th class="px-4 py-4">#</th>
-                                <th class="px-4 py-4">รูป</th>
-                                <th class="px-4 py-4">ทะเบียน</th>
-                                <th class="px-4 py-4">สี</th>
-                                <th class="px-4 py-4">ยี่ห้อ</th>
-                                <th class="px-4 py-4">ความมั่นใจ</th>
-                                <th class="px-4 py-4">สถานะ</th>
-                                <th class="px-4 py-4">ผู้สแกน</th>
-                                <th class="px-4 py-4">เวลา</th>
+                                <th class="px-4 py-4 text-left">#</th>
+                                <th class="px-4 py-4 text-left">รูป</th>
+                                <th class="px-4 py-4 text-left">ทะเบียน</th>
+                                <th class="px-4 py-4 text-left">สี</th>
+                                <th class="px-4 py-4 text-left">ยี่ห้อ</th>
+                                <th class="px-4 py-4 text-left">ความมั่นใจ</th>
+                                <th class="px-4 py-4 text-left">สถานะ</th>
+                                <th class="px-4 py-4 text-left">ผู้สแกน</th>
+                                <th class="px-4 py-4 text-left">เวลา</th>
                             </tr>
                         </thead>
                         <tbody>
