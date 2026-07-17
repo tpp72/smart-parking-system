@@ -17,6 +17,20 @@ class ReservationController extends Controller
 {
     private array $statuses = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
 
+    /** Admin จัดการการจองได้เฉพาะของลานที่ยังไม่มีเจ้าของ */
+    private function assertLotUnowned(int $lotId): void
+    {
+        abort_unless(
+            ParkingLot::where('id', $lotId)->whereNull('owner_id')->exists(),
+            403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้'
+        );
+    }
+
+    private function assertReservationLotUnowned(Reservation $reservation): void
+    {
+        $this->assertLotUnowned($reservation->parking_lot_id);
+    }
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -26,7 +40,8 @@ class ReservationController extends Controller
         $from = $request->query('from'); // YYYY-MM-DD
         $to   = $request->query('to');   // YYYY-MM-DD
 
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
+        $lotIds = $lots->pluck('id');
 
         $reservations = Reservation::query()
             ->with([
@@ -35,9 +50,11 @@ class ReservationController extends Controller
                 'parkingLot:id,name',
                 'parkingSlot:id,parking_lot_id,slot_number',
             ])
+            ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
-                    $qq->whereHas('vehicle', fn($x) => $x->where('license_plate', 'like', "%{$q}%"))
+                    $qq->where('license_plate', 'like', "%{$q}%")
+                        ->orWhereHas('vehicle', fn($x) => $x->where('license_plate', 'like', "%{$q}%"))
                         ->orWhereHas('user', fn($x) => $x->where('name', 'like', "%{$q}%"))
                         ->orWhereHas('user', fn($x) => $x->where('email', 'like', "%{$q}%"));
                 });
@@ -67,9 +84,10 @@ class ReservationController extends Controller
             ->orderBy('license_plate')
             ->get(['id', 'license_plate', 'brand', 'user_id']);
 
-        $lots = ParkingLot::orderBy('name')->get(['id', 'name', 'hourly_rate']);
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
 
         $slots = ParkingSlot::where('status', 'available')
+            ->whereIn('parking_lot_id', $lots->pluck('id'))
             ->orderBy('parking_lot_id')
             ->orderBy('slot_number')
             ->get(['id', 'parking_lot_id', 'slot_number']);
@@ -99,6 +117,8 @@ class ReservationController extends Controller
             'reserve_start'   => ['required', 'date', 'after:now'],
             'reservation_fee' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $this->assertLotUnowned((int) $data['parking_lot_id']);
 
         if (!empty($data['parking_slot_id'])) {
             $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
@@ -141,7 +161,9 @@ class ReservationController extends Controller
 
     public function edit(Reservation $reservation)
     {
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $this->assertReservationLotUnowned($reservation);
+
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
         $statuses = $this->statuses;
 
         $slots = ParkingSlot::query()
@@ -156,6 +178,8 @@ class ReservationController extends Controller
 
     public function update(Request $request, Reservation $reservation)
     {
+        $this->assertReservationLotUnowned($reservation);
+
         $data = $request->validate([
             'parking_lot_id'   => ['required', 'exists:parking_lots,id'],
             'parking_slot_id'  => ['nullable', 'exists:parking_slots,id'],
@@ -163,6 +187,8 @@ class ReservationController extends Controller
             'reservation_fee'  => ['required', 'numeric', 'min:0'],
             'status'           => ['required', Rule::in($this->statuses)],
         ]);
+
+        $this->assertLotUnowned((int) $data['parking_lot_id']);
 
         if (!empty($data['parking_slot_id'])) {
             $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
@@ -221,6 +247,8 @@ class ReservationController extends Controller
 
     public function confirm(Reservation $reservation)
     {
+        $this->assertReservationLotUnowned($reservation);
+
         if ($reservation->status !== 'pending') {
             return back()->withErrors(['error' => "ไม่สามารถยืนยันได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
         }
@@ -269,6 +297,8 @@ class ReservationController extends Controller
 
     public function destroy(Reservation $reservation)
     {
+        $this->assertReservationLotUnowned($reservation);
+
         $reservation->delete();
         admin_audit('reservation.delete', $reservation, []);
         return redirect()->route('admin.reservations.index')->with('success', 'ลบ Reservation แล้ว');

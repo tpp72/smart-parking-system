@@ -17,10 +17,17 @@ class CheckInService
      * Finds a checkable reservation automatically; falls back to $fallbackLotId
      * when no reservation exists.
      *
+     * @param array<int>|null $allowedLotIds  จำกัดขอบเขตลานที่ผู้เรียกมีสิทธิ์ทำ check-in ให้
+     *                                        (Admin ส่ง lot ที่ไม่มีเจ้าของ, Owner ส่ง lot ของตัวเอง)
+     *                                        null = ไม่จำกัด (ใช้กับ flow ที่ผูกกับ reservation ของ vehicle owner เอง เช่น AI scan)
      * @return array{success:bool, log:?ParkingLog, slot:?ParkingSlot, reservation:?Reservation, error:?string}
      */
-    public function checkIn(int $vehicleId, int $fallbackLotId): array
+    public function checkIn(int $vehicleId, int $fallbackLotId, ?array $allowedLotIds = null): array
     {
+        if ($allowedLotIds !== null && !in_array($fallbackLotId, $allowedLotIds, true)) {
+            return $this->fail('ไม่มีสิทธิ์ทำ Check-In ให้ลานจอดนี้');
+        }
+
         // Guard: vehicle already has an active parking session
         if (ParkingLog::where('vehicle_id', $vehicleId)->whereNull('check_out_time')->exists()) {
             return $this->fail('รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
@@ -36,6 +43,7 @@ class CheckInService
                     $q->orWhere('license_plate', $plate);
                 }
             })
+            ->when($allowedLotIds !== null, fn($q) => $q->whereIn('parking_lot_id', $allowedLotIds))
             ->orderBy('reserve_start')
             ->first();
 

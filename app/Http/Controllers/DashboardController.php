@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OwnerApplication;
+use App\Models\ParkingLot;
 use App\Models\SuspiciousVehicle;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -143,6 +144,14 @@ class DashboardController extends Controller
         $lotId = request('lot_id');           // nullable
         $q = trim((string) request('q', '')); // plate search
 
+        // Admin เห็น/จัดการได้เฉพาะลานที่ไม่มีเจ้าของ — ลานที่มี owner เป็นของ Owner คนนั้นเท่านั้น
+        $unownedLotIds = ParkingLot::unowned()->pluck('id');
+
+        // กัน lot_id ที่ส่งมาเป็นลานที่มีเจ้าของ (URL manipulation)
+        if ($lotId && !$unownedLotIds->contains((int) $lotId)) {
+            $lotId = null;
+        }
+
         [$from, $to] = match ($range) {
             '7d'   => [now()->subDays(7)->startOfDay(), now()->endOfDay()],
             'month' => [now()->startOfMonth(), now()->endOfDay()],
@@ -151,6 +160,7 @@ class DashboardController extends Controller
 
         // ===== Slot stats (รวมเป็น 1 query) =====
         $slotStats = DB::table('parking_slots')
+            ->whereIn('parking_lot_id', $unownedLotIds)
             ->selectRaw("
             COUNT(*) as slots_total,
             SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as slots_available,
@@ -158,9 +168,10 @@ class DashboardController extends Controller
             SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as slots_occupied
         ")->first();
 
-        $lotsTotal = DB::table('parking_lots')->count();
+        $lotsTotal = $unownedLotIds->count();
 
         $activeCount = DB::table('parking_logs')
+            ->whereIn('parking_lot_id', $unownedLotIds)
             ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
             ->whereNull('check_out_time')
             ->count();
@@ -174,22 +185,26 @@ class DashboardController extends Controller
             'active_now'       => (int)$activeCount,
             'revenue_paid'     => (float) DB::table('payments as p')
                 ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
+                ->whereIn('pl.parking_lot_id', $unownedLotIds)
                 ->where('p.payment_status', 'paid')
                 ->whereBetween('p.created_at', [$from, $to])
                 ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
                 ->sum('p.total_amount'),
             'unpaid_count'     => (int) DB::table('payments as p')
                 ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
+                ->whereIn('pl.parking_lot_id', $unownedLotIds)
                 ->where('p.payment_status', 'unpaid')
                 ->whereBetween('p.created_at', [$from, $to])
                 ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
                 ->count(),
             'reservations_checked_in' => (int) DB::table('reservations')
+                ->whereIn('parking_lot_id', $unownedLotIds)
                 ->where('status', 'checked_in')
                 ->whereBetween('checked_in_at', [$from, $to])
                 ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
                 ->count(),
             'reservations_completed'  => (int) DB::table('reservations')
+                ->whereIn('parking_lot_id', $unownedLotIds)
                 ->where('status', 'completed')
                 ->whereBetween('completed_at', [$from, $to])
                 ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
@@ -203,6 +218,7 @@ class DashboardController extends Controller
             ->join('users as u', 'u.id', '=', 'v.user_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
             ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
+            ->whereNull('lot.owner_id')
             ->whereNull('pl.check_out_time')
             ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
             ->when($q !== '', fn($qq) => $qq->where('v.license_plate', 'ilike', "%{$q}%"))
@@ -214,6 +230,7 @@ class DashboardController extends Controller
         // Lots overview
         $lotsOverview = DB::table('parking_lots as lot')
             ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
+            ->whereNull('lot.owner_id')
             ->groupBy('lot.id', 'lot.name', 'lot.total_slots', 'lot.hourly_rate')
             ->orderBy('lot.id')
             ->selectRaw("
@@ -245,6 +262,7 @@ class DashboardController extends Controller
         $unpaidPayments = DB::table('payments as p')
             ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
             ->join('vehicles as v', 'v.id', '=', 'pl.vehicle_id')
+            ->whereIn('pl.parking_lot_id', $unownedLotIds)
             ->where('p.payment_status', 'unpaid')
             ->whereBetween('p.created_at', [$from, $to])
             ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
@@ -259,6 +277,7 @@ class DashboardController extends Controller
             ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
             ->join('users as u', 'u.id', '=', 'r.user_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
+            ->whereNull('lot.owner_id')
             ->whereBetween('r.created_at', [$from, $to])
             ->when($lotId, fn($qq) => $qq->where('r.parking_lot_id', $lotId))
             ->when($q !== '', fn($qq) => $qq->where('v.license_plate', 'ilike', "%{$q}%"))
@@ -272,6 +291,7 @@ class DashboardController extends Controller
             ->join('vehicles as v', 'v.id', '=', 'pl.vehicle_id')
             ->join('users as u', 'u.id', '=', 'v.user_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
+            ->whereNull('lot.owner_id')
             ->whereBetween('pl.check_in_time', [$from, $to])
             ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
             ->when($q !== '', fn($qq) => $qq->where('v.license_plate', 'ilike', "%{$q}%"))
@@ -283,6 +303,7 @@ class DashboardController extends Controller
         // Slots preview (optional)
         $slotsPreview = DB::table('parking_slots as s')
             ->join('parking_lots as lot', 'lot.id', '=', 's.parking_lot_id')
+            ->whereNull('lot.owner_id')
             ->when($lotId, fn($qq) => $qq->where('s.parking_lot_id', $lotId))
             ->orderByDesc('s.updated_at')
             ->limit(8)
@@ -302,6 +323,7 @@ class DashboardController extends Controller
             'expired'    => 'rgba(107,114,128,0.85)',
         ];
         $rawStatusCounts = DB::table('reservations')
+            ->whereIn('parking_lot_id', $unownedLotIds)
             ->selectRaw('status, COUNT(*) as count')
             ->whereIn('status', $statusKeys)
             ->groupBy('status')
@@ -339,6 +361,7 @@ class DashboardController extends Controller
 
         $topLotsRaw = DB::table('reservations as r')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
+            ->whereNull('lot.owner_id')
             ->selectRaw('lot.name, COUNT(*) as reservation_count')
             ->groupBy('lot.id', 'lot.name')
             ->orderByDesc('reservation_count')

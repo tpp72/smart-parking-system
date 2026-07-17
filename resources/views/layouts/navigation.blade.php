@@ -60,7 +60,7 @@
                     <a href="{{ route('admin.payments.index') }}" class="{{ $navClass('admin.payments.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         ชำระเงิน
-                        @php $unpaidCount = \App\Models\Payment::where('payment_status','unpaid')->count(); @endphp
+                        @php $unpaidCount = \App\Models\Payment::whereHas('parkingLog.parkingLot', fn($qq) => $qq->whereNull('owner_id'))->where('payment_status','unpaid')->count(); @endphp
                         @if($unpaidCount > 0)
                             <span class="text-xs bg-red-500/30 text-red-300 rounded-full px-1.5">{{ $unpaidCount }}</span>
                         @endif
@@ -95,6 +95,33 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         การจอง
                     </a>
+
+                    <div class="w-px h-5 bg-white/10 mx-1"></div>
+
+                    <a href="{{ route('owner.check-in.create') }}" class="{{ $navClass('owner.check-in.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg>
+                        รถเข้า
+                    </a>
+
+                    <a href="{{ route('owner.check-out.index') }}" class="{{ $navClass('owner.check-out.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l4 4m0 0l-4 4m4-4H3"/></svg>
+                        รถออก
+                    </a>
+
+                    <a href="{{ route('owner.payments.index') }}" class="{{ $navClass('owner.payments.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        ชำระเงิน
+                        @php $ownerUnpaidCount = \App\Models\Payment::whereHas('parkingLog', fn($qq) => $qq->whereHas('parkingLot', fn($qqq) => $qqq->where('owner_id', auth()->id())))->where('payment_status','unpaid')->count(); @endphp
+                        @if($ownerUnpaidCount > 0)
+                            <span class="text-xs bg-red-500/30 text-red-300 rounded-full px-1.5">{{ $ownerUnpaidCount }}</span>
+                        @endif
+                    </a>
+
+                    <a href="{{ route('owner.parking-logs.index') }}" class="{{ $navClass('owner.parking-logs.*') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        ประวัติ
+                    </a>
+
                     <a href="{{ route('owner.revenue.index') }}" class="{{ $navClass('owner.revenue.*') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         รายได้
@@ -312,6 +339,14 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg> ช่องจอด</a>
                 <a href="{{ route('owner.reservations.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.reservations.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg> การจอง</a>
+                <a href="{{ route('owner.check-in.create') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.check-in.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg> รถเข้า</a>
+                <a href="{{ route('owner.check-out.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.check-out.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l4 4m0 0l-4 4m4-4H3"/></svg> รถออก</a>
+                <a href="{{ route('owner.payments.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.payments.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ชำระเงิน</a>
+                <a href="{{ route('owner.parking-logs.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.parking-logs.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> ประวัติ</a>
                 <a href="{{ route('owner.revenue.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('owner.revenue.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> รายได้</a>
 

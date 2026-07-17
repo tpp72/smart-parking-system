@@ -13,16 +13,27 @@ class ParkingSlotController extends Controller
 {
     private array $statuses = ['available', 'reserved', 'occupied'];
 
+    /** Admin จัดการช่องจอดได้เฉพาะของลานที่ยังไม่มีเจ้าของ */
+    private function assertLotUnowned(int $lotId): void
+    {
+        abort_unless(
+            ParkingLot::where('id', $lotId)->whereNull('owner_id')->exists(),
+            403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้'
+        );
+    }
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
         $lotId = $request->query('lot_id');
         $status = $request->query('status');
 
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
+        $lotIds = $lots->pluck('id');
 
         $slots = ParkingSlot::query()
             ->with(['parkingLot:id,name'])
+            ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', fn($query) => $query->where('slot_number', 'like', "%{$q}%"))
             ->when($lotId, fn($query) => $query->where('parking_lot_id', $lotId))
             ->when($status, fn($query) => $query->where('status', $status))
@@ -36,7 +47,7 @@ class ParkingSlotController extends Controller
 
     public function create()
     {
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
         $statuses = $this->statuses;
 
         return view('admin.parking-slots.create', compact('lots', 'statuses'));
@@ -56,6 +67,7 @@ class ParkingSlotController extends Controller
             'status'         => ['required', Rule::in($this->statuses)],
         ]);
 
+        $this->assertLotUnowned((int) $data['parking_lot_id']);
         ParkingSlot::create($data);
 
         return redirect()->route('admin.parking-slots.index')
@@ -64,7 +76,9 @@ class ParkingSlotController extends Controller
 
     public function edit(ParkingSlot $parking_slot)
     {
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $this->assertLotUnowned($parking_slot->parking_lot_id);
+
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
         $statuses = $this->statuses;
 
         return view('admin.parking-slots.edit', [
@@ -76,6 +90,8 @@ class ParkingSlotController extends Controller
 
     public function update(Request $request, ParkingSlot $parking_slot)
     {
+        $this->assertLotUnowned($parking_slot->parking_lot_id);
+
         $data = $request->validate([
             'parking_lot_id' => ['required', 'exists:parking_lots,id'],
             'slot_number'    => [
@@ -89,6 +105,7 @@ class ParkingSlotController extends Controller
             'status'         => ['required', Rule::in($this->statuses)],
         ]);
 
+        $this->assertLotUnowned((int) $data['parking_lot_id']);
         $parking_slot->update($data);
 
         return redirect()->route('admin.parking-slots.index')
@@ -97,6 +114,8 @@ class ParkingSlotController extends Controller
 
     public function destroy(ParkingSlot $parking_slot)
     {
+        $this->assertLotUnowned($parking_slot->parking_lot_id);
+
         $parking_slot->delete();
 
         return redirect()->route('admin.parking-slots.index')
@@ -107,7 +126,7 @@ class ParkingSlotController extends Controller
 
     public function bulkCreate()
     {
-        $lots = ParkingLot::query()->orderBy('name')->get(['id', 'name']);
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
         $statuses = $this->statuses;
 
         return view('admin.parking-slots.bulk', compact('lots', 'statuses'));
@@ -154,6 +173,8 @@ class ParkingSlotController extends Controller
                 ->values()
                 ->all();
         }
+
+        $this->assertLotUnowned((int) $data['parking_lot_id']);
 
         if (count($slotNumbers) === 0) {
             return back()->withErrors(['slot_numbers' => 'ไม่มีรายการช่องจอด'])->withInput();

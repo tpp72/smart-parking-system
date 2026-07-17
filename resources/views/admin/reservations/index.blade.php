@@ -50,13 +50,13 @@
                 <table class="w-full sp-table min-w-[640px]">
                     <thead>
                         <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4">ทะเบียน</th>
-                            <th class="py-3 pr-4">ผู้ใช้</th>
-                            <th class="py-3 pr-4">ลาน</th>
-                            <th class="py-3 pr-4">ช่อง</th>
-                            <th class="py-3 pr-4">เวลาเริ่ม</th>
-                            <th class="py-3 pr-4">ค่าจอง</th>
-                            <th class="py-3 pr-4">สถานะ</th>
+                            <th class="py-3 pr-4 text-left">ทะเบียน</th>
+                            <th class="py-3 pr-4 text-left">ผู้ใช้</th>
+                            <th class="py-3 pr-4 text-left">ลาน</th>
+                            <th class="py-3 pr-4 text-left">ช่อง</th>
+                            <th class="py-3 pr-4 text-left">เวลาเริ่ม</th>
+                            <th class="py-3 pr-4 text-left">ค่าจอง</th>
+                            <th class="py-3 pr-4 text-left">สถานะ</th>
                             <th class="py-3 pr-4" style="text-align:right">จัดการ</th>
                         </tr>
                     </thead>

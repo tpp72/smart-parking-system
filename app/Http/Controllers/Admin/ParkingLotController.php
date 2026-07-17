@@ -9,11 +9,13 @@ use Illuminate\Http\Request;
 
 class ParkingLotController extends Controller
 {
+    // Admin จัดการได้เฉพาะลานจอดที่ยังไม่มีเจ้าของ — ลานที่มี owner ให้ owner จัดการเองเท่านั้น (guard ในแต่ละ method ด้านล่าง)
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
 
-        $lots = ParkingLot::with('owner:id,name')
+        $lots = ParkingLot::unowned()
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('name', 'like', "%{$q}%")
@@ -63,12 +65,16 @@ class ParkingLotController extends Controller
 
     public function edit(ParkingLot $parking_lot)
     {
+        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+
         $owners = User::where('role', 'owner')->orderBy('name')->get(['id', 'name']);
         return view('admin.parking-lots.edit', compact('parking_lot', 'owners'));
     }
 
     public function update(Request $request, ParkingLot $parking_lot)
     {
+        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+
         $data = $request->validate([
             'name'                 => ['required', 'string', 'max:255'],
             'location'             => ['nullable', 'string'],
@@ -93,6 +99,8 @@ class ParkingLotController extends Controller
 
     public function destroy(ParkingLot $parking_lot)
     {
+        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+
         $parking_lot->delete();
 
         return redirect()->route('admin.parking-lots.index')
