@@ -16,9 +16,10 @@
 2. [Tech Stack](#tech-stack)
 3. [Requirements](#requirements)
 4. [Installation](#installation)
-5. [Dev Commands](#dev-commands)
-6. [Roles & Permissions](#roles--permissions)
-7. [Business Logic](#business-logic)
+5. [Demo Accounts (Seed Data)](#demo-accounts-seed-data)
+6. [Dev Commands](#dev-commands)
+7. [Roles & Permissions](#roles--permissions)
+8. [Business Logic](#business-logic)
    - [Reservation Lifecycle](#reservation-lifecycle)
    - [Check-In Logic](#check-in-logic)
    - [Check-Out & Fee Calculation](#check-out--fee-calculation)
@@ -30,10 +31,10 @@
    - [AI Car Scan](#ai-car-scan)
    - [Payment System](#payment-system)
    - [Force Password Reset](#force-password-reset)
-8. [Database Schema](#database-schema)
-9. [E2E Testing (Playwright)](#e2e-testing-playwright)
-10. [Project Structure](#project-structure)
-11. [Environment Variables](#environment-variables)
+9. [Database Schema](#database-schema)
+10. [E2E Testing (Playwright)](#e2e-testing-playwright)
+11. [Project Structure](#project-structure)
+12. [Environment Variables](#environment-variables)
 
 ---
 
@@ -152,6 +153,24 @@ npm run build
 # 5. Run
 php artisan serve
 ```
+
+---
+
+## Demo Accounts (Seed Data)
+
+รันด้วย `php artisan migrate:fresh --seed` เพื่อสร้างข้อมูลจำลองทั้งระบบ (ลานจอด, ช่องจอด, รถ, การจอง, payment, ฯลฯ) — ทุกบัญชี password: **`password`**
+
+| Email | Role | สถานะ |
+|---|---|---|
+| `admin@demo.com` | admin | — |
+| `owner@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
+| `owner2@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
+| `owner3@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
+| `user@demo.com` | user | ผู้ใช้ทั่วไป |
+| `pending.owner@demo.com` | user | ส่งคำขอเป็น Owner แล้ว — รอ admin อนุมัติ |
+| `rejected.owner@demo.com` | user | คำขอเป็น Owner ถูกปฏิเสธแล้ว (มี rejection_reason) |
+
+นอกจากนี้ยังมี user ทั่วไปอีก ~22 คน (อีเมล `@example.com`) พร้อมรถและประวัติการจอง/เช็คอิน-เช็คเอาท์แบบสุ่มให้ทดสอบ dashboard/report ต่างๆ ได้ทันที (รหัสผ่านเดียวกันคือ `password`)
 
 ---
 
@@ -581,6 +600,8 @@ Revenue trend fills all 12 months with `0` if no data — ensuring the x-axis al
 | Scheduler expire การจอง | User | การจองหมดอายุ |
 | Auto check-in สำเร็จ (OCR) | User | เช็คอินสำเร็จ |
 | Check-out สำเร็จ | เจ้าของรถ | เช็คเอาท์เรียบร้อย |
+| Admin อนุมัติคำขอ Owner | ผู้สมัคร | คำขอเจ้าของลานจอดได้รับการอนุมัติ! 🎉 |
+| Admin ปฏิเสธคำขอ Owner | ผู้สมัคร | คำขอเจ้าของลานจอดไม่ได้รับการอนุมัติ (พร้อมเหตุผล) |
 
 Notifications ดูได้ที่ `/notifications` (รองรับทุก role)
 
@@ -701,15 +722,16 @@ owner_applications
 └── timestamps
 
 admin_actions ← Admin audit log
-├── id, admin_id → users
-├── action_type, target_type, target_id
-├── details (json)
+├── id, admin_id → users (nullable)
+├── action (string, dot notation เช่น 'reservation.confirm')
+├── subject_type, subject_id (nullable) ← polymorphic reference
+├── meta (json, nullable), ip_address, user_agent
 └── timestamps
 
 notifications
 ├── id, user_id → users
 ├── title, message
-├── read_at (nullable)
+├── is_read (boolean, default false)
 └── timestamps
 ```
 
@@ -789,22 +811,41 @@ Reports สร้างที่ `e2e/reports/`:
 
 ### ผล E2E ล่าสุด
 
+> รายงานจากการรัน `npm run qa:audit` ครั้งล่าสุดที่มีอยู่ (**generated 2026-06-09** — รันก่อนการย้ายระบบ AI scan มาเป็น Claude Vision รันใหม่ด้วย `npm run qa:audit` เพื่ออัปเดตตัวเลข)
+
 ```
-✓ ai-test.test.js    — route coverage, responsive, forms, nav integrity, loading speed
-✓ feature-tests.test.js — OCR scan, notifications, owner application, reservation lifecycle
-✓ 0 critical bugs found
-✓ 29/29 routes — 100% coverage (รวม /admin/owner-applications, /owner/apply, /owner/application)
+✓ Playwright E2E tests: 105 (Chromium)
+✓ Routes tested: 30
+✓ Bugs found: 0 (critical: 0)
+✓ Auth checks: 8 (failures: 0)
+✓ Responsive checks: 16 (failures: 0)
 ```
+
+Reports เต็มอยู่ที่ `e2e/reports/` — `bug-report.md`, `coverage-report.md`, `security-report.md`, `performance-report.md`, `responsive-report.md`, `authorization-report.md`, `css-report.md`
 
 ### PHPUnit Tests
 
+รันด้วย `php artisan test` (ต้องมี DB `smart_parking_test` แยกจาก dev — ดูค่าใน `phpunit.xml`)
+
 ```
-✓ 120 tests, all passing
-✓ ExpireReservationsTest (10), OcrCheckInTest (10), ReservationNotificationsTest (6)
-✓ SlotReservationLifecycleTest (7), ReservationCheckInIntegrationTest (6), SuspiciousVehicleBlacklistTest (7)
-✓ AdminSuspiciousVehicleTest (9), DashboardChartDataTest (7), UserCancelReservationTest (9)
-✓ ReservationDepositTest (6), ReservationTest (7), AuthenticationTest (4), + others
+Tests: 126 total — 119 passing, 7 failing (327 assertions)
 ```
+
+**Test files (23):**
+```
+tests/Feature/AdminSuspiciousVehicleTest.php      tests/Feature/OcrCheckInTest.php
+tests/Feature/Auth/*.php (5 files)                tests/Feature/ProfileTest.php
+tests/Feature/CheckInTest.php                     tests/Feature/ReservationCheckInIntegrationTest.php
+tests/Feature/CheckOutTest.php                     tests/Feature/ReservationDepositTest.php
+tests/Feature/DashboardChartDataTest.php           tests/Feature/ReservationNotificationsTest.php
+tests/Feature/ExampleTest.php                      tests/Feature/ReservationTest.php
+tests/Feature/ExpireReservationsTest.php           tests/Feature/SlotReservationLifecycleTest.php
+tests/Feature/LotReservationsEnabledTest.php       tests/Feature/SuspiciousVehicleBlacklistTest.php
+                                                    tests/Feature/UserCancelReservationTest.php
+tests/Unit/ExampleTest.php
+```
+
+⚠️ **Known failing (7)** — ทั้งหมดอยู่ใน `ReservationTest.php`, `ReservationDepositTest.php`, `LotReservationsEnabledTest.php`: test payload ยังส่งแค่ `vehicle_id` แบบเก่า แต่ `User\ReservationController::store()` ปัจจุบันบังคับ `license_plate` เป็น required field แล้ว (ตาม flow "จองด้วยทะเบียนโดยตรง") — ต้องอัปเดต test payload ให้ตรงกับ validation ปัจจุบัน
 
 ---
 
@@ -855,7 +896,8 @@ app/
 │   ├── CarScanService.php      ← Claude Vision API + findMatchingReservation()
 │   └── CheckInService.php      ← reusable check-in transaction (lockForUpdate)
 └── Support/
-    └── notify_user.php         ← global helper: notify_user(userId, title, message)
+    ├── notify_user.php         ← global helper: notify_user(userId, title, message)
+    └── admin_audit.php         ← global helper: admin_audit(action, subject?, meta?)
 
 config/
 ├── parking.php    ← grace_period (RESERVATION_GRACE_PERIOD)
