@@ -7,6 +7,7 @@
                     <h1 class="text-3xl font-extrabold sp-glow-text">ผู้ใช้งาน</h1>
                     <p class="text-gray-300 mt-1">ค้นหา/กรอง/แก้ไข/Force reset password</p>
                 </div>
+                <a href="{{ route('admin.users.create') }}" class="sp-btn sp-btn-primary">+ เพิ่มผู้ใช้ใหม่</a>
             </div>
 
             @if (session('success'))
@@ -39,11 +40,11 @@
                 <table class="w-full sp-table min-w-[560px]">
                     <thead>
                         <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4">ชื่อ</th>
-                            <th class="py-3 pr-4">อีเมล</th>
-                            <th class="py-3 pr-4">role</th>
-                            <th class="py-3 pr-4">force reset</th>
-                            <th class="py-3 pr-4">อัปเดต</th>
+                            <th class="py-3 pr-4 text-left">ชื่อ</th>
+                            <th class="py-3 pr-4 text-left">อีเมล</th>
+                            <th class="py-3 pr-4 text-left">role</th>
+                            <th class="py-3 pr-4 text-left">force reset</th>
+                            <th class="py-3 pr-4 text-left">อัปเดต</th>
                             <th class="py-3 pr-4" style="text-align:right">จัดการ</th>
                         </tr>
                     </thead>
