@@ -112,6 +112,28 @@
                 </form>
             </div>
 
+            {{-- Card: Danger Zone (ลบผู้ใช้) --}}
+            <div class="sp-card rounded-2xl p-6 mt-6 border border-red-700/60">
+                <h2 class="text-xl font-extrabold mb-2 text-red-300">ลบผู้ใช้</h2>
+                @if ($user->role === 'owner')
+                    <p class="text-gray-300 text-sm">
+                        ผู้ใช้นี้เป็น <span class="sp-badge sp-badge-owner">owner</span> —
+                        การลบจะ<span class="text-red-300 font-semibold">ลบลานจอดของผู้ใช้นี้ทั้งหมด</span>ไปด้วย
+                        และ<span class="text-red-300 font-semibold">ยกเลิกการจองที่ยัง pending/confirmed</span> ในลานเหล่านั้นอัตโนมัติ
+                        (พร้อมแจ้งเตือนผู้จอง) หากมีรถกำลังจอดอยู่จริง ต้อง Check-Out ก่อนจึงจะลบได้
+                    </p>
+                @else
+                    <p class="text-gray-300 text-sm">การลบผู้ใช้จะลบข้อมูลที่เกี่ยวข้องของผู้ใช้นี้ทั้งหมด และไม่สามารถย้อนกลับได้</p>
+                @endif
+
+                <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="mt-4 flex justify-end"
+                    onsubmit="return confirm('ยืนยันลบผู้ใช้ \'{{ $user->name }}\' ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="sp-btn sp-btn-danger">ลบผู้ใช้นี้</button>
+                </form>
+            </div>
+
         </div>
     </div>
 </x-app-layout>
