@@ -48,7 +48,7 @@ class OcrCheckInTest extends TestCase
         $vehicle = Vehicle::factory()->create();
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertTrue($result['success']);
         $this->assertNotNull($result['log']);
@@ -84,7 +84,7 @@ class OcrCheckInTest extends TestCase
         ]);
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertTrue($result['success']);
         $this->assertNotNull($result['reservation']);
@@ -105,12 +105,13 @@ class OcrCheckInTest extends TestCase
 
         ParkingLog::factory()->create([
             'vehicle_id'     => $vehicle->id,
+            'license_plate'  => $vehicle->license_plate,
             'parking_lot_id' => $lot->id,
             'check_out_time' => null,
         ]);
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('จอดอยู่แล้ว', $result['error']);
@@ -126,7 +127,7 @@ class OcrCheckInTest extends TestCase
         ParkingSlot::factory()->count(3)->occupied()->create(['parking_lot_id' => $lot->id]);
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('ช่องจอดว่าง', $result['error']);
@@ -144,11 +145,11 @@ class OcrCheckInTest extends TestCase
         $service = app(CheckInService::class);
 
         // First check-in
-        $result1 = $service->checkIn($vehicle->id, $lot->id);
+        $result1 = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
         $this->assertTrue($result1['success']);
 
         // Second check-in — should fail
-        $result2 = $service->checkIn($vehicle->id, $lot->id);
+        $result2 = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
         $this->assertFalse($result2['success']);
 
         // Only 1 parking log entry
@@ -174,7 +175,7 @@ class OcrCheckInTest extends TestCase
         ]);
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         // Check-in still succeeds (no reservation matched, just walk-in)
         $this->assertTrue($result['success']);
@@ -261,7 +262,7 @@ class OcrCheckInTest extends TestCase
             'status'         => 'confirmed',
         ]);
 
-        app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertDatabaseHas('reservation_logs', [
             'reservation_id' => $reservation->id,

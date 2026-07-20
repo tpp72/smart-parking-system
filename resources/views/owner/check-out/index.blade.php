@@ -47,10 +47,10 @@
                                 @endphp
                                 <tr class="border-b sp-divider hover:bg-white/5 transition">
                                     <td class="py-3 pr-4 font-bold text-red-300">
-                                        {{ $log->vehicle->license_plate }}
+                                        {{ $log->license_plate }}
                                     </td>
                                     <td class="py-3 pr-4 text-gray-300">
-                                        {{ $log->vehicle->brand }}, {{ $log->vehicle->color }}
+                                        {{ $log->brand }}, {{ $log->color }}
                                     </td>
                                     <td class="py-3 pr-4 text-gray-300">
                                         {{ $log->parkingLot->name }}
@@ -80,7 +80,7 @@
                                     <td class="py-3 pr-4 text-center">
                                         <form method="POST"
                                             action="{{ route('owner.check-out.store', $log) }}"
-                                            onsubmit="return confirm('ยืนยัน Check-Out ทะเบียน {{ $log->vehicle->license_plate }}?')">
+                                            onsubmit="return confirm('ยืนยัน Check-Out ทะเบียน {{ $log->license_plate }}?')">
                                             @csrf
                                             <button type="submit"
                                                 title="บันทึกเวลาออกและคำนวณค่าจอด"

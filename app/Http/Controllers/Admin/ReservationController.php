@@ -171,7 +171,7 @@ class ReservationController extends Controller
             ->orderBy('slot_number')
             ->get(['id', 'slot_number', 'parking_lot_id']);
 
-        $reservation->load(['user', 'vehicle', 'parkingLot', 'parkingSlot', 'parkingLog.vehicle', 'parkingLog.parkingSlot']);
+        $reservation->load(['user', 'vehicle', 'parkingLot', 'parkingSlot', 'parkingLog.parkingSlot']);
 
         return view('admin.reservations.edit', compact('reservation', 'lots', 'slots', 'statuses'));
     }

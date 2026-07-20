@@ -134,12 +134,14 @@ class ReservationNotificationsTest extends TestCase
             'parking_lot_id' => $lot->id,
             'reserve_start'  => now()->subMinutes(5),
             'status'         => 'confirmed',
+            'license_plate'  => $vehicle->license_plate,
+            'brand'          => $vehicle->brand,
+            'color'          => $vehicle->color,
         ]);
 
         $this->actingAs($admin)
             ->post(route('admin.check-in.store'), [
-                'vehicle_id'     => $vehicle->id,
-                'parking_lot_id' => $lot->id,
+                'reservation_id' => $reservation->id,
             ])
             ->assertRedirect();
 
@@ -160,6 +162,7 @@ class ReservationNotificationsTest extends TestCase
 
         $log = ParkingLog::factory()->create([
             'vehicle_id'      => $vehicle->id,
+            'license_plate'   => $vehicle->license_plate,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'check_in_time'   => now()->subHours(2),

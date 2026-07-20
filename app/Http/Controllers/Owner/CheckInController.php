@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
-use App\Models\Vehicle;
+use App\Models\Reservation;
 use App\Services\CheckInService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,52 +15,58 @@ class CheckInController extends Controller
 
     public function create()
     {
-        $vehicles = Vehicle::with('user:id,name')
-            ->orderBy('license_plate')
-            ->get(['id', 'license_plate', 'brand', 'color', 'user_id']);
+        $lots   = ParkingLot::ownedBy(Auth::id())->orderBy('name')->get(['id', 'name']);
+        $lotIds = $lots->pluck('id');
 
-        $lots = ParkingLot::ownedBy(Auth::id())->orderBy('name')->get(['id', 'name']);
+        $reservations = Reservation::checkable()
+            ->whereIn('parking_lot_id', $lotIds)
+            ->with(['user:id,name', 'parkingLot:id,name', 'parkingSlot:id,slot_number'])
+            ->orderBy('reserve_start')
+            ->get(['id', 'user_id', 'license_plate', 'brand', 'color', 'parking_lot_id', 'parking_slot_id', 'reserve_start']);
 
-        return view('owner.check-in.create', compact('vehicles', 'lots'));
+        return view('owner.check-in.create', compact('reservations', 'lots'));
     }
 
     public function store(Request $request)
     {
-        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id')->all();
-
         $data = $request->validate([
-            'vehicle_id'     => ['required', 'exists:vehicles,id'],
-            'parking_lot_id' => ['required', 'exists:parking_lots,id', function ($attr, $value, $fail) use ($ownedLotIds) {
-                if (!in_array((int) $value, $ownedLotIds, true)) {
-                    $fail('ไม่มีสิทธิ์ทำ Check-In ให้ลานจอดนี้');
-                }
-            }],
+            'reservation_id' => ['required', 'exists:reservations,id'],
+        ], [
+            'reservation_id.required' => 'กรุณาเลือกการจอง',
+            'reservation_id.exists'   => 'ไม่พบการจองที่เลือก',
         ]);
 
-        $result = $this->checkInService->checkIn($data['vehicle_id'], $data['parking_lot_id'], $ownedLotIds);
+        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id')->all();
+        $reservation = Reservation::findOrFail($data['reservation_id']);
+
+        if (!in_array($reservation->parking_lot_id, $ownedLotIds, true)) {
+            return back()->withErrors(['reservation_id' => 'ไม่มีสิทธิ์ทำ Check-In ให้การจองนี้'])->withInput();
+        }
+
+        $result = $this->checkInService->checkIn(
+            $reservation->license_plate,
+            $reservation->brand,
+            $reservation->color,
+            $reservation->parking_lot_id,
+            $ownedLotIds,
+            $reservation->vehicle_id
+        );
 
         if (!$result['success']) {
-            $field = str_contains($result['error'], 'ช่องจอด') ? 'parking_lot_id' : 'vehicle_id';
+            $field = str_contains($result['error'], 'ช่องจอด') ? 'parking_lot_id' : 'reservation_id';
             return back()->withErrors([$field => $result['error']])->withInput();
         }
 
-        $vehicle     = Vehicle::find($data['vehicle_id']);
-        $slot        = $result['slot'];
-        $reservation = $result['reservation'];
+        $slot = $result['slot'];
 
-        if ($reservation) {
-            notify_user(
-                $reservation->user_id,
-                'เช็คอินสำเร็จ',
-                "รถทะเบียน {$vehicle->license_plate} เข้าจอดที่ช่อง {$slot->slot_number} แล้ว (การจอง #{$reservation->id})"
-            );
-        }
+        notify_user(
+            $reservation->user_id,
+            'เช็คอินสำเร็จ',
+            "รถทะเบียน {$reservation->license_plate} เข้าจอดที่ช่อง {$slot->slot_number} แล้ว (การจอง #{$reservation->id})"
+        );
 
-        $successMsg = "Check-In สำเร็จ! ทะเบียน {$vehicle->license_plate} → ช่อง {$slot->slot_number}";
-        if ($reservation) {
-            $successMsg .= " (การจอง #{$reservation->id})";
-        }
-
-        return redirect()->route('owner.check-in.create')->with('success', $successMsg);
+        return redirect()->route('owner.check-in.create')->with('success',
+            "Check-In สำเร็จ! ทะเบียน {$reservation->license_plate} → ช่อง {$slot->slot_number} (การจอง #{$reservation->id})"
+        );
     }
 }

@@ -6,7 +6,6 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
-use App\Models\Vehicle;
 use Illuminate\Support\Facades\DB;
 
 class CheckInService
@@ -14,33 +13,39 @@ class CheckInService
     /**
      * Perform vehicle check-in into a parking lot.
      *
-     * Finds a checkable reservation automatically; falls back to $fallbackLotId
-     * when no reservation exists.
+     * ทะเบียน/ยี่ห้อ/สี คือข้อมูลระบุตัวรถหลัก (มาจาก reservation หรือผลสแกน AI เสมอ) ส่วน $vehicleId
+     * เป็นแค่ลิงก์เสริมไปยัง Vehicle record ถ้ามีอยู่จริง (ไม่บังคับ เพราะตอนนี้จองแบบพิมพ์ทะเบียนเอง
+     * ไม่ต้องลงทะเบียนรถล่วงหน้าแล้ว) — หา checkable reservation อัตโนมัติจากทะเบียน; fallback ไปที่
+     * $fallbackLotId ถ้าไม่มี reservation ผูกอยู่ (เช่น walk-in)
      *
      * @param array<int>|null $allowedLotIds  จำกัดขอบเขตลานที่ผู้เรียกมีสิทธิ์ทำ check-in ให้
      *                                        (Admin ส่ง lot ที่ไม่มีเจ้าของ, Owner ส่ง lot ของตัวเอง)
      *                                        null = ไม่จำกัด (ใช้กับ flow ที่ผูกกับ reservation ของ vehicle owner เอง เช่น AI scan)
      * @return array{success:bool, log:?ParkingLog, slot:?ParkingSlot, reservation:?Reservation, error:?string}
      */
-    public function checkIn(int $vehicleId, int $fallbackLotId, ?array $allowedLotIds = null): array
-    {
+    public function checkIn(
+        string $licensePlate,
+        ?string $brand,
+        ?string $color,
+        int $fallbackLotId,
+        ?array $allowedLotIds = null,
+        ?int $vehicleId = null
+    ): array {
         if ($allowedLotIds !== null && !in_array($fallbackLotId, $allowedLotIds, true)) {
             return $this->fail('ไม่มีสิทธิ์ทำ Check-In ให้ลานจอดนี้');
         }
 
-        // Guard: vehicle already has an active parking session
-        if (ParkingLog::where('vehicle_id', $vehicleId)->whereNull('check_out_time')->exists()) {
+        // Guard: ทะเบียนนี้มี parking session ที่ยังไม่ check-out อยู่แล้ว
+        if (ParkingLog::where('license_plate', $licensePlate)->whereNull('check_out_time')->exists()) {
             return $this->fail('รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
         }
 
-        // Find checkable reservation: match by license_plate (new) or vehicle_id (legacy)
-        $plate = Vehicle::where('id', $vehicleId)->value('license_plate');
-
+        // Find checkable reservation: match by license_plate (หลัก) หรือ vehicle_id (เสริม, ถ้ามี)
         $reservation = Reservation::checkable()
-            ->where(function ($q) use ($vehicleId, $plate) {
-                $q->where('vehicle_id', $vehicleId);
-                if ($plate) {
-                    $q->orWhere('license_plate', $plate);
+            ->where(function ($q) use ($vehicleId, $licensePlate) {
+                $q->where('license_plate', $licensePlate);
+                if ($vehicleId) {
+                    $q->orWhere('vehicle_id', $vehicleId);
                 }
             })
             ->when($allowedLotIds !== null, fn($q) => $q->whereIn('parking_lot_id', $allowedLotIds))
@@ -53,7 +58,7 @@ class CheckInService
         $error = null;
         $now   = now();
 
-        DB::transaction(function () use ($vehicleId, $reservation, $lotId, $now, &$slot, &$error, &$log) {
+        DB::transaction(function () use ($vehicleId, $licensePlate, $brand, $color, $reservation, $lotId, $now, &$slot, &$error, &$log) {
             // Try the specifically reserved slot first (may be 'reserved' after confirm or 'available' for legacy)
             if ($reservation?->parking_slot_id) {
                 $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
@@ -77,6 +82,9 @@ class CheckInService
 
             $log = ParkingLog::create([
                 'vehicle_id'      => $vehicleId,
+                'license_plate'   => $licensePlate,
+                'brand'           => $brand,
+                'color'           => $color,
                 'parking_lot_id'  => $slot->parking_lot_id,
                 'parking_slot_id' => $slot->id,
                 'check_in_time'   => $now,

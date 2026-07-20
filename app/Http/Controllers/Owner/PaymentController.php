@@ -16,7 +16,7 @@ class PaymentController extends Controller
         $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id');
 
         $payments = Payment::with([
-            'parkingLog.vehicle:id,license_plate,brand',
+            'parkingLog:id,license_plate,brand,parking_lot_id',
             'parkingLog.parkingLot:id,name',
         ])
             ->whereHas('parkingLog', fn($q) => $q->whereIn('parking_lot_id', $ownedLotIds))

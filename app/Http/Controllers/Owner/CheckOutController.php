@@ -8,6 +8,7 @@ use App\Models\ParkingLot;
 use App\Models\Payment;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
+use App\Models\Vehicle;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,6 @@ class CheckOutController extends Controller
         $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id');
 
         $logs = ParkingLog::with([
-            'vehicle:id,license_plate,brand,color',
             'parkingLot:id,name,hourly_rate',
             'parkingSlot:id,slot_number',
             'reservation:id,reserve_start,status',
@@ -40,7 +40,7 @@ class CheckOutController extends Controller
 
         if ($log->check_out_time !== null) {
             return redirect()->route('owner.check-out.index')
-                ->withErrors(['error' => "ทะเบียน {$log->vehicle->license_plate} Check-Out ไปแล้ว"]);
+                ->withErrors(['error' => "ทะเบียน {$log->license_plate} Check-Out ไปแล้ว"]);
         }
 
         if ($log->payment()->exists()) {
@@ -94,18 +94,19 @@ class CheckOutController extends Controller
             }
         });
 
-        Reservation::where('vehicle_id', $log->vehicle_id)
+        Reservation::where('license_plate', $log->license_plate)
             ->whereIn('status', ['pending', 'confirmed'])
             ->where('reserve_start', '<=', now()->subMinutes(Reservation::gracePeriodMinutes()))
             ->update(['status' => 'expired']);
 
-        $log->load('vehicle:id,license_plate,user_id', 'parkingSlot:id,slot_number');
+        $notifyUserId = $linkedReservation?->user_id
+            ?? ($log->vehicle_id ? Vehicle::find($log->vehicle_id)?->user_id : null);
 
-        if ($log->vehicle?->user_id) {
+        if ($notifyUserId) {
             $msg = $deposit > 0
                 ? sprintf(
                     'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด ฿%.2f | มัดจำ -฿%.2f | คงเหลือ ฿%.2f %s',
-                    $log->vehicle->license_plate,
+                    $log->license_plate,
                     $totalHours,
                     $parkingFee,
                     $deposit,
@@ -114,17 +115,17 @@ class CheckOutController extends Controller
                 )
                 : sprintf(
                     'รถทะเบียน %s ออกจากลานแล้ว | จอด %d ชม. | ค่าจอด ฿%.2f (รอชำระเงิน)',
-                    $log->vehicle->license_plate,
+                    $log->license_plate,
                     $totalHours,
                     $parkingFee,
                 );
-            notify_user($log->vehicle->user_id, 'เช็คเอาท์เรียบร้อย', $msg);
+            notify_user($notifyUserId, 'เช็คเอาท์เรียบร้อย', $msg);
         }
 
         return redirect()->route('owner.check-out.index')
             ->with('success', sprintf(
                 'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
-                $log->vehicle->license_plate,
+                $log->license_plate,
                 $totalHours,
                 $parkingFee,
                 $totalAmount,

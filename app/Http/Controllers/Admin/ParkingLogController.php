@@ -16,15 +16,12 @@ class ParkingLogController extends Controller
 
         $logs = ParkingLog::query()
             ->with([
-                'vehicle:id,license_plate,brand,color',
                 'parkingLot:id,name',
                 'parkingSlot:id,slot_number',
             ])
             ->whereHas('parkingLot', fn($q) => $q->whereNull('owner_id'))
             ->when($q !== '', fn($query) =>
-                $query->whereHas('vehicle', fn($v) =>
-                    $v->where('license_plate', 'ilike', "%{$q}%")
-                )
+                $query->where('license_plate', 'ilike', "%{$q}%")
             )
             ->when($from, fn($query) =>
                 $query->whereDate('check_in_time', '>=', $from)

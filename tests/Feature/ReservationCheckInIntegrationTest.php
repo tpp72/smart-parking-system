@@ -48,7 +48,7 @@ class ReservationCheckInIntegrationTest extends TestCase
         $reservation = $this->confirmedReservation($vehicle, $lot);
 
         $service = app(CheckInService::class);
-        $result  = $service->checkIn($vehicle->id, $lot->id);
+        $result  = $service->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertTrue($result['success']);
 
@@ -87,7 +87,7 @@ class ReservationCheckInIntegrationTest extends TestCase
         $reservation = $this->confirmedReservation($vehicle, $lot);
 
         // Perform check-in first
-        $checkInResult = app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        $checkInResult = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
         $this->assertTrue($checkInResult['success']);
 
         $log = $checkInResult['log'];
@@ -129,7 +129,7 @@ class ReservationCheckInIntegrationTest extends TestCase
         [$lot]   = $this->setupLot();
 
         // No reservation exists for this vehicle
-        $result = app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        $result = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertTrue($result['success']);
         $this->assertNull($result['reservation']);
@@ -152,7 +152,7 @@ class ReservationCheckInIntegrationTest extends TestCase
         // Reservation belongs to vehicleA, but we check-in vehicleB
         $reservation = $this->confirmedReservation($vehicleA, $lot);
 
-        $result = app(CheckInService::class)->checkIn($vehicleB->id, $lot->id);
+        $result = app(CheckInService::class)->checkIn($vehicleB->license_plate, $vehicleB->brand, $vehicleB->color, $lot->id, null, $vehicleB->id);
 
         $this->assertTrue($result['success']);
         $this->assertNull($result['reservation']);
@@ -185,7 +185,7 @@ class ReservationCheckInIntegrationTest extends TestCase
             'reserve_start' => now()->subMinutes($gracePeriod + 60),
         ]);
 
-        $result = app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        $result = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         // Check-in succeeds as walk-in
         $this->assertTrue($result['success']);
@@ -219,7 +219,7 @@ class ReservationCheckInIntegrationTest extends TestCase
             'status'         => 'cancelled',
         ]);
 
-        $result = app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        $result = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         // Check-in succeeds as walk-in
         $this->assertTrue($result['success']);
