@@ -1,4 +1,5 @@
 import './bootstrap';
+import './flatpickr-init';
 
 import Alpine from 'alpinejs';
 

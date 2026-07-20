@@ -15,11 +15,11 @@
                     <input name="q" value="{{ $q }}" placeholder="ค้นหาทะเบียนรถ..."
                         class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600 px-4 py-2" />
 
-                    <input type="date" name="from" value="{{ $from }}" class="sp-select"
-                        title="วันที่เข้า (เริ่มต้น)" />
+                    <input type="text" name="from" data-flatpickr="date" value="{{ $from }}" class="sp-select"
+                        title="วันที่เข้า (เริ่มต้น)" placeholder="วันที่เริ่ม" />
 
-                    <input type="date" name="to" value="{{ $to }}" class="sp-select"
-                        title="วันที่เข้า (สิ้นสุด)" />
+                    <input type="text" name="to" data-flatpickr="date" value="{{ $to }}" class="sp-select"
+                        title="วันที่เข้า (สิ้นสุด)" placeholder="วันที่สิ้นสุด" />
 
                     <div class="flex gap-2">
                         <button class="sp-btn sp-btn-outline flex-1" type="submit">ค้นหา</button>
@@ -46,11 +46,11 @@
                         @forelse ($logs as $log)
                             <tr class="border-b sp-divider hover:bg-white/5 transition">
                                 <td class="py-3 pr-4 font-extrabold text-red-300">
-                                    {{ $log->vehicle?->license_plate ?? '-' }}
+                                    {{ $log->license_plate ?? '-' }}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300">
-                                    {{ $log->vehicle?->brand }}
-                                    <span class="text-gray-500">{{ $log->vehicle?->color }}</span>
+                                    {{ $log->brand }}
+                                    <span class="text-gray-500">{{ $log->color }}</span>
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300">
                                     {{ $log->parkingLot?->name ?? '-' }}

@@ -65,7 +65,7 @@
 
                         <div>
                             <label class="block text-sm text-gray-200 mb-1">เริ่ม *</label>
-                            <input type="datetime-local" name="reserve_start"
+                            <input type="text" name="reserve_start" data-flatpickr="datetime"
                                 value="{{ old('reserve_start', \Carbon\Carbon::parse($reservation->reserve_start)->format('Y-m-d\TH:i')) }}"
                                 class="sp-select" />
                             @error('reserve_start')
@@ -151,7 +151,7 @@
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                         <div>
                             <p class="text-gray-400">ทะเบียน</p>
-                            <p class="font-bold text-red-300">{{ $plog->vehicle?->license_plate ?? '-' }}</p>
+                            <p class="font-bold text-red-300">{{ $plog->license_plate ?? '-' }}</p>
                         </div>
                         <div>
                             <p class="text-gray-400">ช่องจอด</p>
