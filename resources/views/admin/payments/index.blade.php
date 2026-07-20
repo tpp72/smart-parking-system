@@ -55,10 +55,10 @@
                                 <tr>
                                     <td class="px-5 py-3 text-gray-500 text-xs">#{{ $payment->id }}</td>
                                     <td class="px-5 py-3 font-extrabold tracking-wider text-red-300">
-                                        {{ $payment->parkingLog?->vehicle?->license_plate ?? '—' }}
-                                        @if($payment->parkingLog?->vehicle?->brand)
+                                        {{ $payment->parkingLog?->license_plate ?? '—' }}
+                                        @if($payment->parkingLog?->brand)
                                             <span class="block text-xs font-normal text-gray-500">
-                                                {{ $payment->parkingLog->vehicle->brand }}
+                                                {{ $payment->parkingLog->brand }}
                                             </span>
                                         @endif
                                     </td>
@@ -89,7 +89,7 @@
                                         @if($payment->payment_status === 'unpaid')
                                             <form method="POST"
                                                   action="{{ route('admin.payments.mark-paid', $payment) }}"
-                                                  onsubmit="return confirm('ยืนยันรับชำระเงิน ฿{{ number_format((float)$payment->total_amount, 2) }} จากทะเบียน {{ $payment->parkingLog?->vehicle?->license_plate }}?')">
+                                                  onsubmit="return confirm('ยืนยันรับชำระเงิน ฿{{ number_format((float)$payment->total_amount, 2) }} จากทะเบียน {{ $payment->parkingLog?->license_plate }}?')">
                                                 @csrf
                                                 <button type="submit" title="ยืนยันว่าลูกค้าชำระเงินแล้ว" class="sp-btn sp-btn-success text-sm px-4 py-1.5">
                                                     ✓ รับชำระแล้ว

@@ -151,7 +151,7 @@ class SlotReservationLifecycleTest extends TestCase
             'status'          => 'confirmed',
         ]);
 
-        $result = app(CheckInService::class)->checkIn($vehicle->id, $lot->id);
+        $result = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
 
         $this->assertTrue($result['success']);
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'occupied']);
