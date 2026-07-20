@@ -284,3 +284,36 @@
   border-color: rgba(180,28,28,0.65) !important;
   color: #111827 !important;
 }
+
+/* ─── Flatpickr popup calendar (date/datetime pickers) ─────────────── */
+.light-theme .flatpickr-calendar {
+  background: #ede8e4;
+  border: 1px solid rgba(160, 28, 28, 0.50);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(180, 28, 28, 0.10);
+}
+.light-theme .flatpickr-calendar.arrowTop::before,
+.light-theme .flatpickr-calendar.arrowTop::after { border-bottom-color: rgba(160, 28, 28, 0.50); }
+.light-theme .flatpickr-months { background: rgba(180, 28, 28, 0.06); }
+.light-theme .flatpickr-month,
+.light-theme .flatpickr-current-month .flatpickr-monthDropdown-months,
+.light-theme .flatpickr-current-month input.cur-year { color: #111827; fill: #111827; }
+.light-theme .flatpickr-current-month .flatpickr-monthDropdown-months:hover { background: rgba(180, 28, 28, 0.10); }
+.light-theme .flatpickr-prev-month, .light-theme .flatpickr-next-month { color: #111827; fill: #111827; }
+.light-theme .flatpickr-prev-month:hover svg, .light-theme .flatpickr-next-month:hover svg { fill: #dc2626; }
+.light-theme span.flatpickr-weekday { color: rgba(55, 65, 81, 0.85); }
+.light-theme .flatpickr-day { color: #111827; }
+.light-theme .flatpickr-day.flatpickr-disabled,
+.light-theme .flatpickr-day.flatpickr-disabled:hover { color: rgba(107, 114, 128, 0.4); }
+.light-theme .flatpickr-day.prevMonthDay, .light-theme .flatpickr-day.nextMonthDay { color: rgba(107, 114, 128, 0.5); }
+.light-theme .flatpickr-day:hover { background: rgba(180, 28, 28, 0.14); border-color: transparent; }
+.light-theme .flatpickr-day.today { border-color: #dc2626; }
+.light-theme .flatpickr-day.selected,
+.light-theme .flatpickr-day.selected:hover,
+.light-theme .flatpickr-day.selected:focus {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.light-theme .flatpickr-time { background: rgba(180, 28, 28, 0.05); }
+.light-theme .flatpickr-time input { color: #111827; }
+.light-theme .flatpickr-time input:hover, .light-theme .flatpickr-time .flatpickr-am-pm:hover { background: rgba(180, 28, 28, 0.10); }

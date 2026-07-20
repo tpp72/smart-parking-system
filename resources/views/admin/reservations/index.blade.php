@@ -35,8 +35,8 @@
                         @endforeach
                     </select>
 
-                    <input type="date" name="from" value="{{ $from }}" class="sp-select" />
-                    <input type="date" name="to" value="{{ $to }}" class="sp-select" />
+                    <input type="text" name="from" data-flatpickr="date" value="{{ $from }}" class="sp-select" placeholder="วันที่เริ่ม" />
+                    <input type="text" name="to" data-flatpickr="date" value="{{ $to }}" class="sp-select" placeholder="วันที่สิ้นสุด" />
 
                     <div class="flex gap-2 md:col-span-6">
                         <button class="sp-btn sp-btn-outline" type="submit">ค้นหา</button>

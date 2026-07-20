@@ -92,11 +92,12 @@
                     {{-- เวลาเริ่ม --}}
                     <div>
                         <x-input-label for="reserve_start" value="เวลาเริ่ม (Reserve Start)" />
-                        <x-text-input id="reserve_start" name="reserve_start" type="datetime-local"
+                        <x-text-input id="reserve_start" name="reserve_start" type="text"
+                            data-flatpickr="datetime"
                             class="mt-1 block w-full @error('reserve_start') border-red-500 @enderror"
                             value="{{ old('reserve_start', $exampleStart) }}" min="{{ $minDatetime }}" />
                         <p class="text-xs text-gray-500 mt-1">ตัวอย่าง:
-                            {{ now()->addHour()->startOfHour()->format('d/m/Y H:i') }} น.</p>
+                            {{ now()->addHour()->startOfHour()->format('d/m/Y H:i') }} น. — คลิกช่องด้านบนเพื่อเลือกจากปฏิทิน</p>
                         <x-input-error :messages="$errors->get('reserve_start')" class="mt-2" />
                     </div>
 

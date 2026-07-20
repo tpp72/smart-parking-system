@@ -64,6 +64,35 @@
                         <p class="text-xs text-gray-500 mt-1">กรอกป้ายทะเบียนรถที่จะนำมาจอด (แก้ไขได้ภายหลัง ก่อนเช็คอิน)</p>
                     </div>
 
+                    {{-- ยี่ห้อ/สีรถ --}}
+                    <div>
+                        <x-input-label value="ยี่ห้อ / สีรถ" />
+                        <div class="grid grid-cols-2 gap-3 mt-1">
+                            <div>
+                                <x-text-input id="brand" name="brand" type="text"
+                                    class="block w-full @error('brand') border-red-500 @enderror"
+                                    value="{{ old('brand') }}"
+                                    placeholder="เช่น Toyota"
+                                    maxlength="60"
+                                    autocomplete="off"
+                                    required />
+                                <x-input-error :messages="$errors->get('brand')" class="mt-2" />
+                            </div>
+                            <div>
+                                <select id="color" name="color"
+                                    class="sp-select w-full @error('color') border-red-500 @enderror"
+                                    required>
+                                    <option value="">-- สีรถ --</option>
+                                    @foreach (config('car_colors') as $c)
+                                        <option value="{{ $c }}" @selected(old('color') === $c)>{{ $c }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('color')" class="mt-2" />
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">กรอกยี่ห้อและสีรถที่จะนำมาจอด (แก้ไขได้ภายหลัง ก่อนเช็คอิน)</p>
+                    </div>
+
                     {{-- ลานจอด --}}
                     <div>
                         <x-input-label for="parking_lot_id" value="ลานจอด (Parking Lot)" />
@@ -115,11 +144,12 @@
                     @endphp
                     <div>
                         <x-input-label for="reserve_start" value="เวลาเริ่ม (Reserve Start)" />
-                        <x-text-input id="reserve_start" name="reserve_start" type="datetime-local"
+                        <x-text-input id="reserve_start" name="reserve_start" type="text"
+                            data-flatpickr="datetime"
                             class="mt-1 block w-full @error('reserve_start') border-red-500 @enderror"
                             value="{{ old('reserve_start', $exampleStart) }}" min="{{ $minDatetime }}" />
                         <p class="text-xs text-gray-500 mt-1">
-                            ตัวอย่าง: {{ now()->addHour()->startOfHour()->format('d/m/Y H:i') }} น.
+                            ตัวอย่าง: {{ now()->addHour()->startOfHour()->format('d/m/Y H:i') }} น. — คลิกช่องด้านบนเพื่อเลือกจากปฏิทิน
                         </p>
                         <x-input-error :messages="$errors->get('reserve_start')" class="mt-2" />
                     </div>
