@@ -71,6 +71,9 @@
                                 <p class="text-3xl font-extrabold tracking-widest sp-glow-text">
                                     {{ $scan->license_plate ?: '—' }}
                                 </p>
+                                @if($scan->province)
+                                    <p class="text-sm text-gray-400 mt-1">{{ $scan->province }}</p>
+                                @endif
                                 @if($scan->confidence)
                                     <p class="text-xs text-gray-600 mt-1">
                                         ความมั่นใจ {{ number_format($scan->confidence, 1) }}%
@@ -213,6 +216,20 @@
                                 <dt class="text-gray-500">ทะเบียน</dt>
                                 <dd class="font-semibold text-gray-200">{{ $matchedReservation->license_plate ?? $matchedReservation->vehicle?->license_plate ?? '—' }}</dd>
                             </div>
+                            @if($matchedReservation->resolvedProvince())
+                                <div>
+                                    <dt class="text-gray-500">จังหวัดที่แจ้งไว้</dt>
+                                    <dd class="font-semibold text-gray-200">{{ $matchedReservation->resolvedProvince() }}</dd>
+                                </div>
+                            @endif
+                            @if($matchedReservation->brand || $matchedReservation->color)
+                                <div>
+                                    <dt class="text-gray-500">ยี่ห้อ/สีที่แจ้งไว้</dt>
+                                    <dd class="font-semibold text-gray-200">
+                                        {{ $matchedReservation->brand ?? '—' }} / {{ $matchedReservation->color ?? '—' }}
+                                    </dd>
+                                </div>
+                            @endif
                             <div>
                                 <dt class="text-gray-500">ลานจอด</dt>
                                 <dd class="font-semibold text-gray-200">{{ $matchedReservation->parkingLot?->name ?? '—' }}</dd>

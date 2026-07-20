@@ -4,7 +4,7 @@
 
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h1 class="text-2xl font-extrabold sp-glow-text">แก้ไขป้ายทะเบียน</h1>
+                    <h1 class="text-2xl font-extrabold sp-glow-text">แก้ไขข้อมูลรถ</h1>
                     <p class="text-gray-400 text-sm mt-0.5">การจอง #{{ $reservation->id }} — {{ $reservation->parkingLot?->name }}</p>
                 </div>
                 <a href="{{ route('user.reservations.index') }}" class="sp-btn sp-btn-outline text-sm">← กลับ</a>
@@ -72,6 +72,34 @@
                                     <x-input-error :messages="$errors->get('plate_province')" class="mt-2" />
                                 </div>
                             </div>
+                        </div>
+
+                        <div>
+                            <x-input-label value="ยี่ห้อ / สีรถ" />
+                            <div class="grid grid-cols-2 gap-3 mt-1">
+                                <div>
+                                    <x-text-input id="brand" name="brand" type="text"
+                                        class="block w-full @error('brand') border-red-500 @enderror"
+                                        value="{{ old('brand', $reservation->brand) }}"
+                                        placeholder="เช่น Toyota"
+                                        maxlength="60"
+                                        autocomplete="off"
+                                        required />
+                                    <x-input-error :messages="$errors->get('brand')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <select id="color" name="color"
+                                        class="sp-select w-full @error('color') border-red-500 @enderror"
+                                        required>
+                                        <option value="">-- สีรถ --</option>
+                                        @foreach (config('car_colors') as $c)
+                                            <option value="{{ $c }}" @selected(old('color', $reservation->color) === $c)>{{ $c }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('color')" class="mt-2" />
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">กรอกยี่ห้อและสีรถที่จะนำมาจอด (แก้ไขได้ภายหลัง ก่อนเช็คอิน)</p>
                         </div>
 
                         <div class="flex gap-3 pt-1">

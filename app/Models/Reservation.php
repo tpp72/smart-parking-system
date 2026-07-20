@@ -26,6 +26,35 @@ class Reservation extends Model
         return (int) config('parking.grace_period', 30);
     }
 
+    /**
+     * แยกป้ายทะเบียนที่เก็บเป็นสตริงเดียว (เช่น "กข 1234 กรุงเทพมหานคร") ออกเป็น [เลขทะเบียน, จังหวัด]
+     * ใช้กับ reservation เก่าที่จองไว้ก่อนมีคอลัมน์ plate_province แยกต่างหาก — ถ้าคำสุดท้ายไม่ตรงกับ
+     * จังหวัดใดเลย (ไม่มีจังหวัดต่อท้าย) จะคืนจังหวัดว่าง
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function splitPlate(?string $plate): array
+    {
+        $plate = trim((string) $plate);
+        $provinces = config('thai_provinces');
+
+        $lastSpace = strrpos($plate, ' ');
+        if ($lastSpace !== false) {
+            $possibleProvince = substr($plate, $lastSpace + 1);
+            if (in_array($possibleProvince, $provinces, true)) {
+                return [trim(substr($plate, 0, $lastSpace)), $possibleProvince];
+            }
+        }
+
+        return [$plate, ''];
+    }
+
+    /** จังหวัดของป้ายทะเบียนนี้ — ใช้คอลัมน์ plate_province ถ้ามี ไม่งั้น parse จาก license_plate (ข้อมูลเก่า) */
+    public function resolvedProvince(): string
+    {
+        return $this->plate_province ?: self::splitPlate($this->license_plate)[1];
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

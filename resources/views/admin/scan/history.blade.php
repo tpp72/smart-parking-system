@@ -67,6 +67,9 @@
                                     {{-- License Plate --}}
                                     <td class="px-4 py-3 font-extrabold tracking-wider text-red-300">
                                         {{ $scan->license_plate ?: '—' }}
+                                        @if($scan->province)
+                                            <span class="block text-xs font-normal text-gray-500">{{ $scan->province }}</span>
+                                        @endif
                                         @if($scan->vehicle)
                                             <span class="block text-xs font-normal text-green-400">✓ พบในระบบ</span>
                                         @endif

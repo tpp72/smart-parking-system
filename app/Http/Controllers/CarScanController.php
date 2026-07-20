@@ -66,23 +66,50 @@ class CarScanController extends Controller
                             ->exists();
 
                         if ($isCheckable) {
-                            $result = $this->checkInService->checkIn(
-                                $reservation->vehicle_id,
-                                $reservation->parking_lot_id
+                            // ต้องตรงอย่างน้อย 2 ใน 4 เกณฑ์ (ทะเบียน + จังหวัด/ยี่ห้อ/สี) กันเช็คอินรถผิดคัน
+                            // ที่บังเอิญทะเบียนคล้ายกัน ก่อนอนุญาตให้ auto check-in
+                            $match = $this->scanService->matchScanAgainstReservation(
+                                $reservation,
+                                $scan->province,
+                                $scan->brand,
+                                $scan->color
                             );
 
-                            $sessionData['scan_check_in'] = [
-                                'success' => $result['success'],
-                                'error'   => $result['error'],
-                                'slot'    => $result['slot']?->slot_number,
-                            ];
+                            if (!$match['passed']) {
+                                $sessionData['scan_check_in'] = [
+                                    'success' => false,
+                                    'error'   => 'ข้อมูลรถไม่ตรงกับที่แจ้งไว้ตอนจอง: '
+                                        . implode(', ', $match['mismatches'])
+                                        . ' — กรุณาให้เจ้าหน้าที่ตรวจสอบก่อนเช็คอิน',
+                                    'slot'    => null,
+                                ];
+                            } else {
+                                // ใช้ทะเบียน/ยี่ห้อ/สีจาก reservation เป็นหลัก (มีครบเสมอ เพราะบังคับกรอกตอนจอง)
+                                // vehicle_id เป็นแค่ลิงก์เสริมถ้ามี Vehicle record ตรงกันอยู่จริง ไม่บังคับ
+                                $vehicleId = $reservation->vehicle_id ?? $scan->vehicle_id;
 
-                            if ($result['success']) {
-                                notify_user(
-                                    $reservation->user_id,
-                                    'เช็คอินอัตโนมัติสำเร็จ',
-                                    "ทะเบียน {$scan->license_plate} เช็คอินผ่านระบบสแกนรถ เข้าจอดที่ช่อง {$result['slot']->slot_number} แล้ว"
+                                $result = $this->checkInService->checkIn(
+                                    $reservation->license_plate,
+                                    $reservation->brand,
+                                    $reservation->color,
+                                    $reservation->parking_lot_id,
+                                    null,
+                                    $vehicleId
                                 );
+
+                                $sessionData['scan_check_in'] = [
+                                    'success' => $result['success'],
+                                    'error'   => $result['error'],
+                                    'slot'    => $result['slot']?->slot_number,
+                                ];
+
+                                if ($result['success']) {
+                                    notify_user(
+                                        $reservation->user_id,
+                                        'เช็คอินอัตโนมัติสำเร็จ',
+                                        "ทะเบียน {$scan->license_plate} เช็คอินผ่านระบบสแกนรถ เข้าจอดที่ช่อง {$result['slot']->slot_number} แล้ว"
+                                    );
+                                }
                             }
                         } else {
                             // Reservation found but outside check-in window
@@ -94,6 +121,12 @@ class CarScanController extends Controller
                         }
                     }
                     // status === 'checked_in': show info only, no action needed
+                } else {
+                    $sessionData['scan_check_in'] = [
+                        'success' => false,
+                        'error'   => "ไม่พบการจองที่ตรงกับทะเบียน \"{$scan->license_plate}\" ในระบบ — ตรวจสอบว่าทะเบียนที่สแกนได้ตรงกับที่แจ้งไว้ตอนจอง (AI อาจอ่านตัวอักษรผิดถ้าหน้าตาคล้ายกัน) หรือให้เจ้าหน้าที่ทำ Check-In ด้วยตนเอง",
+                        'slot'    => null,
+                    ];
                 }
             }
 
