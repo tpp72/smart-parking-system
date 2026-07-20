@@ -46,15 +46,21 @@ class CarScanService
             $mimeType = 'image/jpeg';
         }
 
-        $prompt = <<<'PROMPT'
+        $provinceList = implode(', ', config('thai_provinces'));
+
+        $prompt = <<<PROMPT
 วิเคราะห์รูปรถยนต์นี้แล้วตอบกลับเป็น JSON เท่านั้น ไม่มีข้อความอื่น ไม่มี markdown:
 
 {
-  "license_plate": "ป้ายทะเบียนรถ เช่น กข 1234 หรือ 5กก 6285 ถ้าไม่เห็นให้ใส่ค่าว่าง",
+  "license_plate": "ป้ายทะเบียนรถ (เฉพาะเลขทะเบียน ไม่รวมจังหวัด) เช่น กข 1234 หรือ 5กก 6285 ถ้าไม่เห็นให้ใส่ค่าว่าง",
+  "province": "ชื่อจังหวัดที่พิมพ์อยู่ด้านล่างของป้ายทะเบียน เลือกจากรายการจังหวัดด้านล่างเท่านั้น ถ้าไม่เห็นหรืออ่านไม่ออกให้ใส่ค่าว่าง",
   "color": "เลือกจากรายการด้านล่างเท่านั้น ห้ามตอบนอกรายการ",
   "brand": "ยี่ห้อรถ เช่น Toyota Honda Mazda Isuzu Ford Mitsubishi Nissan Suzuki Hyundai KIA ถ้าไม่แน่ใจให้ใส่ null",
   "confidence": ตัวเลข 0-100 บอกความมั่นใจในการอ่านป้ายทะเบียน
 }
+
+รายการจังหวัดที่ใช้ได้ (เลือก 1 จังหวัดเท่านั้น ห้ามตอบนอกรายการ):
+{$provinceList}
 
 รายการสีที่ใช้ได้ (เลือก 1 สีเท่านั้น ห้ามตอบนอกรายการ):
 - ขาว = ขาวทุกเฉด
@@ -72,7 +78,8 @@ class CarScanService
 - ชมพู = ชมพูทุกเฉด
 
 หลักเกณฑ์:
-- license_plate: อ่านตัวอักษรและเลขไทย/อังกฤษบนป้ายทะเบียนให้ครบ รูปแบบ "กข 1234" หรือ "5กก 6285"
+- license_plate: อ่านตัวอักษรและเลขไทย/อังกฤษบนป้ายทะเบียนให้ครบ รูปแบบ "กข 1234" หรือ "5กก 6285" (ไม่รวมชื่อจังหวัด)
+- province: อ่านเฉพาะข้อความชื่อจังหวัดที่อยู่ด้านล่างป้ายทะเบียน แยกจาก license_plate
 - color: ดูสีตัวถังรถเท่านั้น ไม่ใช่สีกระจก หลังคา หรือล้อ เลือกจากรายการด้านบนเท่านั้น
 - brand: ดูจากโลโก้หน้ารถหรือรูปทรง
 - ตอบเป็น JSON เท่านั้น ไม่มี ```json ไม่มีคำอธิบายเพิ่ม
@@ -145,6 +152,7 @@ PROMPT;
         $result = $this->detect($absolutePath);
 
         $licensePlate = trim($result['license_plate'] ?? '');
+        $province     = trim($result['province'] ?? '') ?: null;
         $color        = $result['color']       ?? null;
         $brand        = $result['brand']       ?? null;
         $confidence   = isset($result['confidence']) ? (float) $result['confidence'] : null;
@@ -172,6 +180,7 @@ PROMPT;
             'user_id'       => $userId,
             'vehicle_id'    => $vehicleId,
             'license_plate' => $licensePlate,
+            'province'      => $province,
             'color'         => $color,
             'brand'         => $brand,
             'confidence'    => $confidence,
@@ -222,5 +231,43 @@ PROMPT;
             $q->where('license_plate', $plate)
                 ->orWhere('license_plate', 'like', $plate . ' %');
         });
+    }
+
+    /**
+     * เทียบจังหวัด/ยี่ห้อ/สีที่ผู้ใช้แจ้งไว้ตอนจอง กับผลสแกน AI — ป้องกันเช็คอินรถผิดคันที่บังเอิญ
+     * ทะเบียนคล้ายกัน ต้องผ่านทั้ง 2 เงื่อนไข: (1) ทะเบียน+จังหวัดตรง (ทะเบียนตรงอยู่แล้วเพราะเป็นตัว
+     * ที่ใช้หา reservation นี้มา จึงเหลือแค่ต้องตรวจจังหวัดเพิ่ม) และ (2) ยี่ห้อหรือสีตรงอย่างน้อย 1
+     * อย่าง — จองใหม่ทุกรายการบังคับกรอกจังหวัด/ยี่ห้อ/สีอยู่แล้ว จึงไม่ต้องมี fallback สำหรับข้อมูลว่าง
+     *
+     * @return array{passed: bool, mismatches: array<string>}
+     */
+    public function matchScanAgainstReservation(
+        Reservation $reservation,
+        ?string $scannedProvince,
+        ?string $scannedBrand,
+        ?string $scannedColor
+    ): array {
+        $mismatches = [];
+
+        $province = $reservation->resolvedProvince();
+        $provinceOk = $scannedProvince && trim($province) === trim($scannedProvince);
+        if (!$provinceOk) {
+            $mismatches[] = "จังหวัดไม่ตรง: แจ้งไว้ \"{$province}\" แต่สแกนได้ \"" . ($scannedProvince ?: 'ไม่พบ') . '"';
+        }
+
+        $brandOk = $reservation->brand && $scannedBrand
+            && strcasecmp(trim($reservation->brand), trim($scannedBrand)) === 0;
+        $colorOk = $reservation->color && $scannedColor
+            && trim($reservation->color) === trim($scannedColor);
+
+        if (!$brandOk && !$colorOk) {
+            $mismatches[] = "ยี่ห้อและสีไม่ตรงทั้งคู่: แจ้งไว้ยี่ห้อ \"{$reservation->brand}\" สี \"{$reservation->color}\" แต่สแกนได้ยี่ห้อ \""
+                . ($scannedBrand ?: 'ไม่พบ') . "\" สี \"" . ($scannedColor ?: 'ไม่พบ') . '"';
+        }
+
+        return [
+            'passed'     => $provinceOk && ($brandOk || $colorOk),
+            'mismatches' => $mismatches,
+        ];
     }
 }

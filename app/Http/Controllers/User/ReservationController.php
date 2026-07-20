@@ -43,6 +43,8 @@ class ReservationController extends Controller
         $data = $request->validate([
             'plate_number'    => ['required', 'string', 'max:15'],
             'plate_province'  => ['required', 'string', Rule::in(config('thai_provinces'))],
+            'brand'           => ['required', 'string', 'max:60'],
+            'color'           => ['required', 'string', Rule::in(config('car_colors'))],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
             'reserve_start'   => ['required', 'date', 'after:now', 'before:' . now()->addDay()->toDateTimeString()],
@@ -51,6 +53,10 @@ class ReservationController extends Controller
             'plate_number.max'         => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
             'plate_province.required'  => 'กรุณาเลือกจังหวัด',
             'plate_province.in'        => 'กรุณาเลือกจังหวัดจากรายการ',
+            'brand.required'           => 'กรุณากรอกยี่ห้อรถ',
+            'brand.max'                => 'ยี่ห้อรถต้องไม่เกิน 60 ตัวอักษร',
+            'color.required'           => 'กรุณาเลือกสีรถ',
+            'color.in'                 => 'กรุณาเลือกสีจากรายการ',
             'parking_lot_id.required'  => 'กรุณาเลือกลานจอด',
             'parking_lot_id.exists'    => 'ไม่พบลานจอดที่เลือกในระบบ',
             'parking_slot_id.exists'   => 'ไม่พบช่องจอดที่เลือกในระบบ',
@@ -69,19 +75,6 @@ class ReservationController extends Controller
         ) {
             return back()
                 ->withErrors(['license_plate' => 'ป้ายทะเบียนนี้มีการจองที่ยังดำเนินการอยู่ กรุณารอให้เสร็จสิ้นก่อน'])
-                ->withInput();
-        }
-
-        // ป้องกัน: user มีการจอง active อยู่แล้วในช่วงเวลาเดียวกัน
-        $end = \Carbon\Carbon::parse($data['reserve_start'])->addHour()->toDateTimeString();
-        if (Reservation::where('user_id', Auth::id())
-            ->whereIn('status', Reservation::ACTIVE_STATUSES)
-            ->where('reserve_start', '<', $end)
-            ->whereRaw("reserve_start + INTERVAL '1 hour' > ?", [$data['reserve_start']])
-            ->exists()
-        ) {
-            return back()
-                ->withErrors(['reserve_start' => 'คุณมีการจองอื่นในช่วงเวลานี้อยู่แล้ว กรุณาเลือกเวลาอื่น'])
                 ->withInput();
         }
 
@@ -122,6 +115,9 @@ class ReservationController extends Controller
         $reservation = Reservation::create([
             'user_id'         => Auth::id(),
             'license_plate'   => $plate,
+            'plate_province'  => $data['plate_province'],
+            'brand'           => $data['brand'],
+            'color'           => $data['color'],
             'vehicle_id'      => null,
             'parking_lot_id'  => $data['parking_lot_id'],
             'parking_slot_id' => $data['parking_slot_id'] ?? null,
@@ -152,7 +148,8 @@ class ReservationController extends Controller
                 ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
         }
 
-        [$plateNumber, $plateProvince] = $this->splitPlate($reservation->license_plate);
+        $plateNumber = Reservation::splitPlate($reservation->license_plate)[0];
+        $plateProvince = $reservation->resolvedProvince();
 
         return view('user.reservations.edit', compact('reservation', 'plateNumber', 'plateProvince'));
     }
@@ -170,44 +167,61 @@ class ReservationController extends Controller
         $data = $request->validate([
             'plate_number'   => ['required', 'string', 'max:15'],
             'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
+            'brand'          => ['required', 'string', 'max:60'],
+            'color'          => ['required', 'string', Rule::in(config('car_colors'))],
         ], [
             'plate_number.required'   => 'กรุณากรอกเลขทะเบียนรถ',
             'plate_number.max'        => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
             'plate_province.required' => 'กรุณาเลือกจังหวัด',
             'plate_province.in'       => 'กรุณาเลือกจังหวัดจากรายการ',
+            'brand.required'          => 'กรุณากรอกยี่ห้อรถ',
+            'brand.max'               => 'ยี่ห้อรถต้องไม่เกิน 60 ตัวอักษร',
+            'color.required'          => 'กรุณาเลือกสีรถ',
+            'color.in'                => 'กรุณาเลือกสีจากรายการ',
         ]);
 
         $plate = strtoupper(trim($data['plate_number'])) . ' ' . $data['plate_province'];
+        $brand = $data['brand'];
+        $color = $data['color'];
 
-        // ถ้าไม่มีการเปลี่ยนแปลง ข้ามไปเลย
-        if ($plate === $reservation->license_plate) {
+        // ถ้าไม่มีการเปลี่ยนแปลงเลย ข้ามไปเลย
+        if ($plate === $reservation->license_plate
+            && $brand === $reservation->brand
+            && $color === $reservation->color
+        ) {
             return redirect()->route('user.reservations.index')
-                ->with('success', 'ป้ายทะเบียนไม่มีการเปลี่ยนแปลง');
+                ->with('success', 'ไม่มีการเปลี่ยนแปลงข้อมูล');
         }
 
-        // ตรวจสอบว่าป้ายทะเบียนใหม่ไม่มีการจอง active อื่น
-        if (Reservation::where('license_plate', $plate)
-            ->where('id', '!=', $reservation->id)
-            ->whereIn('status', Reservation::ACTIVE_STATUSES)
-            ->exists()
+        // ตรวจสอบว่าป้ายทะเบียนใหม่ไม่มีการจอง active อื่น (เฉพาะกรณีเปลี่ยนทะเบียน)
+        if ($plate !== $reservation->license_plate
+            && Reservation::where('license_plate', $plate)
+                ->where('id', '!=', $reservation->id)
+                ->whereIn('status', Reservation::ACTIVE_STATUSES)
+                ->exists()
         ) {
             return back()
                 ->withErrors(['license_plate' => 'ป้ายทะเบียนนี้มีการจองที่ยังดำเนินการอยู่'])
                 ->withInput();
         }
 
-        $reservation->update(['license_plate' => $plate]);
+        $reservation->update([
+            'license_plate'  => $plate,
+            'plate_province' => $data['plate_province'],
+            'brand'          => $brand,
+            'color'          => $color,
+        ]);
 
         ReservationLog::create([
             'reservation_id' => $reservation->id,
             'old_status'     => $reservation->status,
             'new_status'     => $reservation->status,
             'changed_by'     => Auth::id(),
-            'note'           => "User แก้ไขป้ายทะเบียนเป็น {$plate}",
+            'note'           => "User แก้ไขข้อมูลรถเป็น {$plate}" . ($brand ? " ยี่ห้อ {$brand}" : '') . ($color ? " สี {$color}" : ''),
         ]);
 
         return redirect()->route('user.reservations.index')
-            ->with('success', "อัปเดตป้ายทะเบียนเป็น {$plate} เรียบร้อยแล้ว");
+            ->with('success', "อัปเดตข้อมูลรถเรียบร้อยแล้ว");
     }
 
     /** ยกเลิกการจองที่เป็นของตัวเอง (เฉพาะ pending / confirmed) */
@@ -248,28 +262,6 @@ class ReservationController extends Controller
 
         return redirect()->route('user.reservations.index')
             ->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว");
-    }
-
-    /**
-     * แยกป้ายทะเบียนที่เก็บเป็นสตริงเดียว (เช่น "กข 1234 กรุงเทพมหานคร") ออกเป็น [เลขทะเบียน, จังหวัด]
-     * สำหรับ pre-fill ฟอร์มแก้ไข — ถ้าคำสุดท้ายไม่ตรงกับจังหวัดใดเลย (ข้อมูลเก่าที่ไม่มีจังหวัด) จะคืนจังหวัดว่าง
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function splitPlate(?string $plate): array
-    {
-        $plate = trim((string) $plate);
-        $provinces = config('thai_provinces');
-
-        $lastSpace = strrpos($plate, ' ');
-        if ($lastSpace !== false) {
-            $possibleProvince = substr($plate, $lastSpace + 1);
-            if (in_array($possibleProvince, $provinces, true)) {
-                return [trim(substr($plate, 0, $lastSpace)), $possibleProvince];
-            }
-        }
-
-        return [$plate, ''];
     }
 
     private function hasSlotConflict(int $slotId, string $start): bool
