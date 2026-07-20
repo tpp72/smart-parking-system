@@ -161,7 +161,7 @@
                                 <th class="py-3 pr-4 text-left">ลาน</th>
                                 <th class="py-3 pr-4 text-left">เข้า</th>
                                 <th class="py-3 pr-4 text-left">ออก</th>
-                                <th class="py-3 text-left"></th>
+                                <th class="py-3 text-right"></th>
                             </tr>
                         </thead>
                         <tbody>

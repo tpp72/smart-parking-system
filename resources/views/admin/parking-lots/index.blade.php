@@ -66,7 +66,7 @@
                                     @endif
                                 </td>
                                 <td class="py-3 pr-4">
-                                    <div class="flex gap-2">
+                                    <div class="flex gap-2 justify-end">
                                         <a href="{{ route('admin.parking-lots.edit', $lot) }}"
                                             title="แก้ไขข้อมูลลานจอด"
                                             class="sp-btn sp-btn-outline">
