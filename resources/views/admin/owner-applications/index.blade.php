@@ -62,7 +62,7 @@
                                 <th class="py-3 text-left">ช่องจอด</th>
                                 <th class="py-3 text-left">วันที่ส่ง</th>
                                 <th class="py-3 text-left">สถานะ</th>
-                                <th class="py-3 pr-6"></th>
+                                <th class="py-3 pr-6 text-left"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y sp-divider">
