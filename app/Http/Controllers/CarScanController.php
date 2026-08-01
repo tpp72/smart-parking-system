@@ -122,11 +122,7 @@ class CarScanController extends Controller
                     }
                     // status === 'checked_in': show info only, no action needed
                 } else {
-                    $sessionData['scan_check_in'] = [
-                        'success' => false,
-                        'error'   => "ไม่พบการจองที่ตรงกับทะเบียน \"{$scan->license_plate}\" ในระบบ — ตรวจสอบว่าทะเบียนที่สแกนได้ตรงกับที่แจ้งไว้ตอนจอง (AI อาจอ่านตัวอักษรผิดถ้าหน้าตาคล้ายกัน) หรือให้เจ้าหน้าที่ทำ Check-In ด้วยตนเอง",
-                        'slot'    => null,
-                    ];
+                    $sessionData['scan_check_in'] = $this->attemptWalkInCheckIn($scan);
                 }
             }
 
@@ -137,6 +133,64 @@ class CarScanController extends Controller
                 ->withErrors(['car_image' => 'AI ไม่สามารถวิเคราะห์รูปภาพได้: ' . $e->getMessage()])
                 ->withInput();
         }
+    }
+
+    /**
+     * Auto check-in สำหรับรถที่ไม่ได้จองล่วงหน้า (walk-in) — สแกนแล้วหา reservation ไม่เจอ
+     * เฉพาะ User เท่านั้น (สแกนป้ายทะเบียนตัวเอง) เข้าลานที่ตั้งค่าไว้ตายตัวใน config('parking.walkin_lot_id')
+     * เพราะระบบไม่รู้ว่ากล้อง/ผู้สแกนอยู่ที่ลานไหนจริง
+     *
+     * @return array{success: bool, error: ?string, slot: ?string}
+     */
+    private function attemptWalkInCheckIn(LicensePlateScan $scan): array
+    {
+        if (Auth::user()->role !== 'user') {
+            return [
+                'success' => false,
+                'error'   => "ไม่พบการจองที่ตรงกับทะเบียน \"{$scan->license_plate}\" ในระบบ — ตรวจสอบว่าทะเบียนที่สแกนได้ตรงกับที่แจ้งไว้ตอนจอง (AI อาจอ่านตัวอักษรผิดถ้าหน้าตาคล้ายกัน) หรือให้เจ้าหน้าที่ทำ Check-In ด้วยตนเอง",
+                'slot'    => null,
+            ];
+        }
+
+        $walkinLotId = config('parking.walkin_lot_id');
+        if (!$walkinLotId) {
+            return [
+                'success' => false,
+                'error'   => 'ไม่พบการจองสำหรับทะเบียนนี้ และระบบยังไม่ได้ตั้งค่าลานจอดสำหรับ Auto Check-in แบบไม่ได้จอง กรุณาติดต่อเจ้าหน้าที่',
+                'slot'    => null,
+            ];
+        }
+
+        if ($scan->is_suspicious) {
+            return [
+                'success' => false,
+                'error'   => 'ทะเบียนนี้อยู่ใน Blacklist ไม่สามารถเช็คอินอัตโนมัติได้ กรุณาติดต่อเจ้าหน้าที่',
+                'slot'    => null,
+            ];
+        }
+
+        $result = $this->checkInService->checkIn(
+            $scan->license_plate,
+            $scan->brand,
+            $scan->color,
+            $walkinLotId,
+            null,
+            $scan->vehicle_id
+        );
+
+        if ($result['success']) {
+            notify_user(
+                Auth::id(),
+                'เช็คอินอัตโนมัติสำเร็จ (Walk-in)',
+                "ทะเบียน {$scan->license_plate} เช็คอินผ่านระบบสแกนรถ เข้าจอดที่ช่อง {$result['slot']->slot_number} แล้ว"
+            );
+        }
+
+        return [
+            'success' => $result['success'],
+            'error'   => $result['error'],
+            'slot'    => $result['slot']?->slot_number,
+        ];
     }
 
     /* ─────────────────────────────────────────────────────────────
