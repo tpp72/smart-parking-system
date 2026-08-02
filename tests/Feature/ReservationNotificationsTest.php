@@ -140,9 +140,7 @@ class ReservationNotificationsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.check-in.store'), [
-                'reservation_id' => $reservation->id,
-            ])
+            ->post(route('admin.reservations.check-in', $reservation))
             ->assertRedirect();
 
         $this->assertDatabaseHas('notifications', [
@@ -170,7 +168,7 @@ class ReservationNotificationsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.check-out.store', $log))
+            ->post(route('admin.parking-logs.check-out', $log))
             ->assertRedirect();
 
         $this->assertDatabaseHas('notifications', [

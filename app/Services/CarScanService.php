@@ -141,8 +141,10 @@ PROMPT;
     /**
      * Store the uploaded image, call Claude Vision API, persist scan record.
      * Returns the saved LicensePlateScan model.
+     *
+     * @param int $parkingLotId ลานที่กล้อง/ผู้สแกนอยู่ (ระบบจริงกล้องติดอยู่ที่ลานใดลานหนึ่งเสมอ)
      */
-    public function scanAndSave(UploadedFile $file, int $userId): LicensePlateScan
+    public function scanAndSave(UploadedFile $file, int $userId, int $parkingLotId): LicensePlateScan
     {
         // 1. Store file
         $storedPath   = $file->store('car-scans', 'public');
@@ -177,17 +179,18 @@ PROMPT;
 
         // 5. Persist scan record
         $scan = LicensePlateScan::create([
-            'user_id'       => $userId,
-            'vehicle_id'    => $vehicleId,
-            'license_plate' => $licensePlate,
-            'province'      => $province,
-            'color'         => $color,
-            'brand'         => $brand,
-            'confidence'    => $confidence,
-            'is_suspicious' => $isSuspicious,
-            'source'        => 'manual_upload',
-            'image_path'    => $storedPath,
-            'scan_time'     => now(),
+            'user_id'        => $userId,
+            'vehicle_id'     => $vehicleId,
+            'parking_lot_id' => $parkingLotId,
+            'license_plate'  => $licensePlate,
+            'province'       => $province,
+            'color'          => $color,
+            'brand'          => $brand,
+            'confidence'     => $confidence,
+            'is_suspicious'  => $isSuspicious,
+            'source'         => 'manual_upload',
+            'image_path'     => $storedPath,
+            'scan_time'      => now(),
         ]);
 
         return $scan->load(['vehicle.user']);
@@ -207,7 +210,7 @@ PROMPT;
         // จับคู่ด้วยป้ายทะเบียนที่กรอกตอนจองโดยตรง (flow หลัก) หรือผ่าน vehicle_id (legacy/admin check-in)
         $vehicle = $this->platePrefixMatch(Vehicle::query(), $plate)->first();
 
-        return Reservation::with(['vehicle', 'parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name'])
+        return Reservation::with(['vehicle', 'parkingLot:id,name,owner_id', 'parkingSlot:id,slot_number', 'user:id,name'])
             ->where(function ($q) use ($plate, $vehicle) {
                 $q->where('license_plate', $plate)
                     ->orWhere('license_plate', 'like', $plate . ' %');

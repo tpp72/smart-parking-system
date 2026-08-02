@@ -25,10 +25,10 @@ class CheckInTest extends TestCase
         ]);
     }
 
-    private function postCheckIn(User $admin, array $payload): \Illuminate\Testing\TestResponse
+    private function postCheckIn(User $admin, Reservation $reservation): \Illuminate\Testing\TestResponse
     {
         return $this->actingAs($admin)
-            ->post(route('admin.check-in.store'), $payload);
+            ->post(route('admin.reservations.check-in', $reservation));
     }
 
     /** การจองแบบพิมพ์ทะเบียนเอง (ไม่มี Vehicle) พร้อมเช็คอินทันที */
@@ -55,9 +55,9 @@ class CheckInTest extends TestCase
 
         $reservation = $this->checkableReservation(['parking_lot_id' => $lot->id]);
 
-        $response = $this->postCheckIn($admin, ['reservation_id' => $reservation->id]);
+        $response = $this->postCheckIn($admin, $reservation);
 
-        $response->assertRedirect(route('admin.check-in.create'));
+        $response->assertRedirect();
         $response->assertSessionHas('success');
 
         // log ถูกสร้างพร้อมทะเบียน/ยี่ห้อ/สี แม้ไม่มี Vehicle record
@@ -106,9 +106,9 @@ class CheckInTest extends TestCase
             'license_plate'  => $plate,
         ]);
 
-        $response = $this->postCheckIn($admin, ['reservation_id' => $reservation->id]);
+        $response = $this->postCheckIn($admin, $reservation);
 
-        $response->assertSessionHasErrors('reservation_id');
+        $response->assertSessionHasErrors('error');
         // ต้องไม่มี log เพิ่มขึ้น (ยังมีแค่ 1 รายการ)
         $this->assertDatabaseCount('parking_logs', 1);
     }
@@ -128,21 +128,27 @@ class CheckInTest extends TestCase
 
         $reservation = $this->checkableReservation(['parking_lot_id' => $lot->id]);
 
-        $response = $this->postCheckIn($admin, ['reservation_id' => $reservation->id]);
+        $response = $this->postCheckIn($admin, $reservation);
 
-        $response->assertSessionHasErrors('parking_lot_id');
+        $response->assertSessionHasErrors('error');
         $this->assertDatabaseCount('parking_logs', 0);
     }
 
-    // ─── [4] ห้าม check-in โดยไม่เลือกการจอง ────────────────────────────────
+    // ─── [4] ห้าม check-in ถ้าสถานะไม่ใช่ confirmed ────────────────────────
 
-    public function test_check_in_requires_reservation(): void
+    public function test_check_in_requires_confirmed_status(): void
     {
         $admin = $this->admin();
+        $lot   = ParkingLot::factory()->create();
 
-        $response = $this->postCheckIn($admin, ['reservation_id' => '']);
+        $reservation = $this->checkableReservation([
+            'parking_lot_id' => $lot->id,
+            'status'         => 'pending',
+        ]);
 
-        $response->assertSessionHasErrors('reservation_id');
+        $response = $this->postCheckIn($admin, $reservation);
+
+        $response->assertSessionHasErrors('error');
     }
 
     // ─── [5] guest ถูก redirect ──────────────────────────────────────────────
@@ -152,8 +158,7 @@ class CheckInTest extends TestCase
         $lot = ParkingLot::factory()->create();
         $reservation = $this->checkableReservation(['parking_lot_id' => $lot->id]);
 
-        $this->post(route('admin.check-in.store'), [
-            'reservation_id' => $reservation->id,
-        ])->assertRedirect(route('login'));
+        $this->post(route('admin.reservations.check-in', $reservation))
+            ->assertRedirect(route('login'));
     }
 }

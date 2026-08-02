@@ -11,8 +11,6 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\ReservationLogController;
 use App\Http\Controllers\Admin\AdminActionController;
-use App\Http\Controllers\Admin\CheckInController;
-use App\Http\Controllers\Admin\CheckOutController;
 use App\Http\Controllers\Admin\ParkingLogController;
 use App\Http\Controllers\Admin\VehicleController;
 use App\Http\Controllers\Admin\PaymentController;
@@ -22,8 +20,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicationController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\Owner\ApplicationController as OwnerApplicationController;
-use App\Http\Controllers\Owner\CheckInController as OwnerCheckInController;
-use App\Http\Controllers\Owner\CheckOutController as OwnerCheckOutController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
 use App\Http\Controllers\Owner\ParkingLogController as OwnerParkingLogController;
 use App\Http\Controllers\Owner\ParkingLotController as OwnerParkingLotController;
@@ -71,6 +67,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     // Reservation CRUD
     Route::resource('reservations', ReservationController::class)->except(['show']);
     Route::post('reservations/{reservation}/confirm', [ReservationController::class, 'confirm'])->name('reservations.confirm');
+    Route::post('reservations/{reservation}/check-in', [ReservationController::class, 'checkIn'])->name('reservations.check-in');
+    Route::post('reservations/{reservation}/check-out', [ReservationController::class, 'checkOut'])->name('reservations.check-out');
     // Reservation Logs
     Route::get('reservation-logs', [ReservationLogController::class, 'index'])->name('reservation-logs.index');
     Route::get('reservation-logs/export', [ReservationLogController::class, 'export'])->name('reservation-logs.export');
@@ -79,14 +77,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('admin-actions/export', [AdminActionController::class, 'export'])->name('admin-actions.export');
     // Parking Log History
     Route::get('parking-logs', [ParkingLogController::class, 'index'])->name('parking-logs.index');
+    Route::post('parking-logs/{log}/check-out', [ParkingLogController::class, 'checkOut'])->name('parking-logs.check-out');
     // Vehicles CRUD
     Route::resource('vehicles', VehicleController::class)->except(['show']);
-    // Manual Check-In
-    Route::get('check-in', [CheckInController::class, 'create'])->name('check-in.create');
-    Route::post('check-in', [CheckInController::class, 'store'])->name('check-in.store');
-    // Manual Check-Out
-    Route::get('check-out', [CheckOutController::class, 'index'])->name('check-out.index');
-    Route::post('check-out/{log}', [CheckOutController::class, 'store'])->name('check-out.store');
     // Payments
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [PaymentController::class, 'markPaid'])->name('payments.mark-paid');
@@ -129,24 +122,26 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     Route::post('parking-slots/bulk', [OwnerParkingSlotController::class, 'bulkStore'])->name('parking-slots.bulk.store');
     Route::resource('parking-slots', OwnerParkingSlotController::class)->except(['show']);
 
-    // Reservations (read-only + confirm)
+    // Reservations (read-only + confirm + check-in/out)
     Route::get('reservations', [OwnerReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations/{reservation}/confirm', [OwnerReservationController::class, 'confirm'])->name('reservations.confirm');
+    Route::post('reservations/{reservation}/check-in', [OwnerReservationController::class, 'checkIn'])->name('reservations.check-in');
+    Route::post('reservations/{reservation}/check-out', [OwnerReservationController::class, 'checkOut'])->name('reservations.check-out');
 
-    // Manual Check-In
-    Route::get('check-in', [OwnerCheckInController::class, 'create'])->name('check-in.create');
-    Route::post('check-in', [OwnerCheckInController::class, 'store'])->name('check-in.store');
-    // Manual Check-Out
-    Route::get('check-out', [OwnerCheckOutController::class, 'index'])->name('check-out.index');
-    Route::post('check-out/{log}', [OwnerCheckOutController::class, 'store'])->name('check-out.store');
     // Payments
     Route::get('payments', [OwnerPaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [OwnerPaymentController::class, 'markPaid'])->name('payments.mark-paid');
     // Parking Log History
     Route::get('parking-logs', [OwnerParkingLogController::class, 'index'])->name('parking-logs.index');
+    Route::post('parking-logs/{log}/check-out', [OwnerParkingLogController::class, 'checkOut'])->name('parking-logs.check-out');
 
     // Revenue
     Route::get('revenue', [OwnerRevenueController::class, 'index'])->name('revenue.index');
+
+    // AI Car Scan
+    Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
+    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
+    Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
 });
 
 // ===== Owner Application — accessible to any authenticated user (apply + status) =====

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\LicensePlateScan;
+use App\Models\ParkingLot;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Services\CarScanService;
 use App\Services\CheckInService;
 use Illuminate\Http\Request;
@@ -16,19 +18,36 @@ class CarScanController extends Controller
         private CheckInService  $checkInService,
     ) {}
 
-    /* ─────────────────────────────────────────────────────────────
-     | GET  /admin/scan   OR   /user/scan
-     ─────────────────────────────────────────────────────────────*/
-    public function create()
+    /**
+     * ลานที่ role ปัจจุบันมีสิทธิ์ "เป็นกล้อง" ได้ — ระบบจริงกล้องติดอยู่ที่ลานใดลานหนึ่งเสมอ
+     * (admin: ลานที่ไม่มีเจ้าของ, owner: ลานของตัวเอง, user: ลานสาธารณะที่เปิดให้จอง)
+     */
+    private function authorizedLots()
     {
-        return view('scan.index');
+        return match (Auth::user()->role) {
+            'admin' => ParkingLot::unowned(),
+            'owner' => ParkingLot::ownedBy(Auth::id()),
+            default => ParkingLot::reservable(),
+        };
     }
 
     /* ─────────────────────────────────────────────────────────────
-     | POST /admin/scan   OR   /user/scan
+     | GET  /admin/scan   OR   /owner/scan   OR   /user/scan
+     ─────────────────────────────────────────────────────────────*/
+    public function create()
+    {
+        $lots = $this->authorizedLots()->orderBy('name')->get(['id', 'name']);
+
+        return view('scan.index', compact('lots'));
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+     | POST /admin/scan   OR   /owner/scan   OR   /user/scan
      ─────────────────────────────────────────────────────────────*/
     public function store(Request $request)
     {
+        $allowedLotIds = $this->authorizedLots()->pluck('id')->all();
+
         $request->validate([
             'car_image' => [
                 'required',
@@ -37,17 +56,26 @@ class CarScanController extends Controller
                 'mimes:jpg,jpeg,png',
                 'max:5120',
             ],
+            'parking_lot_id' => ['required', 'integer', function ($attr, $value, $fail) use ($allowedLotIds) {
+                if (!in_array((int) $value, $allowedLotIds, true)) {
+                    $fail('ไม่มีสิทธิ์สแกนให้ลานจอดนี้');
+                }
+            }],
         ], [
-            'car_image.required' => 'กรุณาเลือกรูปภาพรถก่อน',
-            'car_image.image'    => 'ไฟล์ต้องเป็นรูปภาพเท่านั้น',
-            'car_image.mimes'    => 'รองรับเฉพาะ JPG และ PNG',
-            'car_image.max'      => 'ขนาดไฟล์ต้องไม่เกิน 5 MB',
+            'car_image.required'    => 'กรุณาเลือกรูปภาพรถก่อน',
+            'car_image.image'       => 'ไฟล์ต้องเป็นรูปภาพเท่านั้น',
+            'car_image.mimes'       => 'รองรับเฉพาะ JPG และ PNG',
+            'car_image.max'         => 'ขนาดไฟล์ต้องไม่เกิน 5 MB',
+            'parking_lot_id.required' => 'กรุณาเลือกลานจอด (จำลองตำแหน่งกล้อง)',
         ]);
+
+        $parkingLotId = (int) $request->input('parking_lot_id');
 
         try {
             $scan = $this->scanService->scanAndSave(
                 $request->file('car_image'),
-                Auth::id()
+                Auth::id(),
+                $parkingLotId
             );
 
             $sessionData = ['scan_result' => $scan->id];
@@ -84,6 +112,11 @@ class CarScanController extends Controller
                                     'slot'    => null,
                                 ];
                             } else {
+                                // ตรวจ blacklist — ไม่บล็อกการเช็คอิน แค่แจ้งเตือน Owner ของลาน + Admin ทุกคน
+                                if ($scan->is_suspicious) {
+                                    $this->notifySuspiciousVehicle($scan, $reservation->parkingLot ?? ParkingLot::find($reservation->parking_lot_id));
+                                }
+
                                 // ใช้ทะเบียน/ยี่ห้อ/สีจาก reservation เป็นหลัก (มีครบเสมอ เพราะบังคับกรอกตอนจอง)
                                 // vehicle_id เป็นแค่ลิงก์เสริมถ้ามี Vehicle record ตรงกันอยู่จริง ไม่บังคับ
                                 $vehicleId = $reservation->vehicle_id ?? $scan->vehicle_id;
@@ -122,7 +155,7 @@ class CarScanController extends Controller
                     }
                     // status === 'checked_in': show info only, no action needed
                 } else {
-                    $sessionData['scan_check_in'] = $this->attemptWalkInCheckIn($scan);
+                    $sessionData['scan_check_in'] = $this->attemptWalkInCheckIn($scan, $parkingLotId, $allowedLotIds);
                 }
             }
 
@@ -137,44 +170,24 @@ class CarScanController extends Controller
 
     /**
      * Auto check-in สำหรับรถที่ไม่ได้จองล่วงหน้า (walk-in) — สแกนแล้วหา reservation ไม่เจอ
-     * เฉพาะ User เท่านั้น (สแกนป้ายทะเบียนตัวเอง) เข้าลานที่ตั้งค่าไว้ตายตัวใน config('parking.walkin_lot_id')
-     * เพราะระบบไม่รู้ว่ากล้อง/ผู้สแกนอยู่ที่ลานไหนจริง
+     * เช็คอินเข้าลานที่เลือกไว้ตอนสแกน (จำลองตำแหน่งกล้อง) ใช้ได้ทุก role ตามลานที่มีสิทธิ์
      *
+     * @param array<int> $allowedLotIds
      * @return array{success: bool, error: ?string, slot: ?string}
      */
-    private function attemptWalkInCheckIn(LicensePlateScan $scan): array
+    private function attemptWalkInCheckIn(LicensePlateScan $scan, int $parkingLotId, array $allowedLotIds): array
     {
-        if (Auth::user()->role !== 'user') {
-            return [
-                'success' => false,
-                'error'   => "ไม่พบการจองที่ตรงกับทะเบียน \"{$scan->license_plate}\" ในระบบ — ตรวจสอบว่าทะเบียนที่สแกนได้ตรงกับที่แจ้งไว้ตอนจอง (AI อาจอ่านตัวอักษรผิดถ้าหน้าตาคล้ายกัน) หรือให้เจ้าหน้าที่ทำ Check-In ด้วยตนเอง",
-                'slot'    => null,
-            ];
-        }
-
-        $walkinLotId = config('parking.walkin_lot_id');
-        if (!$walkinLotId) {
-            return [
-                'success' => false,
-                'error'   => 'ไม่พบการจองสำหรับทะเบียนนี้ และระบบยังไม่ได้ตั้งค่าลานจอดสำหรับ Auto Check-in แบบไม่ได้จอง กรุณาติดต่อเจ้าหน้าที่',
-                'slot'    => null,
-            ];
-        }
-
+        // ตรวจ blacklist — ไม่บล็อกการเช็คอิน แค่แจ้งเตือน Owner ของลาน + Admin ทุกคน
         if ($scan->is_suspicious) {
-            return [
-                'success' => false,
-                'error'   => 'ทะเบียนนี้อยู่ใน Blacklist ไม่สามารถเช็คอินอัตโนมัติได้ กรุณาติดต่อเจ้าหน้าที่',
-                'slot'    => null,
-            ];
+            $this->notifySuspiciousVehicle($scan, ParkingLot::find($parkingLotId));
         }
 
         $result = $this->checkInService->checkIn(
             $scan->license_plate,
             $scan->brand,
             $scan->color,
-            $walkinLotId,
-            null,
+            $parkingLotId,
+            $allowedLotIds,
             $scan->vehicle_id
         );
 
@@ -193,15 +206,40 @@ class CarScanController extends Controller
         ];
     }
 
+    /**
+     * แจ้งเตือน Owner ของลาน (ถ้ามี) + Admin ทุกคน เมื่อพบรถต้องสงสัยกำลังเช็คอิน — ไม่บล็อกการเช็คอิน
+     * แค่แจ้งรายละเอียดรถ/ลาน/เวลาให้ตรวจสอบภายหลัง
+     */
+    private function notifySuspiciousVehicle(LicensePlateScan $scan, ?ParkingLot $lot): void
+    {
+        $lotName = $lot?->name ?? 'ไม่ทราบลาน';
+        $detail  = "ทะเบียน {$scan->license_plate}"
+            . ($scan->brand ? " ยี่ห้อ {$scan->brand}" : '')
+            . ($scan->color ? " สี {$scan->color}" : '')
+            . " เข้าจอดที่ลาน {$lotName} เวลา " . now()->format('d/m/Y H:i');
+
+        $recipientIds = collect();
+        if ($lot?->owner_id) {
+            $recipientIds->push($lot->owner_id);
+        }
+        $recipientIds = $recipientIds->merge(User::where('role', 'admin')->pluck('id'))->unique();
+
+        foreach ($recipientIds as $userId) {
+            notify_user($userId, '⚠ พบรถต้องสงสัย (Blacklist)', $detail);
+        }
+    }
+
     /* ─────────────────────────────────────────────────────────────
-     | GET  /admin/scan/history
+     | GET  /admin/scan/history   OR   /owner/scan/history
      ─────────────────────────────────────────────────────────────*/
     public function history(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $lotIds = $this->authorizedLots()->pluck('id');
 
-        $scans = LicensePlateScan::with(['user:id,name', 'vehicle:id,license_plate,brand,color'])
+        $scans = LicensePlateScan::with(['user:id,name', 'vehicle:id,license_plate,brand,color', 'parkingLot:id,name'])
             ->where('source', 'manual_upload')
+            ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', fn($query) =>
                 $query->where('license_plate', 'like', "%{$q}%")
             )
@@ -209,6 +247,8 @@ class CarScanController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.scan.history', compact('scans', 'q'));
+        $view = Auth::user()->role === 'owner' ? 'owner.scan.history' : 'admin.scan.history';
+
+        return view($view, compact('scans', 'q'));
     }
 }

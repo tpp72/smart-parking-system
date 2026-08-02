@@ -3,9 +3,14 @@
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
             {{-- ── Header ──────────────────────────────────────────── --}}
+            @php
+                $role = auth()->user()->role;
+                $scanStoreRoute   = route("{$role}.scan.store");
+                $scanHistoryRoute = in_array($role, ['admin', 'owner'], true) ? route("{$role}.scan.history") : null;
+            @endphp
             <div class="mb-6">
-                @if(auth()->user()->role === 'admin')
-                    <a href="{{ route('admin.scan.history') }}"
+                @if($scanHistoryRoute)
+                    <a href="{{ $scanHistoryRoute }}"
                        class="text-gray-400 hover:text-white text-sm transition">← ประวัติการสแกน</a>
                 @else
                     <a href="{{ route('user.dashboard') }}"
@@ -248,6 +253,11 @@
             @endif
 
             {{-- ── Upload Form ─────────────────────────────────────── --}}
+            @if($lots->isEmpty())
+                <div class="sp-card rounded-2xl p-6 text-center text-gray-300">
+                    ยังไม่มีลานจอดที่คุณมีสิทธิ์สแกนได้
+                </div>
+            @else
             <div class="sp-card rounded-2xl p-6"
                  x-data="{
                      preview: null,
@@ -262,11 +272,27 @@
                  }">
 
                 <form method="POST"
-                      action="{{ auth()->user()->role === 'admin' ? route('admin.scan.store') : route('user.scan.store') }}"
+                      action="{{ $scanStoreRoute }}"
                       enctype="multipart/form-data"
                       class="space-y-5"
                       @submit="loading = true">
                     @csrf
+
+                    {{-- ลานจอด (จำลองตำแหน่งกล้อง) --}}
+                    <div>
+                        <x-input-label for="parking_lot_id" value="ลานจอด (จำลองตำแหน่งกล้อง)" />
+                        <select id="parking_lot_id" name="parking_lot_id" required
+                                class="sp-select w-full @error('parking_lot_id') border-red-500 @enderror">
+                            <option value="">-- เลือกลานจอด --</option>
+                            @foreach($lots as $lot)
+                                <option value="{{ $lot->id }}" @selected(old('parking_lot_id') == $lot->id)>
+                                    {{ $lot->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">ระบบจริงกล้องจะติดอยู่ที่ลานนี้และส่งข้อมูลมาอัตโนมัติ</p>
+                        <x-input-error :messages="$errors->get('parking_lot_id')" class="mt-2" />
+                    </div>
 
                     {{-- Drop Zone --}}
                     <div>
@@ -348,11 +374,12 @@
                     </p>
                 </form>
             </div>
+            @endif
 
-            {{-- Admin: link to history --}}
-            @if(auth()->user()->role === 'admin')
+            {{-- Admin/Owner: link to history --}}
+            @if($scanHistoryRoute)
                 <div class="mt-4 text-center">
-                    <a href="{{ route('admin.scan.history') }}"
+                    <a href="{{ $scanHistoryRoute }}"
                        class="text-sm text-gray-500 hover:text-gray-300 transition">
                         ดูประวัติการสแกนทั้งหมด →
                     </a>
