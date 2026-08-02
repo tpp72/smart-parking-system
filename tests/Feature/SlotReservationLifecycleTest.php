@@ -176,7 +176,7 @@ class SlotReservationLifecycleTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.check-out.store', $log))
+            ->post(route('admin.parking-logs.check-out', $log))
             ->assertRedirect();
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);

@@ -8,6 +8,8 @@ use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
 use App\Models\Vehicle;
+use App\Services\CheckInService;
+use App\Services\CheckOutService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,11 @@ use Illuminate\Validation\Rule;
 class ReservationController extends Controller
 {
     private array $statuses = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
+
+    public function __construct(
+        private CheckInService  $checkInService,
+        private CheckOutService $checkOutService,
+    ) {}
 
     /** Admin จัดการการจองได้เฉพาะของลานที่ยังไม่มีเจ้าของ */
     private function assertLotUnowned(int $lotId): void
@@ -47,8 +54,9 @@ class ReservationController extends Controller
             ->with([
                 'user:id,name,email',
                 'vehicle:id,user_id,license_plate',
-                'parkingLot:id,name',
+                'parkingLot:id,name,hourly_rate',
                 'parkingSlot:id,parking_lot_id,slot_number',
+                'parkingLog:id,reservation_id,check_in_time',
             ])
             ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', function ($query) use ($q) {
@@ -67,6 +75,11 @@ class ReservationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $checkableIds = Reservation::checkable()
+            ->whereIn('id', $reservations->pluck('id'))
+            ->pluck('id')
+            ->all();
+
         return view('admin.reservations.index', compact(
             'reservations',
             'lots',
@@ -74,7 +87,8 @@ class ReservationController extends Controller
             'status',
             'lotId',
             'from',
-            'to'
+            'to',
+            'checkableIds'
         ));
     }
 
@@ -293,6 +307,87 @@ class ReservationController extends Controller
         admin_audit('reservation.confirm', $reservation, ['status' => 'confirmed']);
 
         return back()->with('success', "ยืนยันการจอง #{$reservation->id} เรียบร้อยแล้ว");
+    }
+
+    /** Check-In รถของการจองนี้โดยตรง (แทนหน้า Manual Check-In แยก) */
+    public function checkIn(Reservation $reservation)
+    {
+        $this->assertReservationLotUnowned($reservation);
+
+        if ($reservation->status !== 'confirmed') {
+            return back()->withErrors(['error' => "ไม่สามารถเช็คอินได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
+        }
+
+        if (!Reservation::checkable()->where('id', $reservation->id)->exists()) {
+            return back()->withErrors(['error' => 'อยู่นอกช่วงเวลาเช็คอิน (เร็วเกินไปหรือเกินเวลากำหนด)']);
+        }
+
+        $allowedLotIds = ParkingLot::unowned()->pluck('id')->all();
+
+        $result = $this->checkInService->checkIn(
+            $reservation->license_plate,
+            $reservation->brand,
+            $reservation->color,
+            $reservation->parking_lot_id,
+            $allowedLotIds,
+            $reservation->vehicle_id
+        );
+
+        if (!$result['success']) {
+            return back()->withErrors(['error' => $result['error']]);
+        }
+
+        $slot = $result['slot'];
+
+        notify_user(
+            $reservation->user_id,
+            'เช็คอินสำเร็จ',
+            "รถทะเบียน {$reservation->license_plate} เข้าจอดที่ช่อง {$slot->slot_number} แล้ว (การจอง #{$reservation->id})"
+        );
+
+        admin_audit('parking_log.check_in', $reservation, [
+            'parking_lot_id'  => $slot->parking_lot_id,
+            'parking_slot_id' => $slot->id,
+        ]);
+
+        return back()->with('success',
+            "Check-In สำเร็จ! ทะเบียน {$reservation->license_plate} → ช่อง {$slot->slot_number}"
+        );
+    }
+
+    /** Check-Out รถของการจองนี้โดยตรง (แทนหน้า Manual Check-Out แยก) */
+    public function checkOut(Reservation $reservation)
+    {
+        $this->assertReservationLotUnowned($reservation);
+
+        if ($reservation->status !== 'checked_in') {
+            return back()->withErrors(['error' => "ไม่สามารถเช็คเอาท์ได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
+        }
+
+        $log = $reservation->parkingLog;
+        abort_if(!$log, 404, 'ไม่พบ Parking Log ของการจองนี้');
+
+        $allowedLotIds = ParkingLot::unowned()->pluck('id')->all();
+        $result = $this->checkOutService->checkOut($log, $allowedLotIds);
+
+        if (!$result['success']) {
+            return back()->withErrors(['error' => $result['error']]);
+        }
+
+        admin_audit('parking_log.check_out', $log, [
+            'total_hours'          => $result['totalHours'],
+            'parking_fee'          => $result['parkingFee'],
+            'reservation_discount' => $result['deposit'],
+            'total_amount'         => $result['totalAmount'],
+        ]);
+
+        return back()->with('success', sprintf(
+            'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
+            $reservation->license_plate,
+            $result['totalHours'],
+            $result['parkingFee'],
+            $result['totalAmount'],
+        ));
     }
 
     public function destroy(Reservation $reservation)

@@ -93,7 +93,7 @@ class ReservationDepositTest extends TestCase
             'check_in_time'   => now()->subHours(2),
         ]);
 
-        $this->actingAs($admin)->post(route('admin.check-out.store', $log));
+        $this->actingAs($admin)->post(route('admin.reservations.check-out', $reservation));
 
         $payment = Payment::where('parking_log_id', $log->id)->first();
         $this->assertNotNull($payment);
@@ -124,7 +124,7 @@ class ReservationDepositTest extends TestCase
             'check_out_time'  => null,
         ]);
 
-        $this->actingAs($admin)->post(route('admin.check-out.store', $log));
+        $this->actingAs($admin)->post(route('admin.parking-logs.check-out', $log));
 
         $payment = Payment::where('parking_log_id', $log->id)->first();
         $this->assertNotNull($payment);
@@ -159,7 +159,7 @@ class ReservationDepositTest extends TestCase
             'check_in_time'   => now()->subMinutes(20),
         ]);
 
-        $this->actingAs($admin)->post(route('admin.check-out.store', $log));
+        $this->actingAs($admin)->post(route('admin.reservations.check-out', $reservation));
 
         $payment = Payment::where('parking_log_id', $log->id)->first();
         $this->assertNotNull($payment);
@@ -195,7 +195,7 @@ class ReservationDepositTest extends TestCase
             'check_in_time'   => now()->subMinutes(45), // ceil → 1 hr
         ]);
 
-        $this->actingAs($admin)->post(route('admin.check-out.store', $log));
+        $this->actingAs($admin)->post(route('admin.reservations.check-out', $reservation));
 
         $payment = Payment::where('parking_log_id', $log->id)->first();
         $this->assertEquals('paid', $payment->payment_status);
@@ -227,7 +227,7 @@ class ReservationDepositTest extends TestCase
             'check_in_time'   => now()->subMinutes(30), // 1 hr min → fee = 30
         ]);
 
-        $this->actingAs($admin)->post(route('admin.check-out.store', $log));
+        $this->actingAs($admin)->post(route('admin.reservations.check-out', $reservation));
 
         $payment = Payment::where('parking_log_id', $log->id)->first();
         $this->assertGreaterThanOrEqual(0, (float) $payment->total_amount);

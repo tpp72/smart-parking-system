@@ -5,9 +5,9 @@
             <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div>
                     <h1 class="text-2xl font-extrabold sp-glow-text">ประวัติการสแกนรถ</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">Scan History — บันทึกการตรวจรถด้วย AI ทั้งหมด</p>
+                    <p class="text-gray-400 text-sm mt-0.5">Scan History — บันทึกการตรวจรถด้วย AI ในลานของคุณ</p>
                 </div>
-                <a href="{{ route('admin.scan.create') }}"
+                <a href="{{ route('owner.scan.create') }}"
                    class="sp-btn sp-btn-primary sp-glow-btn gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -21,12 +21,12 @@
             @endif
 
             {{-- Search --}}
-            <form method="GET" action="{{ route('admin.scan.history') }}" class="mb-5 flex gap-2">
+            <form method="GET" action="{{ route('owner.scan.history') }}" class="mb-5 flex gap-2">
                 <input type="text" name="q" value="{{ $q }}" placeholder="ค้นหาทะเบียน..."
                        class="sp-select flex-1 max-w-xs px-4 py-2 text-sm">
                 <button type="submit" class="sp-btn sp-btn-outline text-sm px-4">ค้นหา</button>
                 @if($q)
-                    <a href="{{ route('admin.scan.history') }}" class="sp-btn sp-btn-outline text-sm px-4">ล้าง</a>
+                    <a href="{{ route('owner.scan.history') }}" class="sp-btn sp-btn-outline text-sm px-4">ล้าง</a>
                 @endif
             </form>
 
@@ -138,7 +138,7 @@
                                     <td colspan="10">
                                         <x-sp-empty message="ยังไม่มีประวัติการสแกน"
                                                     sub="อัปโหลดรูปรถเพื่อเริ่มต้น">
-                                            <a href="{{ route('admin.scan.create') }}"
+                                            <a href="{{ route('owner.scan.create') }}"
                                                class="sp-btn sp-btn-primary sp-glow-btn mt-4 gap-2">
                                                 สแกนรถเลย
                                             </a>

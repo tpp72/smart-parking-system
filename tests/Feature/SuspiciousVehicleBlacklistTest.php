@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ParkingLot;
 use App\Models\SuspiciousVehicle;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -90,6 +91,7 @@ class SuspiciousVehicleBlacklistTest extends TestCase
         SuspiciousVehicle::factory()->create(['license_plate' => $plate]);
 
         $user = User::factory()->create(['force_password_reset' => false]);
+        $lot  = ParkingLot::factory()->create();
 
         $service = $this->partialMock(CarScanService::class, function ($mock) use ($plate) {
             $mock->shouldReceive('detect')->andReturn([
@@ -101,7 +103,7 @@ class SuspiciousVehicleBlacklistTest extends TestCase
         });
 
         $file = UploadedFile::fake()->image('car.jpg');
-        $scan = $service->scanAndSave($file, $user->id);
+        $scan = $service->scanAndSave($file, $user->id, $lot->id);
 
         $this->assertTrue((bool) $scan->is_suspicious);
     }
@@ -116,6 +118,7 @@ class SuspiciousVehicleBlacklistTest extends TestCase
         SuspiciousVehicle::factory()->inactive()->create(['license_plate' => $plate]);
 
         $user = User::factory()->create(['force_password_reset' => false]);
+        $lot  = ParkingLot::factory()->create();
 
         $service = $this->partialMock(CarScanService::class, function ($mock) use ($plate) {
             $mock->shouldReceive('detect')->andReturn([
@@ -127,7 +130,7 @@ class SuspiciousVehicleBlacklistTest extends TestCase
         });
 
         $file = UploadedFile::fake()->image('car.jpg');
-        $scan = $service->scanAndSave($file, $user->id);
+        $scan = $service->scanAndSave($file, $user->id, $lot->id);
 
         $this->assertFalse((bool) $scan->is_suspicious);
     }

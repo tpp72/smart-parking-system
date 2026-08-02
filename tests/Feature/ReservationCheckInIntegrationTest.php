@@ -90,9 +90,7 @@ class ReservationCheckInIntegrationTest extends TestCase
         $checkInResult = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
         $this->assertTrue($checkInResult['success']);
 
-        $log = $checkInResult['log'];
-
-        // Perform check-out via admin HTTP route
+        // Perform check-out via admin HTTP route (bound to the reservation, not the parking log)
         $admin = User::factory()->create([
             'role'                 => 'admin',
             'force_password_reset' => false,
@@ -100,8 +98,8 @@ class ReservationCheckInIntegrationTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.check-out.store', $log))
-            ->assertRedirect(route('admin.check-out.index'));
+            ->post(route('admin.reservations.check-out', $reservation))
+            ->assertRedirect();
 
         // Reservation → completed
         $this->assertDatabaseHas('reservations', [

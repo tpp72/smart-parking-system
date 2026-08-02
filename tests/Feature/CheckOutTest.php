@@ -44,7 +44,7 @@ class CheckOutTest extends TestCase
     private function postCheckOut(User $admin, ParkingLog $log): \Illuminate\Testing\TestResponse
     {
         return $this->actingAs($admin)
-            ->post(route('admin.check-out.store', $log));
+            ->post(route('admin.parking-logs.check-out', $log));
     }
 
     // ─── [1] สำเร็จ ─────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ class CheckOutTest extends TestCase
 
         $response = $this->postCheckOut($admin, $log);
 
-        $response->assertRedirect(route('admin.check-out.index'));
+        $response->assertRedirect();
         $response->assertSessionHas('success');
 
         // check_out_time ถูก set
@@ -84,7 +84,7 @@ class CheckOutTest extends TestCase
 
         $response = $this->postCheckOut($admin, $log);
 
-        $response->assertRedirect(route('admin.check-out.index'));
+        $response->assertRedirect();
         $response->assertSessionHasErrors('error');
         $this->assertDatabaseCount('payments', 0);
     }
@@ -120,7 +120,7 @@ class CheckOutTest extends TestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)
-            ->post(route('admin.check-out.store', 99999))
+            ->post(route('admin.parking-logs.check-out', 99999))
             ->assertNotFound();
     }
 

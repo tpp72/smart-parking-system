@@ -23,4 +23,9 @@ class LicensePlateScan extends Model
     {
         return $this->belongsTo(Vehicle::class);
     }
+
+    public function parkingLot()
+    {
+        return $this->belongsTo(ParkingLot::class);
+    }
 }

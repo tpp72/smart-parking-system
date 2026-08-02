@@ -37,8 +37,11 @@
                             <tr>
                                 <th class="px-5 py-4 text-left">#</th>
                                 <th class="px-5 py-4 text-left">ทะเบียน</th>
+                                <th class="px-5 py-4 text-left">ผู้ใช้</th>
                                 <th class="px-5 py-4 text-left">ลาน</th>
                                 <th class="px-5 py-4 text-right">ชั่วโมง</th>
+                                <th class="px-5 py-4 text-right">ค่าจอด</th>
+                                <th class="px-5 py-4 text-right">มัดจำ</th>
                                 <th class="px-5 py-4 text-right">ยอดรวม</th>
                                 <th class="px-5 py-4 text-center">สถานะ</th>
                                 <th class="px-5 py-4 text-left">วันที่</th>
@@ -58,6 +61,9 @@
                                         @endif
                                     </td>
                                     <td class="px-5 py-3 text-gray-300">
+                                        {{ $payment->parkingLog?->reservation?->user?->name ?? 'Walk-in' }}
+                                    </td>
+                                    <td class="px-5 py-3 text-gray-300">
                                         {{ $payment->parkingLog?->parkingLot?->name ?? '—' }}
                                     </td>
                                     <td class="px-5 py-3 text-right text-gray-300">
@@ -65,6 +71,16 @@
                                         <span class="block text-xs text-gray-500">
                                             {{ number_format((float)$payment->hourly_rate, 2) }} ฿/ชม.
                                         </span>
+                                    </td>
+                                    <td class="px-5 py-3 text-right text-gray-300">
+                                        ฿{{ number_format((float)$payment->parking_fee, 2) }}
+                                    </td>
+                                    <td class="px-5 py-3 text-right">
+                                        @if((float)$payment->reservation_discount > 0)
+                                            <span class="text-green-400">-฿{{ number_format((float)$payment->reservation_discount, 2) }}</span>
+                                        @else
+                                            <span class="text-gray-600">—</span>
+                                        @endif
                                     </td>
                                     <td class="px-5 py-3 text-right font-extrabold
                                         {{ $payment->payment_status === 'paid' ? 'text-green-300' : 'text-yellow-300' }}">
@@ -97,7 +113,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8">
+                                    <td colspan="11">
                                         <x-sp-empty
                                             message="{{ $status === 'unpaid' ? 'ไม่มีรายการค้างชำระ' : 'ไม่มีข้อมูล' }}"
                                             sub="{{ $status === 'unpaid' ? 'ลูกค้าทุกคนชำระเงินครบแล้ว' : '' }}" />

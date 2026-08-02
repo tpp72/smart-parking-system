@@ -14,8 +14,10 @@ class PaymentController extends Controller
         $status = $request->query('status', 'unpaid');
 
         $payments = Payment::with([
-            'parkingLog:id,license_plate,brand,parking_lot_id',
+            'parkingLog:id,license_plate,brand,parking_lot_id,reservation_id',
             'parkingLog.parkingLot:id,name',
+            'parkingLog.reservation:id,user_id',
+            'parkingLog.reservation.user:id,name',
         ])
             ->whereHas('parkingLog.parkingLot', fn($q) => $q->whereNull('owner_id'))
             ->when($status !== 'all', fn($q) => $q->where('payment_status', $status))
