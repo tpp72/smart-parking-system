@@ -7,7 +7,11 @@
         document.getElementById('html-root').classList.toggle('light-theme', t === 'light');
     },
     toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark'); }
-}" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white transform-gpu">
+}" class="sticky top-0 z-50 text-white">
+    {{-- Separate backdrop layer from the sticky element itself — Safari fails to
+         repaint backdrop-filter correctly when it's combined directly with
+         position:sticky on scroll, letting the page's red gradient bleed through. --}}
+    <div class="absolute inset-x-0 top-0 h-14 -z-10 bg-black/80 border-b border-red-900/60 backdrop-blur-md"></div>
     @php
         $isAdmin = auth()->check() && auth()->user()->role === 'admin';
         $isOwner = auth()->check() && auth()->user()->role === 'owner';
