@@ -7,7 +7,7 @@
         document.getElementById('html-root').classList.toggle('light-theme', t === 'light');
     },
     toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark'); }
-}" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white">
+}" class="sticky top-0 z-50 bg-black/80 border-b border-red-900/60 backdrop-blur-md text-white transform-gpu">
     @php
         $isAdmin = auth()->check() && auth()->user()->role === 'admin';
         $isOwner = auth()->check() && auth()->user()->role === 'owner';
