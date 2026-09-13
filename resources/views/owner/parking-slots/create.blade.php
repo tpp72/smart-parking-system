@@ -24,15 +24,6 @@
                             <input name="slot_number" value="{{ old('slot_number') }}" class="sp-select w-full" placeholder="เช่น A01" />
                             @error('slot_number')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
                         </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-sm text-gray-200 mb-1">สถานะ *</label>
-                            <select name="status" class="sp-select w-full">
-                                @foreach($statuses as $st)
-                                    <option value="{{ $st }}" @selected(old('status', 'available') === $st)>{{ $st }}</option>
-                                @endforeach
-                            </select>
-                            @error('status')<p class="text-red-300 text-sm mt-1">{{ $message }}</p>@enderror
-                        </div>
                     </div>
                     <div class="flex gap-2 pt-2">
                         <button type="submit" class="sp-btn sp-btn-primary">บันทึก</button>

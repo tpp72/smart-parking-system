@@ -13,9 +13,11 @@ if (! function_exists('admin_audit')) {
     {
         try {
             $request = request();
+            $actor   = Auth::user();
 
             AdminAction::create([
-                'admin_id'     => Auth::id(),
+                'actor_id'     => $actor?->id,
+                'actor_role'   => $actor?->role ?? 'system',
                 'action'       => $action,
                 'subject_type' => $subject ? class_basename($subject) : null,
                 'subject_id'   => $subject?->getKey(), // ✅ ดีกว่า ->id

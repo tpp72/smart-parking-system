@@ -13,7 +13,6 @@ class ParkingLotFactory extends Factory
             'location'             => $this->faker->address(),
             'total_slots'          => $this->faker->numberBetween(10, 200),
             'hourly_rate'          => $this->faker->randomElement([20.00, 30.00, 40.00, 50.00]),
-            'is_active'            => true,
             'reservations_enabled' => true,
         ];
     }

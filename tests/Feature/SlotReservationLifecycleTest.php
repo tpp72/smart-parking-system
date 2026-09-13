@@ -7,8 +7,8 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
 use App\Services\CheckInService;
+use App\Services\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -43,34 +43,40 @@ class SlotReservationLifecycleTest extends TestCase
             'parking_lot_id' => $lot->id,
             'status'         => $slotStatus,
         ]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $owner->id]);
 
         $reservation = Reservation::factory()->create([
             'user_id'         => $owner->id,
-            'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->addHour(),
             'status'          => $reservationStatus,
         ]);
 
-        return compact('lot', 'slot', 'vehicle', 'reservation');
+        return compact('lot', 'slot', 'reservation');
     }
 
-    // ─── [1] confirm: available → reserved ──────────────────────────────────
+    // ─── [1] ยืนยันรับเงินมัดจำ: available → reserved ────────────────────────
 
-    public function test_confirm_sets_slot_to_reserved(): void
+    public function test_deposit_mark_paid_sets_slot_to_reserved(): void
     {
-        $admin       = $this->admin();
-        $user        = $this->regularUser();
-        ['reservation' => $reservation, 'slot' => $slot] = $this->makeReservationWithSlot($user, 'pending', 'available');
+        $admin = $this->admin();
+        $lot   = ParkingLot::factory()->create();
+        $slot  = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
+
+        $reservation = app(ReservationService::class)->create($this->regularUser(), $lot, [
+            'license_plate'  => 'กข 7777',
+            'plate_province' => 'กรุงเทพมหานคร',
+            'brand'          => 'Toyota',
+            'color'          => 'ขาว',
+            'reserve_start'  => now()->addHour(),
+        ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.reservations.confirm', $reservation))
+            ->post(route('admin.payments.mark-paid', $reservation->depositPayment))
             ->assertRedirect();
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'reserved']);
-        $this->assertDatabaseHas('reservations',  ['id' => $reservation->id, 'status' => 'confirmed']);
+        $this->assertDatabaseHas('reservations',  ['id' => $reservation->id, 'status' => 'confirmed', 'parking_slot_id' => $slot->id]);
     }
 
     // ─── [2] user cancel: reserved → available ───────────────────────────────
@@ -96,13 +102,7 @@ class SlotReservationLifecycleTest extends TestCase
         ['reservation' => $reservation, 'slot' => $slot] = $this->makeReservationWithSlot($user, 'confirmed', 'reserved');
 
         $this->actingAs($admin)
-            ->patch(route('admin.reservations.update', $reservation), [
-                'parking_lot_id'  => $reservation->parking_lot_id,
-                'parking_slot_id' => $reservation->parking_slot_id,
-                'reserve_start'   => $reservation->reserve_start->format('Y-m-d H:i:s'),
-                'reservation_fee' => $reservation->reservation_fee,
-                'status'          => 'cancelled',
-            ])
+            ->post(route('admin.reservations.cancel', $reservation))
             ->assertRedirect();
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);
@@ -117,11 +117,9 @@ class SlotReservationLifecycleTest extends TestCase
         $graceMinutes = (int) config('parking.grace_period', 30);
         $lot          = ParkingLot::factory()->create();
         $slot         = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'reserved']);
-        $vehicle      = Vehicle::factory()->create(['user_id' => $user->id]);
 
         Reservation::factory()->create([
             'user_id'         => $user->id,
-            'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->subMinutes($graceMinutes + 1),
@@ -137,21 +135,19 @@ class SlotReservationLifecycleTest extends TestCase
 
     public function test_check_in_sets_reserved_slot_to_occupied(): void
     {
-        $user    = $this->regularUser();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'reserved']);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = $this->regularUser();
+        $lot  = ParkingLot::factory()->create();
+        $slot = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'reserved']);
 
-        Reservation::factory()->create([
+        $reservation = Reservation::factory()->create([
             'user_id'         => $user->id,
-            'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now(),
             'status'          => 'confirmed',
         ]);
 
-        $result = app(CheckInService::class)->checkIn($vehicle->license_plate, $vehicle->brand, $vehicle->color, $lot->id, null, $vehicle->id);
+        $result = app(CheckInService::class)->checkInReservation($reservation);
 
         $this->assertTrue($result['success']);
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'occupied']);
@@ -161,14 +157,11 @@ class SlotReservationLifecycleTest extends TestCase
 
     public function test_check_out_sets_occupied_slot_to_available(): void
     {
-        $admin   = $this->admin();
-        $user    = $this->regularUser();
-        $lot     = ParkingLot::factory()->create(['hourly_rate' => 20]);
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $admin = $this->admin();
+        $lot   = ParkingLot::factory()->create(['hourly_rate' => 20]);
+        $slot  = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
 
         $log = ParkingLog::factory()->create([
-            'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'check_in_time'   => now()->subHour(),
@@ -180,22 +173,5 @@ class SlotReservationLifecycleTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);
-    }
-
-    // ─── [7] confirm blocked when slot is occupied ───────────────────────────
-
-    public function test_confirm_fails_when_slot_is_occupied(): void
-    {
-        $admin = $this->admin();
-        $user  = $this->regularUser();
-        ['reservation' => $reservation, 'slot' => $slot] = $this->makeReservationWithSlot($user, 'pending', 'occupied');
-
-        $this->actingAs($admin)
-            ->post(route('admin.reservations.confirm', $reservation))
-            ->assertRedirect()
-            ->assertSessionHasErrors('error');
-
-        $this->assertDatabaseHas('reservations',  ['id' => $reservation->id, 'status' => 'pending']);
-        $this->assertDatabaseHas('parking_slots', ['id' => $slot->id,        'status' => 'occupied']);
     }
 }

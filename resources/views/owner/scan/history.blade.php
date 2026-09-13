@@ -68,11 +68,8 @@
                                     {{-- License Plate --}}
                                     <td class="px-4 py-3 font-extrabold tracking-wider text-red-300">
                                         {{ $scan->license_plate ?: '—' }}
-                                        @if($scan->province)
-                                            <span class="block text-xs font-normal text-gray-500">{{ $scan->province }}</span>
-                                        @endif
-                                        @if($scan->vehicle)
-                                            <span class="block text-xs font-normal text-green-400">✓ พบในระบบ</span>
+                                        @if($scan->plate_province)
+                                            <span class="block text-xs font-normal text-gray-500">{{ $scan->plate_province }}</span>
                                         @endif
                                     </td>
 
@@ -116,10 +113,15 @@
 
                                     {{-- Status --}}
                                     <td class="px-4 py-3">
-                                        @if($scan->is_suspicious)
-                                            <span class="sp-badge sp-badge-bad">⚠ Blacklist</span>
+                                        @if($scan->result === 'unreadable')
+                                            <span class="sp-badge sp-badge-warn">อ่านทะเบียนไม่ได้</span>
+                                        @elseif($scan->result === 'low_accuracy')
+                                            <span class="sp-badge sp-badge-warn">Accuracy ไม่ผ่านเกณฑ์</span>
                                         @else
-                                            <span class="sp-badge sp-badge-ok">✓ ปกติ</span>
+                                            <span class="sp-badge sp-badge-ok">✓ ผ่านเกณฑ์</span>
+                                        @endif
+                                        @if($scan->is_suspicious)
+                                            <span class="sp-badge sp-badge-bad mt-1">⚠ Blacklist</span>
                                         @endif
                                     </td>
 

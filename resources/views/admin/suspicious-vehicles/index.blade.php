@@ -54,7 +54,7 @@
                         <tbody class="divide-y divide-white/5">
                             @forelse($entries as $entry)
                                 <tr class="hover:bg-white/[0.03] transition">
-                                    <td class="px-4 py-3 font-bold font-mono tracking-wide">{{ $entry->license_plate }}</td>
+                                    <td class="px-4 py-3 font-bold font-mono tracking-wide">{{ $entry->license_plate }}<span class="block text-xs font-normal text-gray-500">{{ $entry->plate_province }}</span></td>
                                     <td class="px-4 py-3 text-gray-300 max-w-xs truncate">{{ $entry->reason ?? '—' }}</td>
                                     <td class="px-4 py-3">
                                         @if($entry->level === 'high')

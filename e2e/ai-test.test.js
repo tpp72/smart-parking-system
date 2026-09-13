@@ -338,8 +338,6 @@ test.describe('AI Web Testing — Smart Parking System', () => {
       '/admin/parking-lots/create',
       '/admin/parking-slots/create',
       '/admin/devices/create',
-      '/admin/vehicles/create',
-      '/admin/reservations/create',
     ];
 
     for (const route of CREATE_PAGES) {

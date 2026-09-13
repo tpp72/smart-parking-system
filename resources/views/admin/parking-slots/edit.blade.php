@@ -12,7 +12,6 @@
                 @include('admin.parking-slots.partials.form', [
                     'slot' => $slot,
                     'lots' => $lots,
-                    'statuses' => $statuses,
                     'submitLabel' => 'อัปเดต',
                 ])
             </form>

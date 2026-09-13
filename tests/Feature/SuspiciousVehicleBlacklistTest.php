@@ -5,70 +5,61 @@ namespace Tests\Feature;
 use App\Models\ParkingLot;
 use App\Models\SuspiciousVehicle;
 use App\Models\User;
-use App\Models\Vehicle;
 use App\Services\CarScanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
+/** Blacklist ตรวจด้วย ทะเบียน + จังหวัด */
 class SuspiciousVehicleBlacklistTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const PROVINCE = 'กรุงเทพมหานคร';
 
     // ─── [1] active blacklist entry → is_suspicious = true ─────────────────
 
     public function test_active_blacklist_entry_flags_scan_as_suspicious(): void
     {
-        $plate = 'กข 1234';
-
         SuspiciousVehicle::factory()->create([
-            'license_plate' => $plate,
-            'is_active'     => true,
+            'license_plate'  => 'กข 1234',
+            'plate_province' => self::PROVINCE,
+            'is_active'      => true,
         ]);
 
-        $result = $this->callIsSuspicious($plate);
-
-        $this->assertTrue($result);
+        $this->assertTrue($this->callIsSuspicious('กข 1234', self::PROVINCE));
     }
 
     // ─── [2] inactive blacklist entry → is_suspicious = false ──────────────
 
     public function test_inactive_blacklist_entry_does_not_flag_scan(): void
     {
-        $plate = 'กข 5678';
-
         SuspiciousVehicle::factory()->inactive()->create([
-            'license_plate' => $plate,
+            'license_plate'  => 'กข 5678',
+            'plate_province' => self::PROVINCE,
         ]);
 
-        $result = $this->callIsSuspicious($plate);
-
-        $this->assertFalse($result);
+        $this->assertFalse($this->callIsSuspicious('กข 5678', self::PROVINCE));
     }
 
     // ─── [3] no blacklist entry → is_suspicious = false ────────────────────
 
     public function test_unknown_plate_is_not_suspicious(): void
     {
-        $result = $this->callIsSuspicious('ทด 9999');
-
-        $this->assertFalse($result);
+        $this->assertFalse($this->callIsSuspicious('ทด 9999', self::PROVINCE));
     }
 
-    // ─── [4] same plate: one active one inactive → suspicious = true ────────
+    // ─── [4] same plate, different province → not suspicious ───────────────
 
-    public function test_active_record_wins_when_mixed_with_inactive(): void
+    public function test_same_plate_in_different_province_is_not_suspicious(): void
     {
-        $plate = 'คค 1111';
+        SuspiciousVehicle::factory()->create([
+            'license_plate'  => 'คค 1111',
+            'plate_province' => 'เชียงใหม่',
+        ]);
 
-        // inactive first
-        SuspiciousVehicle::factory()->inactive()->create(['license_plate' => $plate . '-old']);
-
-        // active entry for this plate
-        SuspiciousVehicle::factory()->create(['license_plate' => $plate, 'is_active' => true]);
-
-        $this->assertTrue($this->callIsSuspicious($plate));
+        $this->assertFalse($this->callIsSuspicious('คค 1111', self::PROVINCE));
     }
 
     // ─── [5] scopeActive() excludes inactive records ────────────────────────
@@ -87,25 +78,12 @@ class SuspiciousVehicleBlacklistTest extends TestCase
     {
         Storage::fake('public');
 
-        $plate = 'สส 2222';
-        SuspiciousVehicle::factory()->create(['license_plate' => $plate]);
+        SuspiciousVehicle::factory()->create(['license_plate' => 'สส 2222', 'plate_province' => self::PROVINCE]);
 
-        $user = User::factory()->create(['force_password_reset' => false]);
-        $lot  = ParkingLot::factory()->create();
-
-        $service = $this->partialMock(CarScanService::class, function ($mock) use ($plate) {
-            $mock->shouldReceive('detect')->andReturn([
-                'license_plate' => $plate,
-                'color'         => 'ดำ',
-                'brand'         => 'Toyota',
-                'confidence'    => 95.0,
-            ]);
-        });
-
-        $file = UploadedFile::fake()->image('car.jpg');
-        $scan = $service->scanAndSave($file, $user->id, $lot->id);
+        $scan = $this->scan('สส 2222', self::PROVINCE);
 
         $this->assertTrue((bool) $scan->is_suspicious);
+        $this->assertSame(self::PROVINCE, $scan->plate_province);
     }
 
     // ─── [7] full scan flow: inactive blacklist → is_suspicious = false ──────
@@ -114,33 +92,53 @@ class SuspiciousVehicleBlacklistTest extends TestCase
     {
         Storage::fake('public');
 
-        $plate = 'สส 3333';
-        SuspiciousVehicle::factory()->inactive()->create(['license_plate' => $plate]);
+        SuspiciousVehicle::factory()->inactive()->create(['license_plate' => 'สส 3333', 'plate_province' => self::PROVINCE]);
 
-        $user = User::factory()->create(['force_password_reset' => false]);
-        $lot  = ParkingLot::factory()->create();
-
-        $service = $this->partialMock(CarScanService::class, function ($mock) use ($plate) {
-            $mock->shouldReceive('detect')->andReturn([
-                'license_plate' => $plate,
-                'color'         => 'ขาว',
-                'brand'         => 'Honda',
-                'confidence'    => 90.0,
-            ]);
-        });
-
-        $file = UploadedFile::fake()->image('car.jpg');
-        $scan = $service->scanAndSave($file, $user->id, $lot->id);
+        $scan = $this->scan('สส 3333', self::PROVINCE);
 
         $this->assertFalse((bool) $scan->is_suspicious);
     }
 
-    // ─── helper ─────────────────────────────────────────────────────────────
+    // ─── [8] AI อ่านทะเบียนไม่ได้ → บันทึก Scan ได้ (license_plate = null) ──
 
-    private function callIsSuspicious(string $licensePlate): bool
+    public function test_scan_and_save_stores_unreadable_plate_as_null(): void
+    {
+        Storage::fake('public');
+
+        $scan = $this->scan('', '');
+
+        $this->assertNull($scan->license_plate);
+        $this->assertNull($scan->plate_province);
+        $this->assertSame('unreadable', $scan->result);
+        $this->assertFalse((bool) $scan->is_suspicious);
+        $this->assertDatabaseHas('license_plate_scans', ['id' => $scan->id, 'license_plate' => null]);
+    }
+
+    // ─── helpers ────────────────────────────────────────────────────────────
+
+    private function scan(string $plate, string $province)
+    {
+        $user = User::factory()->create(['force_password_reset' => false]);
+        $lot  = ParkingLot::factory()->create();
+
+        $service = $this->partialMock(CarScanService::class, function ($mock) use ($plate, $province) {
+            $mock->shouldReceive('detect')->andReturn([
+                'license_plate' => $plate,
+                'province'      => $province,
+                'color'         => 'ดำ',
+                'brand'         => 'Toyota',
+                'confidence'    => 95.0,
+            ]);
+        });
+
+        return $service->scanAndSave(UploadedFile::fake()->image('car.jpg'), $user->id, $lot->id);
+    }
+
+    private function callIsSuspicious(string $licensePlate, string $province): bool
     {
         return SuspiciousVehicle::active()
             ->where('license_plate', $licensePlate)
+            ->where('plate_province', $province)
             ->exists();
     }
 }

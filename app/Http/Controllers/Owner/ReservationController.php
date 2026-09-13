@@ -4,15 +4,15 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
-use App\Models\ParkingSlot;
 use App\Models\Reservation;
-use App\Models\ReservationLog;
 use App\Services\CheckInService;
 use App\Services\CheckOutService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Owner ดู Reservation ของลานตัวเอง — การยืนยันการจองเกิดจาก Mark as Paid เงินมัดจำในหน้า Payments
+ */
 class ReservationController extends Controller
 {
     public function __construct(
@@ -33,7 +33,6 @@ class ReservationController extends Controller
 
         $reservations = Reservation::with([
             'user:id,name,email',
-            'vehicle:id,user_id,license_plate',
             'parkingLot:id,name,hourly_rate',
             'parkingSlot:id,parking_lot_id,slot_number',
             'parkingLog:id,reservation_id,check_in_time',
@@ -41,7 +40,6 @@ class ReservationController extends Controller
             ->whereIn('parking_lot_id', $ownedLotIds)
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
                 $qq->where('license_plate', 'like', "%{$q}%")
-                    ->orWhereHas('vehicle', fn($x) => $x->where('license_plate', 'like', "%{$q}%"))
                     ->orWhereHas('user', fn($x) => $x->where('name', 'like', "%{$q}%"));
             }))
             ->when($status, fn($query) => $query->where('status', $status))
@@ -52,9 +50,9 @@ class ReservationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $statuses = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
+        $statuses = Reservation::STATUSES;
 
-        $checkableIds = Reservation::checkable()
+        $checkableIds = Reservation::manuallyCheckable()
             ->whereIn('id', $reservations->pluck('id'))
             ->pluck('id')
             ->all();
@@ -64,77 +62,14 @@ class ReservationController extends Controller
         ));
     }
 
-    public function confirm(Reservation $reservation)
-    {
-        $ownedLotIds = ParkingLot::where('owner_id', Auth::id())->pluck('id');
-        abort_unless($ownedLotIds->contains($reservation->parking_lot_id), 403);
-
-        if ($reservation->status !== 'pending') {
-            return back()->withErrors(['error' => "ไม่สามารถยืนยันได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
-        }
-
-        $slotError = null;
-
-        DB::transaction(function () use ($reservation, &$slotError) {
-            if ($reservation->parking_slot_id) {
-                $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$slot || $slot->status !== 'available') {
-                    $slotError = "ช่องจอดที่จองไว้ไม่พร้อมใช้งาน (สถานะ: {$slot?->status})";
-                    return;
-                }
-
-                $slot->update(['status' => 'reserved']);
-            }
-
-            $reservation->update(['status' => 'confirmed']);
-
-            ReservationLog::create([
-                'reservation_id' => $reservation->id,
-                'old_status'     => 'pending',
-                'new_status'     => 'confirmed',
-                'changed_by'     => Auth::id(),
-                'note'           => 'เจ้าของลานจอดยืนยันการจอง',
-            ]);
-        });
-
-        if ($slotError) {
-            return back()->withErrors(['error' => $slotError]);
-        }
-
-        notify_user(
-            $reservation->user_id,
-            'การจองได้รับการยืนยัน',
-            "การจอง #{$reservation->id} ของคุณได้รับการยืนยันแล้ว กรุณาเช็คอินภายในเวลาที่กำหนด"
-        );
-
-        return back()->with('success', "ยืนยันการจอง #{$reservation->id} เรียบร้อยแล้ว");
-    }
-
     /** Check-In รถของการจองนี้โดยตรง (แทนหน้า Manual Check-In แยก) */
     public function checkIn(Reservation $reservation)
     {
         $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id')->all();
         abort_unless(in_array($reservation->parking_lot_id, $ownedLotIds, true), 403, 'ไม่มีสิทธิ์จัดการลานจอดนี้');
 
-        if ($reservation->status !== 'confirmed') {
-            return back()->withErrors(['error' => "ไม่สามารถเช็คอินได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
-        }
-
-        if (!Reservation::checkable()->where('id', $reservation->id)->exists()) {
-            return back()->withErrors(['error' => 'อยู่นอกช่วงเวลาเช็คอิน (เร็วเกินไปหรือเกินเวลากำหนด)']);
-        }
-
-        $result = $this->checkInService->checkIn(
-            $reservation->license_plate,
-            $reservation->brand,
-            $reservation->color,
-            $reservation->parking_lot_id,
-            $ownedLotIds,
-            $reservation->vehicle_id
-        );
+        // Manual Check-in (Fallback) — เฉพาะการจองที่ confirmed · รถที่มาก่อนเวลาจองเข้าได้หลังเจ้าหน้าที่ตรวจสอบ
+        $result = $this->checkInService->checkInReservation($reservation, Auth::user(), allowEarly: true);
 
         if (!$result['success']) {
             return back()->withErrors(['error' => $result['error']]);

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -28,7 +29,13 @@ return new class extends Migration
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
+
+            $table->index(['status', 'created_at']);
+            $table->index('user_id');
         });
+
+        DB::statement("ALTER TABLE owner_applications ADD CONSTRAINT owner_applications_status_check CHECK (status IN ('pending','approved','rejected'))");
+        DB::statement("ALTER TABLE owner_applications ADD CONSTRAINT owner_applications_type_check CHECK (applicant_type IN ('individual','company'))");
     }
 
     public function down(): void

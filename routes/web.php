@@ -3,7 +3,6 @@
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\User\ReservationController as UserReservationController;
-use App\Http\Controllers\User\VehicleController as UserVehicleController;
 use App\Http\Controllers\User\ParkingLogController as UserParkingLogController;
 use App\Http\Controllers\Admin\ParkingLotController;
 use App\Http\Controllers\Admin\ParkingSlotController;
@@ -12,7 +11,6 @@ use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\ReservationLogController;
 use App\Http\Controllers\Admin\AdminActionController;
 use App\Http\Controllers\Admin\ParkingLogController;
-use App\Http\Controllers\Admin\VehicleController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\SuspiciousVehicleController;
 use App\Http\Controllers\CarScanController;
@@ -64,9 +62,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::patch('users/{user}/force-reset', [AdminUserController::class, 'forceReset'])->name('users.force-reset');
     // ลบผู้ใช้ (owner จะลบลานจอดของตัวเองไปด้วย + ยกเลิกการจองที่ค้างอยู่)
     Route::delete('users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
-    // Reservation CRUD
-    Route::resource('reservations', ReservationController::class)->except(['show']);
-    Route::post('reservations/{reservation}/confirm', [ReservationController::class, 'confirm'])->name('reservations.confirm');
+    // Reservations — ไม่มีการสร้าง/แก้ไข/ลบ/ยืนยันด้วยมือ (ยืนยันผ่าน Mark as Paid เงินมัดจำ)
+    Route::get('reservations', [ReservationController::class, 'index'])->name('reservations.index');
+    Route::post('reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
     Route::post('reservations/{reservation}/check-in', [ReservationController::class, 'checkIn'])->name('reservations.check-in');
     Route::post('reservations/{reservation}/check-out', [ReservationController::class, 'checkOut'])->name('reservations.check-out');
     // Reservation Logs
@@ -78,8 +76,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     // Parking Log History
     Route::get('parking-logs', [ParkingLogController::class, 'index'])->name('parking-logs.index');
     Route::post('parking-logs/{log}/check-out', [ParkingLogController::class, 'checkOut'])->name('parking-logs.check-out');
-    // Vehicles CRUD
-    Route::resource('vehicles', VehicleController::class)->except(['show']);
     // Payments
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [PaymentController::class, 'markPaid'])->name('payments.mark-paid');
@@ -114,7 +110,6 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     Route::post('parking-lots', [OwnerParkingLotController::class, 'store'])->name('parking-lots.store');
     Route::get('parking-lots/{parking_lot}/edit', [OwnerParkingLotController::class, 'edit'])->name('parking-lots.edit');
     Route::patch('parking-lots/{parking_lot}', [OwnerParkingLotController::class, 'update'])->name('parking-lots.update');
-    Route::patch('parking-lots/{parking_lot}/toggle', [OwnerParkingLotController::class, 'toggle'])->name('parking-lots.toggle');
     Route::delete('parking-lots/{parking_lot}', [OwnerParkingLotController::class, 'destroy'])->name('parking-lots.destroy');
 
     // Parking Slots
@@ -122,9 +117,8 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     Route::post('parking-slots/bulk', [OwnerParkingSlotController::class, 'bulkStore'])->name('parking-slots.bulk.store');
     Route::resource('parking-slots', OwnerParkingSlotController::class)->except(['show']);
 
-    // Reservations (read-only + confirm + check-in/out)
+    // Reservations (read-only + check-in/out) — ยืนยันการจองผ่าน Mark as Paid เงินมัดจำ
     Route::get('reservations', [OwnerReservationController::class, 'index'])->name('reservations.index');
-    Route::post('reservations/{reservation}/confirm', [OwnerReservationController::class, 'confirm'])->name('reservations.confirm');
     Route::post('reservations/{reservation}/check-in', [OwnerReservationController::class, 'checkIn'])->name('reservations.check-in');
     Route::post('reservations/{reservation}/check-out', [OwnerReservationController::class, 'checkOut'])->name('reservations.check-out');
 

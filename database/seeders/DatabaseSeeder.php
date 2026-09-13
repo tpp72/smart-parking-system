@@ -14,35 +14,44 @@ use App\Models\Reservation;
 use App\Models\ReservationLog;
 use App\Models\SuspiciousVehicle;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * ข้อมูลตัวอย่างตาม Data Model ใหม่ (Plate-based):
+ * - Reservation เก็บ ทะเบียน + จังหวัด + ยี่ห้อ + สี (ไม่มี Vehicle)
+ * - Deposit = hourly_rate × 1 เป็น Payment จริง (type = deposit) · reservation_fee = ส่วนลด = hourly_rate
+ * - Slot ถูก Lock (reserved) เมื่อยืนยันรับเงิน Deposit แล้วเท่านั้น
+ * - Walk-in = Reservation ของ "Walkin User" · Deposit 0 · ไม่มีส่วนลด
+ * - จองล่วงหน้าไม่เกิน 1 วัน · Expire หลัง reserve_start 1 ชั่วโมง
+ */
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /** ช่องจอดที่ยังไม่ถูกใช้ (available) ต่อ 1 ลาน — ใช้แจกให้ checked_in / confirmed แบบเลือกช่องล่วงหน้า */
+    /** ช่องจอดที่ยังว่าง (available) ต่อ 1 ลาน — แจกให้รายการที่ถือครอง Slot อยู่ตอนนี้ */
     private array $slotPool = [];
 
-    /** ช่องจอดทั้งหมดต่อ 1 ลาน — ใช้อ้างอิงกับรายการที่ "จบไปแล้ว" (ไม่กระทบสถานะช่องปัจจุบัน) */
+    /** ช่องจอดทั้งหมดต่อ 1 ลาน — ใช้กับรายการที่จบไปแล้ว (ไม่กระทบสถานะช่องปัจจุบัน) */
     private array $allSlots = [];
 
-    /** ทะเบียนรถที่ถูกใช้ไปแล้ว กันชนกัน */
-    private array $usedPlates = [];
+    /** รถที่ใช้ไปแล้ว (ทะเบียน|จังหวัด) กันชนกัน */
+    private array $usedCars = [];
 
     private array $brands = ['Toyota', 'Honda', 'Isuzu', 'Ford', 'Mazda', 'Nissan', 'BMW', 'Mercedes-Benz', 'Mitsubishi', 'Suzuki'];
 
-    /** 13 สีตามที่ Claude Vision ใช้ตอบ */
-    private array $colors = ['ขาว', 'ดำ', 'เทา', 'เงิน', 'ทอง', 'น้ำตาล', 'แดง', 'ส้ม', 'เหลือง', 'เขียว', 'น้ำเงิน', 'ม่วง', 'ชมพู'];
-
     private array $provinces = ['กรุงเทพมหานคร', 'เชียงใหม่', 'ชลบุรี', 'ภูเก็ต', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'ขอนแก่น', 'นครราชสีมา', 'สงขลา'];
+
+    private array $colors = [];
 
     public function run(): void
     {
+        $this->colors = config('car_colors');
+
         DB::transaction(function () {
             $admin = $this->seedAdmin();
             $demoUser = $this->seedDemoUser();
@@ -54,17 +63,13 @@ class DatabaseSeeder extends Seeder
             $lots = $this->seedParkingLots($owners);
             $this->seedParkingSlots($lots);
 
-            $vehiclesByUser = $this->seedVehicles($renters);
-            $allVehicles = collect($vehiclesByUser)->flatten(1);
+            $this->seedReservations($renters, $lots, $admin);
+            $this->seedWalkInReservations(User::walkin(), $lots, $admin);
 
-            $this->seedSuspiciousVehicles($admin, $allVehicles);
-
-            [$activeVehicleIds] = $this->seedReservationsAndLogs($renters, $vehiclesByUser, $lots, $admin);
-            $this->seedWalkInParkingLogs($lots, $allVehicles, $activeVehicleIds);
-            $this->seedLicensePlateScans($renters, $allVehicles, $admin);
-            $this->seedNotifications($renters, $owners, $admin);
-            $this->seedAdditionalAdminActions($admin, $owners);
-            $this->seedAdminActionsForUnownedLots($admin);
+            $blacklist = $this->seedSuspiciousVehicles($admin);
+            $this->seedLicensePlateScans($renters, $admin, $lots, $blacklist);
+            $this->seedNotifications($renters, $owners);
+            $this->seedAuditLogs($admin);
         });
     }
 
@@ -105,7 +110,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         $owners = [];
-        foreach ($ownerSeeds as $i => $seed) {
+        foreach ($ownerSeeds as $seed) {
             $owner = User::create([
                 'name' => $seed['name'],
                 'email' => $seed['email'],
@@ -233,7 +238,7 @@ class DatabaseSeeder extends Seeder
             ['owner' => 1, 'name' => 'ลานจอดรถ คอนโด ริเวอร์ไซด์ นนทบุรี', 'address' => '99 ถ.รัตนาธิเบศร์', 'district' => 'เมืองนนทบุรี', 'province' => 'นนทบุรี', 'landmark' => 'ริมแม่น้ำเจ้าพระยา', 'total_slots' => 20, 'hourly_rate' => 15],
             ['owner' => 2, 'name' => 'ลานจอดรถ โรงพยาบาลรวมแพทย์ เชียงใหม่', 'address' => '8 ถ.ช้างเผือก', 'district' => 'เมืองเชียงใหม่', 'province' => 'เชียงใหม่', 'landmark' => 'ติดโรงพยาบาล', 'total_slots' => 35, 'hourly_rate' => 20],
             ['owner' => 2, 'name' => 'ลานจอดรถ นิคมอุตสาหกรรม แหลมฉบัง', 'address' => '200 หมู่ 4 ถ.สุขุมวิท', 'district' => 'ศรีราชา', 'province' => 'ชลบุรี', 'landmark' => 'ประตู 3', 'total_slots' => 50, 'hourly_rate' => 25],
-            // ลานของหน่วยงานรัฐ — ไม่มีเจ้าของเอกชน จึงอยู่ในความดูแลของ Admin โดยตรง (owner_id = null)
+            // ลานของ Admin (owner_id = null) — Admin ทุกคนใช้ร่วมกัน
             ['owner' => null, 'name' => 'ลานจอดรถ เทศบาลนครระยอง', 'address' => 'ถ.สุขุมวิท', 'district' => 'เมืองระยอง', 'province' => 'ระยอง', 'landmark' => 'หน้าศาลากลางจังหวัด', 'total_slots' => 30, 'hourly_rate' => 15],
             ['owner' => null, 'name' => 'ลานจอดรถ สาธารณะ สนามบินภูเก็ต โซน B', 'address' => '222 ถ.เทพกระษัตรี', 'district' => 'ถลาง', 'province' => 'ภูเก็ต', 'landmark' => 'โซนจอดรถสาธารณะ', 'total_slots' => 45, 'hourly_rate' => 35],
         ];
@@ -250,7 +255,6 @@ class DatabaseSeeder extends Seeder
                 'landmark' => $seed['landmark'],
                 'total_slots' => $seed['total_slots'],
                 'hourly_rate' => $seed['hourly_rate'],
-                'is_active' => true,
                 'reservations_enabled' => true,
                 'created_at' => now()->subDays(random_int(90, 200)),
             ]);
@@ -296,312 +300,300 @@ class DatabaseSeeder extends Seeder
         return $all ? $all[array_rand($all)] : null;
     }
 
-    // ================= Vehicles =================
+    // ================= Cars (Plate-based) =================
 
-    /** @param array<int,User> $users @return array<int,array<int,Vehicle>> keyed by user_id */
-    private function seedVehicles(array $users): array
+    /** @return array{license_plate: string, plate_province: string, brand: string, color: string} */
+    private function makeCar(): array
     {
         $consonantPairs = ['กข', 'ขค', 'คง', 'งจ', 'จฉ', 'ชซ', 'ฎฏ', 'ทธ', 'พร', 'สต', 'อบ', 'ผม', 'ฮย'];
-        $byUser = [];
 
-        foreach ($users as $user) {
-            $count = random_int(1, 2);
-            $vehicles = [];
-
-            for ($i = 0; $i < $count; $i++) {
-                $plate = $this->makeUniquePlate($consonantPairs);
-
-                $vehicles[] = Vehicle::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $plate,
-                    'brand' => $this->brands[array_rand($this->brands)],
-                    'color' => $this->colors[array_rand($this->colors)],
-                    'created_at' => now()->subDays(random_int(1, 140)),
-                ]);
-            }
-
-            $byUser[$user->id] = $vehicles;
-        }
-
-        return $byUser;
-    }
-
-    private function makeUniquePlate(array $consonantPairs): string
-    {
         do {
-            $plate = $consonantPairs[array_rand($consonantPairs)] . ' '
-                . random_int(1000, 9999) . ' '
-                . $this->provinces[array_rand($this->provinces)];
-        } while (isset($this->usedPlates[$plate]));
+            $plate = $consonantPairs[array_rand($consonantPairs)] . ' ' . random_int(1000, 9999);
+            $province = $this->provinces[array_rand($this->provinces)];
+        } while (isset($this->usedCars["{$plate}|{$province}"]));
 
-        $this->usedPlates[$plate] = true;
-        return $plate;
-    }
+        $this->usedCars["{$plate}|{$province}"] = true;
 
-    // ================= Suspicious Vehicles =================
-
-    private function seedSuspiciousVehicles(User $admin, $allVehicles): void
-    {
-        $reasons = [
-            'แจ้งความรถหาย',
-            'ค้างชำระค่าจอดหลายครั้ง',
-            'พบพฤติกรรมต้องสงสัยจากกล้องวงจรปิด',
-            'ตำรวจแจ้งเตือนให้เฝ้าระวัง',
-            'ป้ายทะเบียนปลอม / ไม่ตรงกับฐานข้อมูลกรมขนส่ง',
-            'มีประวัติทำลายทรัพย์สินในลานจอด',
+        return [
+            'license_plate' => $plate,
+            'plate_province' => $province,
+            'brand' => $this->brands[array_rand($this->brands)],
+            'color' => $this->colors[array_rand($this->colors)],
         ];
-
-        // 2 รายการ อ้างอิงจากรถที่มีอยู่จริงในระบบ (จำลองเคสที่ตรวจพบ)
-        $sample = $allVehicles->random(min(2, $allVehicles->count()));
-        foreach ($sample as $vehicle) {
-            SuspiciousVehicle::create([
-                'license_plate' => $vehicle->license_plate,
-                'reason' => $reasons[array_rand($reasons)],
-                'level' => 'high',
-                'is_active' => true,
-                'added_by' => $admin->id,
-                'created_at' => now()->subDays(random_int(1, 30)),
-            ]);
-        }
-
-        // อีก 4 รายการ เป็นทะเบียนต้องสงสัยทั่วไป (ไม่ผูกกับรถในระบบ)
-        $consonantPairs = ['ฆฒ', 'ฌญ', 'ฐฑ', 'ณด'];
-        for ($i = 0; $i < 4; $i++) {
-            SuspiciousVehicle::create([
-                'license_plate' => $consonantPairs[$i] . ' ' . random_int(1000, 9999),
-                'reason' => $reasons[array_rand($reasons)],
-                'level' => ['low', 'medium', 'high'][array_rand(['low', 'medium', 'high'])],
-                'is_active' => random_int(1, 10) <= 8,
-                'added_by' => $admin->id,
-                'created_at' => now()->subDays(random_int(1, 60)),
-            ]);
-        }
     }
 
-    // ================= Reservations, Logs, Parking Logs, Payments =================
+    /** ผู้ยืนยันรับเงินของลาน: Owner ของลาน หรือ Admin ถ้าเป็นลานของ Admin */
+    private function cashierId(ParkingLot $lot, User $admin): int
+    {
+        return $lot->owner_id ?? $admin->id;
+    }
+
+    // ================= Reservations =================
 
     /**
      * @param array<int,User> $renters
-     * @param array<int,array<int,Vehicle>> $vehiclesByUser
      * @param array<int,ParkingLot> $lots
-     * @return array{0: array<int,int>} [activeVehicleIds]
      */
-    private function seedReservationsAndLogs(array $renters, array $vehiclesByUser, array $lots, User $admin): array
+    private function seedReservations(array $renters, array $lots, User $admin): void
     {
-        $activeVehicleIds = [];
-
         $specs = [
             'completed' => 28,
             'checked_in' => 9,
             'confirmed' => 12,
             'pending' => 12,
-            'cancelled' => 6,
-            'expired' => 7,
+            'cancelled' => 8,
+            'expired' => 8,
         ];
 
         foreach ($specs as $status => $count) {
             for ($i = 0; $i < $count; $i++) {
                 $user = $renters[array_rand($renters)];
-                $userVehicles = $vehiclesByUser[$user->id];
-                $vehicle = $userVehicles[array_rand($userVehicles)];
                 $lot = $lots[array_rand($lots)];
 
-                $this->createReservationCase($status, $user, $vehicle, $lot, $admin, $activeVehicleIds);
+                $this->createReservationCase($status, $user, $lot, $admin);
             }
         }
-
-        return [$activeVehicleIds];
     }
 
-    private function createReservationCase(string $status, User $user, Vehicle $vehicle, ParkingLot $lot, User $admin, array &$activeVehicleIds): void
+    private function createReservationCase(string $status, User $user, ParkingLot $lot, User $admin): void
     {
-        $hourlyRate = (float) $lot->hourly_rate;
+        $rate = (float) $lot->hourly_rate;
+        $cashierId = $this->cashierId($lot, $admin);
+
+        $base = array_merge($this->makeCar(), [
+            'user_id' => $user->id,
+            'parking_lot_id' => $lot->id,
+            'deposit_amount' => $rate,   // Deposit = hourly_rate × 1
+            'reservation_fee' => $rate,  // ส่วนลด = hourly_rate
+        ]);
 
         switch ($status) {
             case 'completed':
                 $checkedInAt = now()->subDays(random_int(1, 25))->subHours(random_int(0, 10))->setMinute(random_int(0, 59))->setSecond(0);
                 $reserveStart = $checkedInAt->copy()->subMinutes(random_int(5, 20));
-                $durationMinutes = random_int(35, 360);
-                $completedAt = $checkedInAt->copy()->addMinutes($durationMinutes);
-                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 48));
+                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 20));
+                $paidAt = $bookedAt->copy()->addMinutes(random_int(5, 50));
+                $completedAt = $checkedInAt->copy()->addMinutes(random_int(35, 360));
+                $slotId = $this->pickAnySlot($lot->id);
 
-                $reservation = Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
-                    'parking_slot_id' => null,
+                $reservation = Reservation::create($base + [
+                    'parking_slot_id' => $slotId,
                     'reserve_start' => $reserveStart,
                     'checked_in_at' => $checkedInAt,
                     'completed_at' => $completedAt,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'completed',
                     'created_at' => $bookedAt,
                     'updated_at' => $completedAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'confirmed', $admin->id, 'Admin ยืนยันการจอง', $bookedAt->copy()->addMinutes(random_int(5, 60)));
-                $this->logTransition($reservation, 'confirmed', 'checked_in', null, "Auto check-in: รถเข้าจอด", $checkedInAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
+                $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Auto check-in: รถเข้าจอด', $checkedInAt);
                 $this->logTransition($reservation, 'checked_in', 'completed', null, 'Auto completed: รถออกจากลานแล้ว', $completedAt);
 
-                $slotId = $this->pickAnySlot($lot->id);
-                $log = ParkingLog::create([
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
-                    'parking_slot_id' => $slotId,
-                    'reservation_id' => $reservation->id,
-                    'check_in_time' => $checkedInAt,
-                    'check_out_time' => $completedAt,
-                    'created_at' => $checkedInAt,
-                    'updated_at' => $completedAt,
-                ]);
-
-                $this->createPayment($log, $checkedInAt, $completedAt, $hourlyRate, $reservation->reservation_fee);
+                $log = $this->parkingLog($reservation, $slotId, $checkedInAt, $completedAt);
+                $this->checkoutPayment($log, $reservation, $rate, $cashierId);
                 break;
 
             case 'checked_in':
+                $slotId = $this->pickSlotFromPool($lot->id);
+                if (!$slotId) {
+                    return;
+                }
+
                 $checkedInAt = now()->subMinutes(random_int(10, 180));
                 $reserveStart = $checkedInAt->copy()->subMinutes(random_int(0, 15));
-                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 24));
+                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 20));
+                $paidAt = $bookedAt->copy()->addMinutes(random_int(5, 50));
 
-                $reservation = Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
-                    'parking_slot_id' => null,
+                ParkingSlot::whereKey($slotId)->update(['status' => 'occupied']);
+
+                $reservation = Reservation::create($base + [
+                    'parking_slot_id' => $slotId,
                     'reserve_start' => $reserveStart,
                     'checked_in_at' => $checkedInAt,
-                    'completed_at' => null,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'checked_in',
                     'created_at' => $bookedAt,
                     'updated_at' => $checkedInAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'confirmed', $admin->id, 'Admin ยืนยันการจอง', $bookedAt->copy()->addMinutes(random_int(5, 60)));
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
                 $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Auto check-in: รถเข้าจอด', $checkedInAt);
 
-                $slotId = $this->pickSlotFromPool($lot->id);
-                if ($slotId) {
-                    ParkingSlot::whereKey($slotId)->update(['status' => 'occupied']);
-                }
-
-                ParkingLog::create([
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
-                    'parking_slot_id' => $slotId,
-                    'reservation_id' => $reservation->id,
-                    'check_in_time' => $checkedInAt,
-                    'check_out_time' => null,
-                    'created_at' => $checkedInAt,
-                    'updated_at' => $checkedInAt,
-                ]);
-
-                $activeVehicleIds[] = $vehicle->id;
+                $this->parkingLog($reservation, $slotId, $checkedInAt, null);
                 break;
 
             case 'confirmed':
-                $reserveStart = now()->addHours(random_int(0, 20))->addMinutes(random_int(0, 59));
-                $bookedAt = now()->subHours(random_int(1, 30));
-
-                $preselect = random_int(1, 10) <= 5;
-                $slotId = $preselect ? $this->pickSlotFromPool($lot->id) : null;
-                if ($slotId) {
-                    ParkingSlot::whereKey($slotId)->update(['status' => 'reserved']);
+                // Slot ถูก Lock เมื่อยืนยันรับเงิน Deposit แล้ว
+                $slotId = $this->pickSlotFromPool($lot->id);
+                if (!$slotId) {
+                    return;
                 }
 
-                $reservation = Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
+                $bookedAt = now()->subMinutes(random_int(60, 180));
+                $paidAt = $bookedAt->copy()->addMinutes(random_int(5, 30));
+                $reserveStart = now()->addMinutes(random_int(30, 20 * 60)); // ไม่เกิน 1 วันจากเวลาจอง
+
+                ParkingSlot::whereKey($slotId)->update(['status' => 'reserved']);
+
+                $reservation = Reservation::create($base + [
                     'parking_slot_id' => $slotId,
                     'reserve_start' => $reserveStart,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'confirmed',
                     'created_at' => $bookedAt,
-                    'updated_at' => $bookedAt->copy()->addMinutes(random_int(5, 60)),
+                    'updated_at' => $paidAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'confirmed', $admin->id, 'Admin ยืนยันการจอง', $reservation->updated_at);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
                 break;
 
             case 'pending':
-                $reserveStart = now()->addHours(random_int(1, 23))->addMinutes(random_int(0, 59));
-                $bookedAt = now()->subHours(random_int(0, 6));
+                // ยังไม่ยืนยันรับเงิน → ไม่ถือครอง Slot
+                $bookedAt = now()->subMinutes(random_int(0, 360));
+                $reserveStart = now()->addMinutes(random_int(60, 17 * 60));
 
-                Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
+                $reservation = Reservation::create($base + [
                     'parking_slot_id' => null,
                     'reserve_start' => $reserveStart,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'pending',
                     'created_at' => $bookedAt,
                     'updated_at' => $bookedAt,
                 ]);
+
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->depositPayment($reservation, 'unpaid', null, $bookedAt, null);
                 break;
 
             case 'cancelled':
-                $reserveStart = now()->addDays(random_int(-3, 3))->addHours(random_int(0, 12));
-                $bookedAt = $reserveStart->copy()->subHours(random_int(2, 48));
-                $cancelledAt = $bookedAt->copy()->addHours(random_int(1, 20));
+                $reserveStart = now()->addHours(random_int(-72, 20));
+                $bookedAt = $reserveStart->copy()->subHours(random_int(2, 20))->min(now()->subMinutes(20));
+                $windowEnd = $reserveStart->copy()->min(now());
+                $window = max(10, (int) $bookedAt->diffInMinutes($windowEnd));
+                $cancelledAt = $bookedAt->copy()->addMinutes(intdiv($window, 2));
+                $wasPaid = random_int(1, 10) <= 5;
 
-                $reservation = Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
+                $reservation = Reservation::create($base + [
                     'parking_slot_id' => null,
                     'reserve_start' => $reserveStart,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'cancelled',
                     'created_at' => $bookedAt,
                     'updated_at' => $cancelledAt,
                 ]);
 
-                $byUser = random_int(1, 10) <= 7;
-                $this->logTransition(
-                    $reservation,
-                    'pending',
-                    'cancelled',
-                    $byUser ? null : $admin->id,
-                    $byUser ? 'ผู้ใช้ยกเลิกการจองด้วยตนเอง' : 'ยกเลิกโดยผู้ดูแลระบบ',
-                    $cancelledAt
-                );
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+
+                if ($wasPaid) {
+                    // ยกเลิกหลังชำระ Deposit → ไม่คืนเงิน (Payment คงสถานะ paid)
+                    $paidAt = $bookedAt->copy()->addMinutes(intdiv($window, 4));
+                    $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
+                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
+                    $this->logTransition($reservation, 'confirmed', 'cancelled', $user->id, 'User ยกเลิกการจอง', $cancelledAt);
+                } else {
+                    // ยกเลิกก่อนชำระ Deposit → void
+                    $this->depositPayment($reservation, 'void', null, $bookedAt, null, $cancelledAt);
+                    $this->logTransition($reservation, 'pending', 'cancelled', $user->id, 'User ยกเลิกการจอง', $cancelledAt);
+                }
                 break;
 
             case 'expired':
                 $reserveStart = now()->subHours(random_int(2, 72));
-                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 24));
-                $expiredAt = $reserveStart->copy()->addMinutes(random_int(31, 90));
-                $wasConfirmed = random_int(1, 10) <= 5;
+                $bookedAt = $reserveStart->copy()->subHours(random_int(1, 20));
+                $expiredAt = $reserveStart->copy()->addMinutes(60);
+                $wasPaid = random_int(1, 10) <= 5;
 
-                $reservation = Reservation::create([
-                    'user_id' => $user->id,
-                    'license_plate' => $vehicle->license_plate,
-                    'vehicle_id' => $vehicle->id,
-                    'parking_lot_id' => $lot->id,
+                $reservation = Reservation::create($base + [
                     'parking_slot_id' => null,
                     'reserve_start' => $reserveStart,
-                    'reservation_fee' => $hourlyRate,
                     'status' => 'expired',
                     'created_at' => $bookedAt,
                     'updated_at' => $expiredAt,
                 ]);
 
-                if ($wasConfirmed) {
-                    $this->logTransition($reservation, 'pending', 'confirmed', $admin->id, 'Admin ยืนยันการจอง', $bookedAt->copy()->addHours(1));
-                    $this->logTransition($reservation, 'confirmed', 'expired', null, 'หมดเวลาจอง (เลย grace period โดยไม่ check-in)', $expiredAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+
+                if ($wasPaid) {
+                    $paidAt = $bookedAt->copy()->addMinutes(random_int(10, 50));
+                    $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
+                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
+                    $this->logTransition($reservation, 'confirmed', 'expired', null, 'Auto-expired: เกินเวลาเช็คอิน 60 นาที', $expiredAt);
                 } else {
-                    $this->logTransition($reservation, 'pending', 'expired', null, 'หมดเวลาจอง (เลย grace period โดยไม่ check-in)', $expiredAt);
+                    $this->depositPayment($reservation, 'void', null, $bookedAt, null, $expiredAt);
+                    $this->logTransition($reservation, 'pending', 'expired', null, 'Auto-expired: เกินเวลาเช็คอิน 60 นาที', $expiredAt);
                 }
                 break;
         }
     }
+
+    // ================= Walk-in (Reservation ของ Walkin User) =================
+
+    /** @param array<int,ParkingLot> $lots */
+    private function seedWalkInReservations(User $walkin, array $lots, User $admin): void
+    {
+        // Walk-in ที่จบไปแล้ว
+        for ($i = 0; $i < 15; $i++) {
+            $lot = $lots[array_rand($lots)];
+            $checkIn = now()->subDays(random_int(1, 30))->subHours(random_int(0, 12))->setSecond(0);
+            $checkOut = $checkIn->copy()->addMinutes(random_int(30, 300));
+            $slotId = $this->pickAnySlot($lot->id);
+
+            $reservation = Reservation::create(array_merge($this->makeCar(), [
+                'user_id' => $walkin->id,
+                'is_walk_in' => true,
+                'parking_lot_id' => $lot->id,
+                'parking_slot_id' => $slotId,
+                'reserve_start' => $checkIn,
+                'checked_in_at' => $checkIn,
+                'completed_at' => $checkOut,
+                'deposit_amount' => 0,
+                'reservation_fee' => 0,
+                'status' => 'completed',
+                'created_at' => $checkIn,
+                'updated_at' => $checkOut,
+            ]));
+
+            $this->logTransition($reservation, null, 'checked_in', null, 'Walk-in: ระบบสร้างการจองและเช็คอินอัตโนมัติ', $checkIn);
+            $this->logTransition($reservation, 'checked_in', 'completed', null, 'Auto completed: รถออกจากลานแล้ว', $checkOut);
+
+            $log = $this->parkingLog($reservation, $slotId, $checkIn, $checkOut);
+            $this->checkoutPayment($log, $reservation, (float) $lot->hourly_rate, $this->cashierId($lot, $admin));
+        }
+
+        // Walk-in ที่กำลังจอดอยู่ตอนนี้
+        for ($i = 0; $i < 3; $i++) {
+            $lot = $lots[array_rand($lots)];
+            $slotId = $this->pickSlotFromPool($lot->id);
+            if (!$slotId) {
+                continue;
+            }
+            ParkingSlot::whereKey($slotId)->update(['status' => 'occupied']);
+
+            $checkIn = now()->subMinutes(random_int(5, 120));
+
+            $reservation = Reservation::create(array_merge($this->makeCar(), [
+                'user_id' => $walkin->id,
+                'is_walk_in' => true,
+                'parking_lot_id' => $lot->id,
+                'parking_slot_id' => $slotId,
+                'reserve_start' => $checkIn,
+                'checked_in_at' => $checkIn,
+                'deposit_amount' => 0,
+                'reservation_fee' => 0,
+                'status' => 'checked_in',
+                'created_at' => $checkIn,
+                'updated_at' => $checkIn,
+            ]));
+
+            $this->logTransition($reservation, null, 'checked_in', null, 'Walk-in: ระบบสร้างการจองและเช็คอินอัตโนมัติ', $checkIn);
+            $this->parkingLog($reservation, $slotId, $checkIn, null);
+        }
+    }
+
+    // ================= Logs / Payments helpers =================
 
     private function logTransition(Reservation $reservation, ?string $old, string $new, ?int $changedBy, string $note, Carbon $at): void
     {
@@ -616,116 +608,176 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
-    private function createPayment(ParkingLog $log, Carbon $checkIn, Carbon $checkOut, float $hourlyRate, float $reservationFee = 0): Payment
+    private function parkingLog(Reservation $reservation, ?int $slotId, Carbon $checkIn, ?Carbon $checkOut): ParkingLog
     {
-        $diffMinutes = $checkIn->diffInMinutes($checkOut);
-        $totalHours = max(1, (int) ceil($diffMinutes / 60));
-        $parkingFee = round($totalHours * $hourlyRate, 2);
-        $deposit = min($reservationFee, $parkingFee);
-        $totalAmount = round($parkingFee - $deposit, 2);
-
-        // ส่วนใหญ่ชำระแล้ว บาง record ยังค้างจ่ายเพื่อความสมจริง
-        $paid = $totalAmount <= 0 || random_int(1, 10) <= 8;
-
-        return Payment::create([
-            'parking_log_id' => $log->id,
-            'reservation_id' => $log->reservation_id,
-            'total_hours' => $totalHours,
-            'hourly_rate' => $hourlyRate,
-            'parking_fee' => $parkingFee,
-            'reservation_discount' => $deposit,
-            'total_amount' => $totalAmount,
-            'payment_status' => $paid ? 'paid' : 'unpaid',
-            'created_at' => $checkOut,
-            'updated_at' => $checkOut,
+        return ParkingLog::create([
+            'parking_lot_id' => $reservation->parking_lot_id,
+            'parking_slot_id' => $slotId,
+            'reservation_id' => $reservation->id,
+            'license_plate' => $reservation->license_plate,
+            'plate_province' => $reservation->plate_province,
+            'brand' => $reservation->brand,
+            'color' => $reservation->color,
+            'check_in_time' => $checkIn,
+            'check_out_time' => $checkOut,
+            'created_at' => $checkIn,
+            'updated_at' => $checkOut ?? $checkIn,
         ]);
     }
 
-    // ================= Walk-in Parking Logs (ไม่มีการจองล่วงหน้า) =================
-
-    /** @param array<int,ParkingLot> $lots */
-    private function seedWalkInParkingLogs(array $lots, $allVehicles, array $activeVehicleIds): void
+    /** Deposit Payment — status: unpaid (รอรับเงิน) / paid (ยืนยันรับเงินแล้ว) / void (ยกเลิกหรือหมดอายุก่อนชำระ) */
+    private function depositPayment(Reservation $reservation, string $status, ?int $paidBy, Carbon $createdAt, ?Carbon $paidAt, ?Carbon $voidAt = null): Payment
     {
-        // ประวัติ walk-in ที่จบไปแล้ว
-        for ($i = 0; $i < 15; $i++) {
-            $lot = $lots[array_rand($lots)];
-            $vehicle = $allVehicles->random();
-            $hourlyRate = (float) $lot->hourly_rate;
-
-            $checkIn = now()->subDays(random_int(1, 30))->subHours(random_int(0, 12));
-            $checkOut = $checkIn->copy()->addMinutes(random_int(30, 300));
-            $slotId = $this->pickAnySlot($lot->id);
-
-            $log = ParkingLog::create([
-                'vehicle_id' => $vehicle->id,
-                'parking_lot_id' => $lot->id,
-                'parking_slot_id' => $slotId,
-                'reservation_id' => null,
-                'check_in_time' => $checkIn,
-                'check_out_time' => $checkOut,
-                'created_at' => $checkIn,
-                'updated_at' => $checkOut,
-            ]);
-
-            $this->createPayment($log, $checkIn, $checkOut, $hourlyRate, 0);
-        }
-
-        // รถที่ walk-in เข้ามาจอดอยู่ตอนนี้ (ไม่ผ่านการจอง)
-        $eligibleVehicles = $allVehicles->reject(fn ($v) => in_array($v->id, $activeVehicleIds, true));
-
-        for ($i = 0; $i < 3 && $eligibleVehicles->count() > 0; $i++) {
-            $vehicle = $eligibleVehicles->random();
-            $eligibleVehicles = $eligibleVehicles->reject(fn ($v) => $v->id === $vehicle->id);
-
-            $lot = $lots[array_rand($lots)];
-            $slotId = $this->pickSlotFromPool($lot->id);
-            if (!$slotId) {
-                continue;
-            }
-            ParkingSlot::whereKey($slotId)->update(['status' => 'occupied']);
-
-            $checkIn = now()->subMinutes(random_int(5, 120));
-
-            ParkingLog::create([
-                'vehicle_id' => $vehicle->id,
-                'parking_lot_id' => $lot->id,
-                'parking_slot_id' => $slotId,
-                'reservation_id' => null,
-                'check_in_time' => $checkIn,
-                'check_out_time' => null,
-                'created_at' => $checkIn,
-                'updated_at' => $checkIn,
-            ]);
-        }
+        return Payment::create([
+            'type' => Payment::TYPE_DEPOSIT,
+            'reservation_id' => $reservation->id,
+            'parking_log_id' => null,
+            'hourly_rate' => $reservation->deposit_amount,
+            'total_hours' => null,
+            'parking_fee' => 0,
+            'deposit_deduction' => 0,
+            'reservation_discount' => 0,
+            'total_amount' => $reservation->deposit_amount,
+            'payment_status' => $status,
+            'paid_by' => $status === 'paid' ? $paidBy : null,
+            'paid_at' => $status === 'paid' ? $paidAt : null,
+            'created_at' => $createdAt,
+            'updated_at' => $paidAt ?? $voidAt ?? $createdAt,
+        ]);
     }
 
-    // ================= License Plate Scans (AI Car Scan history) =================
-
-    private function seedLicensePlateScans(array $renters, $allVehicles, User $admin): void
+    /** Checkout Payment — ค่าจอดจริง − Deposit − reservation_fee (ไม่ติดลบ) */
+    private function checkoutPayment(ParkingLog $log, Reservation $reservation, float $rate, int $cashierId): Payment
     {
-        $suspiciousPlates = SuspiciousVehicle::where('is_active', true)->pluck('license_plate')->all();
+        $totalHours = max(1, (int) ceil($log->check_in_time->diffInMinutes($log->check_out_time) / 60));
+        $parkingFee = round($totalHours * $rate, 2);
+        $depositDeduction = min((float) $reservation->deposit_amount, $parkingFee);
+        $discount = min((float) $reservation->reservation_fee, $parkingFee - $depositDeduction);
+        $totalAmount = round($parkingFee - $depositDeduction - $discount, 2);
+
+        $autoPaid = $totalAmount <= 0;
+        $paid = $autoPaid || random_int(1, 10) <= 8;
+        $paidAt = $autoPaid ? $log->check_out_time : $log->check_out_time->copy()->addMinutes(random_int(5, 120));
+
+        return Payment::create([
+            'type' => Payment::TYPE_CHECKOUT,
+            'reservation_id' => $reservation->id,
+            'parking_log_id' => $log->id,
+            'hourly_rate' => $rate,
+            'total_hours' => $totalHours,
+            'parking_fee' => $parkingFee,
+            'deposit_deduction' => $depositDeduction,
+            'reservation_discount' => $discount,
+            'total_amount' => $totalAmount,
+            'payment_status' => $paid ? 'paid' : 'unpaid',
+            'paid_by' => $paid && !$autoPaid ? $cashierId : null,
+            'paid_at' => $paid ? $paidAt : null,
+            'created_at' => $log->check_out_time,
+            'updated_at' => $paid ? $paidAt : $log->check_out_time,
+        ]);
+    }
+
+    // ================= Suspicious Vehicles (Blacklist: ทะเบียน + จังหวัด) =================
+
+    private function seedSuspiciousVehicles(User $admin): Collection
+    {
+        $reasons = [
+            'แจ้งความรถหาย',
+            'ค้างชำระค่าจอดหลายครั้ง',
+            'พบพฤติกรรมต้องสงสัยจากกล้องวงจรปิด',
+            'ตำรวจแจ้งเตือนให้เฝ้าระวัง',
+            'ป้ายทะเบียนปลอม / ไม่ตรงกับฐานข้อมูลกรมขนส่ง',
+            'มีประวัติทำลายทรัพย์สินในลานจอด',
+        ];
+
+        // 2 รายการ อ้างอิงจากรถที่เคยเข้าใช้บริการ (จำลองเคสที่ตรวจพบ)
+        $sample = Reservation::inRandomOrder()->limit(2)->get(['license_plate', 'plate_province']);
+        foreach ($sample as $car) {
+            SuspiciousVehicle::create([
+                'license_plate' => $car->license_plate,
+                'plate_province' => $car->plate_province,
+                'reason' => $reasons[array_rand($reasons)],
+                'level' => 'high',
+                'is_active' => true,
+                'added_by' => $admin->id,
+                'created_at' => now()->subDays(random_int(1, 30)),
+            ]);
+        }
+
+        // อีก 4 รายการ เป็นรถต้องสงสัยทั่วไป
+        for ($i = 0; $i < 4; $i++) {
+            $car = $this->makeCar();
+            SuspiciousVehicle::create([
+                'license_plate' => $car['license_plate'],
+                'plate_province' => $car['plate_province'],
+                'reason' => $reasons[array_rand($reasons)],
+                'level' => ['low', 'medium', 'high'][array_rand(['low', 'medium', 'high'])],
+                'is_active' => random_int(1, 10) <= 8,
+                'added_by' => $admin->id,
+                'created_at' => now()->subDays(random_int(1, 60)),
+            ]);
+        }
+
+        return SuspiciousVehicle::all();
+    }
+
+    // ================= License Plate Scans (AI Scan — Upload จำลองกล้อง) =================
+
+    /**
+     * @param array<int,User> $renters
+     * @param array<int,ParkingLot> $lots
+     */
+    private function seedLicensePlateScans(array $renters, User $admin, array $lots, Collection $blacklist): void
+    {
+        $activeBlacklist = $blacklist->where('is_active', true)->values();
 
         for ($i = 0; $i < 20; $i++) {
-            $matched = random_int(1, 10) <= 7;
-            $vehicle = $matched ? $allVehicles->random() : null;
-            $user = $vehicle ? User::find($vehicle->user_id) : $renters[array_rand($renters)];
+            $lot = $lots[array_rand($lots)];
+            // การอัปโหลดเป็นการจำลองกล้อง ไม่ขึ้นกับผู้อัปโหลด
+            $uploaderId = match (random_int(1, 3)) {
+                1 => $lot->owner_id ?? $admin->id,
+                2 => $admin->id,
+                default => $renters[array_rand($renters)]->id,
+            };
 
-            $isSuspicious = !empty($suspiciousPlates) && random_int(1, 10) <= 2;
-            $plate = $isSuspicious
-                ? $suspiciousPlates[array_rand($suspiciousPlates)]
-                : ($vehicle->license_plate ?? ('กก ' . random_int(1000, 9999) . ' ' . $this->provinces[array_rand($this->provinces)]));
+            $roll = random_int(1, 20);
+            if ($roll === 1) {
+                // AI อ่านทะเบียนไม่ได้
+                $plate = null;
+                $province = null;
+                $brand = null;
+                $color = null;
+                $confidence = random_int(1000, 4000) / 100;
+            } else {
+                $car = ($roll <= 4 && $activeBlacklist->isNotEmpty())
+                    ? $activeBlacklist->random()
+                    : Reservation::inRandomOrder()->first();
+
+                $plate = $car->license_plate;
+                $province = $car->plate_province;
+                $brand = $car->brand ?? $this->brands[array_rand($this->brands)];
+                $color = $car->color ?? $this->colors[array_rand($this->colors)];
+                $confidence = random_int(7000, 9950) / 100;
+            }
+
+            $isSuspicious = $plate !== null && $activeBlacklist
+                ->where('license_plate', $plate)
+                ->where('plate_province', $province)
+                ->isNotEmpty();
 
             $scanTime = now()->subDays(random_int(0, 45))->subHours(random_int(0, 20));
 
             LicensePlateScan::create([
-                'user_id' => $user?->id,
-                'vehicle_id' => $vehicle?->id,
+                'user_id' => $uploaderId,
+                'parking_lot_id' => $lot->id,
                 'license_plate' => $plate,
-                'color' => $this->colors[array_rand($this->colors)],
-                'brand' => $this->brands[array_rand($this->brands)],
-                'confidence' => round(random_int(750, 990) / 1000, 2),
+                'plate_province' => $province,
+                'brand' => $brand,
+                'color' => $color,
+                'confidence' => $confidence,
+                'result' => LicensePlateScan::classify($plate, $province, $confidence),
                 'is_suspicious' => $isSuspicious,
-                'source' => random_int(1, 10) <= 6 ? 'manual_upload' : 'auto_checkin',
+                'source' => 'manual_upload',
                 'image_path' => 'car-scans/' . $scanTime->format('Ymd_His') . '_' . random_int(1000, 9999) . '.jpg',
                 'scan_time' => $scanTime,
                 'created_at' => $scanTime,
@@ -736,13 +788,17 @@ class DatabaseSeeder extends Seeder
 
     // ================= Notifications =================
 
-    private function seedNotifications(array $renters, array $owners, User $admin): void
+    /**
+     * @param array<int,User> $renters
+     * @param array<int,User> $owners
+     */
+    private function seedNotifications(array $renters, array $owners): void
     {
         $templates = [
-            ['title' => 'การจองได้รับการยืนยัน', 'body' => 'การจองของคุณได้รับการยืนยันแล้ว กรุณาเช็คอินภายในเวลาที่กำหนด'],
+            ['title' => 'การจองได้รับการยืนยัน', 'body' => 'ยืนยันรับเงินมัดจำแล้ว การจองของคุณได้รับการยืนยัน กรุณาเช็คอินภายในเวลาที่กำหนด'],
             ['title' => 'เช็คอินสำเร็จ', 'body' => 'รถของคุณเข้าจอดในระบบเรียบร้อยแล้ว'],
             ['title' => 'เช็คเอาท์เรียบร้อย', 'body' => 'รถของคุณออกจากลานแล้ว ขอบคุณที่ใช้บริการ'],
-            ['title' => 'การจองถูกยกเลิก', 'body' => 'การจองของคุณถูกยกเลิกโดยผู้ดูแลระบบ'],
+            ['title' => 'การจองถูกยกเลิก', 'body' => 'การจองของคุณถูกยกเลิกเรียบร้อยแล้ว'],
             ['title' => 'การจองหมดอายุ', 'body' => 'การจองของคุณหมดอายุเนื่องจากไม่ได้เช็คอินภายในเวลาที่กำหนด'],
         ];
 
@@ -763,7 +819,6 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // แจ้งเตือนเจ้าของลานจอด
         foreach ($owners as $owner) {
             $createdAt = now()->subDays(random_int(30, 80));
             Notification::create([
@@ -776,7 +831,6 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // แจ้งผลผู้สมัครที่ pending/rejected
         $rejected = User::where('email', 'rejected.owner@demo.com')->first();
         if ($rejected) {
             $createdAt = now()->subDays(random_int(3, 15));
@@ -791,206 +845,86 @@ class DatabaseSeeder extends Seeder
         }
     }
 
-    // ================= Admin Actions (extra, ไม่ซ้ำกับที่สร้างระหว่าง flow อื่น) =================
+    // ================= Audit Logs (ทุก Role + System) =================
 
-    private function seedAdditionalAdminActions(User $admin, array $owners): void
+    private function audit(?User $actor, string $action, ?string $subjectType, ?int $subjectId, array $meta, Carbon $at): void
     {
-        // force password reset ให้ user สุ่มบางคน
-        $targets = User::where('role', 'user')->inRandomOrder()->limit(3)->get();
-        foreach ($targets as $target) {
-            $target->update(['force_password_reset' => true]);
-
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'user.force_reset',
-                'subject_type' => 'User',
-                'subject_id' => $target->id,
-                'meta' => ['reason' => 'นโยบายความปลอดภัยประจำไตรมาส'],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => now()->subDays(random_int(1, 20)),
-            ]);
-        }
-
-        // owner_application.approve / reject ของ 3 owner ที่อนุมัติแล้ว
-        foreach (OwnerApplication::where('status', 'approved')->get() as $app) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'owner_application.approve',
-                'subject_type' => 'OwnerApplication',
-                'subject_id' => $app->id,
-                'meta' => [],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $app->reviewed_at,
-            ]);
-        }
-
-        foreach (OwnerApplication::where('status', 'rejected')->get() as $app) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'owner_application.reject',
-                'subject_type' => 'OwnerApplication',
-                'subject_id' => $app->id,
-                'meta' => ['reason' => $app->rejection_reason],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $app->reviewed_at,
-            ]);
-        }
-
-        // suspicious_vehicle.create
-        foreach (SuspiciousVehicle::all() as $sv) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'suspicious_vehicle.create',
-                'subject_type' => 'SuspiciousVehicle',
-                'subject_id' => $sv->id,
-                'meta' => ['license_plate' => $sv->license_plate, 'level' => $sv->level],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $sv->created_at,
-            ]);
-        }
+        AdminAction::create([
+            'actor_id' => $actor?->id,
+            'actor_role' => $actor?->role ?? 'system',
+            'action' => $action,
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'meta' => $meta ?: null,
+            'ip_address' => $actor ? '127.0.0.1' : null,
+            'user_agent' => $actor ? 'Mozilla/5.0 (Seeder)' : null,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
     }
 
-    /**
-     * Audit log สำหรับกิจกรรมที่ Admin ทำเองบนลานที่ไม่มีเจ้าของ (รัฐ/สาธารณะ)
-     * — ให้หน้า Admin Actions Log มีตัวอย่างครบทุก action type ที่เพิ่มเข้ามาใหม่
-     * (reservation.confirm/update, parking_log.check_in/check_out, payment.mark_paid, user.create/delete)
-     */
-    private function seedAdminActionsForUnownedLots(User $admin): void
+    private function seedAuditLogs(User $admin): void
     {
-        $unownedLotIds = ParkingLot::unowned()->pluck('id');
-        if ($unownedLotIds->isEmpty()) {
-            return;
+        $users = User::all()->keyBy('id');
+
+        // Admin: force password reset
+        $targets = User::where('role', 'user')->where('is_system', false)->inRandomOrder()->limit(3)->get();
+        foreach ($targets as $target) {
+            $target->update(['force_password_reset' => true]);
+            $this->audit($admin, 'user.force_reset', 'User', $target->id, ['force_password_reset' => true], now()->subDays(random_int(1, 20)));
         }
 
-        // reservation.confirm — จาก ReservationLog จริงที่ Admin เป็นคนยืนยัน บนลานที่ไม่มีเจ้าของ
-        $confirmLogs = ReservationLog::where('new_status', 'confirmed')
-            ->where('changed_by', $admin->id)
-            ->whereHas('reservation', fn($q) => $q->whereIn('parking_lot_id', $unownedLotIds))
-            ->get(['id', 'reservation_id', 'created_at']);
+        // User: ส่งคำขอเป็น Owner · Admin: อนุมัติ/ปฏิเสธ
+        foreach (OwnerApplication::all() as $app) {
+            $applicant = $users[$app->user_id];
+            $this->audit($applicant, 'owner_application.submit', 'OwnerApplication', $app->id, [], $app->created_at);
 
-        foreach ($confirmLogs as $log) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'reservation.confirm',
-                'subject_type' => 'Reservation',
-                'subject_id' => $log->reservation_id,
-                'meta' => ['status' => 'confirmed'],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $log->created_at,
-            ]);
-        }
-
-        // reservation.update — จาก ReservationLog จริงที่ Admin เป็นคนยกเลิก บนลานที่ไม่มีเจ้าของ
-        $cancelLogs = ReservationLog::where('new_status', 'cancelled')
-            ->where('changed_by', $admin->id)
-            ->whereHas('reservation', fn($q) => $q->whereIn('parking_lot_id', $unownedLotIds))
-            ->get(['id', 'reservation_id', 'created_at']);
-
-        // การันตีให้มีอย่างน้อย 1 รายการ (ไม่พึ่งดวงสุ่มล้วนๆ) — หยิบ cancelled log ใดก็ได้บนลานที่ไม่มีเจ้าของ มาระบุว่า Admin เป็นคนยกเลิก
-        if ($cancelLogs->isEmpty()) {
-            $fallbackLog = ReservationLog::where('new_status', 'cancelled')
-                ->whereHas('reservation', fn($q) => $q->whereIn('parking_lot_id', $unownedLotIds))
-                ->first();
-
-            if ($fallbackLog) {
-                $fallbackLog->update(['changed_by' => $admin->id, 'note' => 'ยกเลิกโดยผู้ดูแลระบบ']);
-                $cancelLogs = collect([$fallbackLog]);
+            if ($app->status === 'approved') {
+                $this->audit($admin, 'owner_application.approve', 'OwnerApplication', $app->id, [], $app->reviewed_at);
+            } elseif ($app->status === 'rejected') {
+                $this->audit($admin, 'owner_application.reject', 'OwnerApplication', $app->id, ['reason' => $app->rejection_reason], $app->reviewed_at);
             }
         }
 
-        foreach ($cancelLogs as $log) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'reservation.update',
-                'subject_type' => 'Reservation',
-                'subject_id' => $log->reservation_id,
-                'meta' => ['changed' => ['status']],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $log->created_at,
-            ]);
+        // Admin: เพิ่มรายการ Blacklist
+        foreach (SuspiciousVehicle::all() as $sv) {
+            $this->audit($admin, 'suspicious_vehicle.create', 'SuspiciousVehicle', $sv->id, [
+                'license_plate' => $sv->license_plate,
+                'plate_province' => $sv->plate_province,
+                'level' => $sv->level,
+            ], $sv->created_at);
         }
 
-        // parking_log.check_in / parking_log.check_out — จาก ParkingLog จริงบนลานที่ไม่มีเจ้าของ
-        $logs = ParkingLog::whereIn('parking_lot_id', $unownedLotIds)
-            ->get(['id', 'parking_lot_id', 'parking_slot_id', 'reservation_id', 'check_in_time', 'check_out_time']);
-
-        foreach ($logs as $log) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'parking_log.check_in',
-                'subject_type' => 'ParkingLog',
-                'subject_id' => $log->id,
-                'meta' => [
-                    'parking_lot_id' => $log->parking_lot_id,
-                    'parking_slot_id' => $log->parking_slot_id,
-                    'reservation_id' => $log->reservation_id,
-                ],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $log->check_in_time,
-            ]);
-
-            if ($log->check_out_time) {
-                AdminAction::create([
-                    'admin_id' => $admin->id,
-                    'action' => 'parking_log.check_out',
-                    'subject_type' => 'ParkingLog',
-                    'subject_id' => $log->id,
-                    'meta' => [],
-                    'ip_address' => '127.0.0.1',
-                    'user_agent' => 'Mozilla/5.0 (Seeder)',
-                    'created_at' => $log->check_out_time,
-                ]);
-            }
+        // User: สร้าง / ยกเลิกการจอง (ReservationLog ที่ผู้ใช้เป็นผู้กระทำ)
+        $userLogs = ReservationLog::whereNotNull('changed_by')
+            ->whereIn('new_status', ['pending', 'cancelled'])
+            ->get();
+        foreach ($userLogs as $log) {
+            $actor = $users[$log->changed_by];
+            $action = $log->new_status === 'pending' ? 'reservation.create' : 'reservation.cancel';
+            $this->audit($actor, $action, 'Reservation', $log->reservation_id, [], $log->created_at);
         }
 
-        // payment.mark_paid — จาก Payment จริงที่ชำระแล้วและมียอด > 0 (ต้องมีคนกดยืนยันรับเงิน)
-        $paidPayments = Payment::whereHas('parkingLog', fn($q) => $q->whereIn('parking_lot_id', $unownedLotIds))
-            ->where('payment_status', 'paid')
-            ->where('total_amount', '>', 0)
-            ->get(['id', 'total_amount', 'updated_at']);
-
-        foreach ($paidPayments as $p) {
-            AdminAction::create([
-                'admin_id' => $admin->id,
-                'action' => 'payment.mark_paid',
-                'subject_type' => 'ParkingLog',
-                'subject_id' => $p->id,
-                'meta' => ['payment_id' => $p->id, 'total_amount' => $p->total_amount],
-                'ip_address' => '127.0.0.1',
-                'user_agent' => 'Mozilla/5.0 (Seeder)',
-                'created_at' => $p->updated_at,
-            ]);
+        // Admin / Owner: ยืนยันรับเงิน (Mark as Paid)
+        foreach (Payment::whereNotNull('paid_by')->get() as $payment) {
+            $this->audit($users[$payment->paid_by], 'payment.mark_paid', 'Payment', $payment->id, [
+                'type' => $payment->type,
+                'reservation_id' => $payment->reservation_id,
+                'total_amount' => $payment->total_amount,
+            ], $payment->paid_at);
         }
 
-        // user.create / user.delete — ตัวอย่างประวัติการเพิ่ม/ลบผู้ใช้ (เป็น audit trail ของบัญชีที่ไม่มีอยู่แล้ว
-        // เหมือนสถานการณ์จริงหลังลบ user — admin_actions ไม่มี FK ผูกกับ users จึงเก็บ record ไว้ได้)
-        AdminAction::create([
-            'admin_id' => $admin->id,
-            'action' => 'user.create',
-            'subject_type' => 'User',
-            'subject_id' => 9990,
-            'meta' => ['role' => 'user'],
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'Mozilla/5.0 (Seeder)',
-            'created_at' => now()->subDays(40),
-        ]);
+        // System: Auto check-in / Auto expire
+        $systemLogs = ReservationLog::whereNull('changed_by')
+            ->whereIn('new_status', ['checked_in', 'expired'])
+            ->get();
+        foreach ($systemLogs as $log) {
+            $action = $log->new_status === 'checked_in' ? 'reservation.auto_check_in' : 'reservation.expire';
+            $this->audit(null, $action, 'Reservation', $log->reservation_id, [], $log->created_at);
+        }
 
-        AdminAction::create([
-            'admin_id' => $admin->id,
-            'action' => 'user.delete',
-            'subject_type' => 'User',
-            'subject_id' => 9991,
-            'meta' => ['role' => 'owner', 'lots_deleted' => 1, 'reservations_cancelled' => 2],
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'Mozilla/5.0 (Seeder)',
-            'created_at' => now()->subDays(12),
-        ]);
+        // Admin: ตัวอย่างประวัติการเพิ่ม/ลบผู้ใช้ (audit trail ของบัญชีที่ไม่มีอยู่แล้ว)
+        $this->audit($admin, 'user.create', 'User', 9990, ['role' => 'user'], now()->subDays(40));
+        $this->audit($admin, 'user.delete', 'User', 9991, ['role' => 'owner', 'lots_deleted' => 1, 'reservations_cancelled' => 2], now()->subDays(12));
     }
 }

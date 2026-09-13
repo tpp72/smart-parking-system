@@ -51,11 +51,9 @@ class ParkingLotController extends Controller
             'total_slots'          => ['required', 'integer', 'min:0'],
             'hourly_rate'          => ['required', 'numeric', 'min:0'],
             'owner_id'             => ['nullable', 'exists:users,id'],
-            'is_active'            => ['boolean'],
             'reservations_enabled' => ['boolean'],
         ]);
 
-        $data['is_active']            = $request->boolean('is_active', true);
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
         ParkingLot::create($data);
 
@@ -85,11 +83,9 @@ class ParkingLotController extends Controller
             'total_slots'          => ['required', 'integer', 'min:0'],
             'hourly_rate'          => ['required', 'numeric', 'min:0'],
             'owner_id'             => ['nullable', 'exists:users,id'],
-            'is_active'            => ['boolean'],
             'reservations_enabled' => ['boolean'],
         ]);
 
-        $data['is_active']            = $request->boolean('is_active', true);
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
         $parking_lot->update($data);
 

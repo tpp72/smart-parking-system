@@ -18,10 +18,11 @@ class AdminActionController extends Controller
         $to = $request->query('to');     // YYYY-MM-DD
 
         $base = DB::table('admin_actions as aa')
-            ->leftJoin('users as u', 'u.id', '=', 'aa.admin_id')
+            ->leftJoin('users as u', 'u.id', '=', 'aa.actor_id')
             ->select([
                 'aa.id',
                 'aa.action',
+                'aa.actor_role',
                 'aa.subject_type',
                 'aa.subject_id',
                 'aa.meta',
@@ -63,10 +64,11 @@ class AdminActionController extends Controller
         $to = $request->query('to');
 
         $query = DB::table('admin_actions as aa')
-            ->leftJoin('users as u', 'u.id', '=', 'aa.admin_id')
+            ->leftJoin('users as u', 'u.id', '=', 'aa.actor_id')
             ->select([
                 'aa.id',
                 'aa.action',
+                'aa.actor_role',
                 'aa.subject_type',
                 'aa.subject_id',
                 'aa.meta',
@@ -94,13 +96,14 @@ class AdminActionController extends Controller
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
 
-            fputcsv($out, ['id', 'action', 'subject_type', 'subject_id', 'admin_name', 'admin_email', 'ip', 'created_at', 'meta']);
+            fputcsv($out, ['id', 'action', 'actor_role', 'subject_type', 'subject_id', 'actor_name', 'actor_email', 'ip', 'created_at', 'meta']);
 
             $query->chunk(1000, function ($rows) use ($out) {
                 foreach ($rows as $r) {
                     fputcsv($out, [
                         $r->id,
                         $r->action,
+                        $r->actor_role,
                         $r->subject_type,
                         $r->subject_id,
                         $r->admin_name,
