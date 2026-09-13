@@ -6,9 +6,7 @@ use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DashboardChartDataTest extends TestCase
@@ -38,12 +36,10 @@ class DashboardChartDataTest extends TestCase
 
     private function makeReservationForLot(ParkingLot $lot, string $status): Reservation
     {
-        $user    = User::factory()->create(['role' => 'user', 'force_password_reset' => false, 'email_verified_at' => now()]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = User::factory()->create(['role' => 'user', 'force_password_reset' => false, 'email_verified_at' => now()]);
 
         return Reservation::factory()->create([
             'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
             'parking_lot_id' => $lot->id,
             'status'         => $status,
             'reserve_start'  => now()->addHour(),
@@ -113,7 +109,6 @@ class DashboardChartDataTest extends TestCase
     {
         $admin = $this->admin();
 
-        // Create 6 lots, each with a different number of reservations
         for ($i = 1; $i <= 6; $i++) {
             $lot = ParkingLot::factory()->create();
             for ($j = 0; $j < $i; $j++) {
@@ -152,7 +147,6 @@ class DashboardChartDataTest extends TestCase
         $lotA = ParkingLot::factory()->create(['owner_id' => $ownerA->id]);
         $lotB = ParkingLot::factory()->create(['owner_id' => $ownerB->id]);
 
-        // 3 pending for ownerA, 2 pending for ownerB
         $this->makeReservationForLot($lotA, 'pending');
         $this->makeReservationForLot($lotA, 'pending');
         $this->makeReservationForLot($lotA, 'pending');

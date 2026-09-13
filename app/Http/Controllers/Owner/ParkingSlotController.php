@@ -10,15 +10,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
+/**
+ * Owner จัดการช่องจอดของลานตัวเอง — สถานะช่อง (available / reserved / occupied) ระบบเป็นผู้จัดการเท่านั้น
+ */
 class ParkingSlotController extends Controller
 {
-    private array $statuses = ['available', 'reserved', 'occupied'];
-
-    private function ownedLotIds(): array
-    {
-        return ParkingLot::where('owner_id', Auth::id())->pluck('id')->all();
-    }
-
     private function assertLotOwned(int $lotId): void
     {
         abort_unless(
@@ -52,8 +48,7 @@ class ParkingSlotController extends Controller
     public function create()
     {
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        $statuses = $this->statuses;
-        return view('owner.parking-slots.create', compact('lots', 'statuses'));
+        return view('owner.parking-slots.create', compact('lots'));
     }
 
     public function store(Request $request)
@@ -65,11 +60,10 @@ class ParkingSlotController extends Controller
                 Rule::unique('parking_slots', 'slot_number')
                     ->where(fn($q) => $q->where('parking_lot_id', $request->parking_lot_id)),
             ],
-            'status'         => ['required', Rule::in($this->statuses)],
         ]);
 
         $this->assertLotOwned((int) $data['parking_lot_id']);
-        ParkingSlot::create($data);
+        ParkingSlot::create($data + ['status' => 'available']);
 
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'เพิ่มช่องจอดเรียบร้อยแล้ว');
@@ -79,10 +73,10 @@ class ParkingSlotController extends Controller
     {
         $this->assertLotOwned($parking_slot->parking_lot_id);
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        $statuses = $this->statuses;
-        return view('owner.parking-slots.edit', ['slot' => $parking_slot, 'lots' => $lots, 'statuses' => $statuses]);
+        return view('owner.parking-slots.edit', ['slot' => $parking_slot, 'lots' => $lots]);
     }
 
+    /** แก้ไขได้เฉพาะเลขช่อง / ลาน — ช่องที่ถูกจองหรือมีรถจอดอยู่ย้ายลานไม่ได้ */
     public function update(Request $request, ParkingSlot $parking_slot)
     {
         $this->assertLotOwned($parking_slot->parking_lot_id);
@@ -95,10 +89,14 @@ class ParkingSlotController extends Controller
                     ->where(fn($q) => $q->where('parking_lot_id', $request->parking_lot_id))
                     ->ignore($parking_slot->id),
             ],
-            'status'         => ['required', Rule::in($this->statuses)],
         ]);
 
         $this->assertLotOwned((int) $data['parking_lot_id']);
+
+        if ((int) $data['parking_lot_id'] !== $parking_slot->parking_lot_id && $parking_slot->status !== 'available') {
+            return back()->withErrors(['parking_lot_id' => 'ย้ายช่องจอดที่ถูกจองหรือมีรถจอดอยู่ไปลานอื่นไม่ได้'])->withInput();
+        }
+
         $parking_slot->update($data);
 
         return redirect()->route('owner.parking-slots.index')
@@ -108,10 +106,25 @@ class ParkingSlotController extends Controller
     public function destroy(ParkingSlot $parking_slot)
     {
         $this->assertLotOwned($parking_slot->parking_lot_id);
-        if ($parking_slot->status !== 'available') {
-            return back()->withErrors(['error' => 'ไม่สามารถลบช่องจอดที่กำลังใช้งานอยู่']);
+
+        $error = DB::transaction(function () use ($parking_slot) {
+            $slot = ParkingSlot::whereKey($parking_slot->id)->lockForUpdate()->first();
+
+            if ($slot->status === 'occupied') {
+                return 'ไม่สามารถลบช่องจอดที่มีรถจอดอยู่';
+            }
+            if ($slot->status === 'reserved') {
+                return 'ไม่สามารถลบช่องจอดที่ถูก Lock ให้การจองที่ยืนยันแล้ว';
+            }
+
+            $slot->delete();
+            return null;
+        });
+
+        if ($error) {
+            return back()->withErrors(['error' => $error]);
         }
-        $parking_slot->delete();
+
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'ลบช่องจอดเรียบร้อยแล้ว');
     }
@@ -119,8 +132,7 @@ class ParkingSlotController extends Controller
     public function bulkCreate()
     {
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        $statuses = $this->statuses;
-        return view('owner.parking-slots.bulk', compact('lots', 'statuses'));
+        return view('owner.parking-slots.bulk', compact('lots'));
     }
 
     public function bulkStore(Request $request)
@@ -129,7 +141,6 @@ class ParkingSlotController extends Controller
 
         $baseRules = [
             'parking_lot_id' => ['required', 'integer'],
-            'status'         => ['required', Rule::in($this->statuses)],
             'mode'           => ['required', Rule::in(['range', 'list'])],
         ];
 
@@ -185,7 +196,7 @@ class ParkingSlotController extends Controller
                 $rows[] = [
                     'parking_lot_id' => $data['parking_lot_id'],
                     'slot_number'    => $sn,
-                    'status'         => $data['status'],
+                    'status'         => 'available',
                     'created_at'     => $now,
                     'updated_at'     => $now,
                 ];

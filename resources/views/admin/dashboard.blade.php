@@ -22,12 +22,6 @@
                         <span class="text-sm font-semibold">การจอง</span>
                         <span class="text-xs opacity-50">Reservations</span>
                     </a>
-                    <a href="{{ route('admin.vehicles.index') }}"
-                        class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10h4l3 6H13v-6z"/></svg>
-                        <span class="text-sm font-semibold">จัดการรถ</span>
-                        <span class="text-xs opacity-50">Vehicles</span>
-                    </a>
                     <a href="{{ route('admin.parking-slots.index') }}"
                         class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>

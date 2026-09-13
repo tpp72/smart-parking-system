@@ -94,28 +94,6 @@
                 </form>
             </div>
 
-            {{-- Toggle Active --}}
-            <div class="sp-card rounded-2xl p-6 mt-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="font-bold text-gray-200">สถานะลาน</h3>
-                        <p class="text-sm text-gray-400">
-                            ปัจจุบัน:
-                            @if($lot->is_active)
-                                <span class="text-green-400 font-bold">เปิดใช้งาน</span> — ปรากฏในตลาด, รับจองได้
-                            @else
-                                <span class="text-red-400 font-bold">ปิดใช้งาน</span> — ซ่อนจากตลาด
-                            @endif
-                        </p>
-                    </div>
-                    <form method="POST" action="{{ route('owner.parking-lots.toggle', $lot->id) }}">
-                        @csrf @method('PATCH')
-                        <button type="submit" class="sp-btn {{ $lot->is_active ? 'sp-btn-danger' : 'sp-btn-primary' }}">
-                            {{ $lot->is_active ? 'ปิดลาน' : 'เปิดลาน' }}
-                        </button>
-                    </form>
-                </div>
-            </div>
 
             {{-- Danger zone --}}
             <div class="sp-card rounded-2xl p-6 mt-4 border border-red-900/40">

@@ -245,50 +245,6 @@ test.describe('2. Admin Dashboard', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 3. VEHICLE MANAGEMENT
-// ═══════════════════════════════════════════════════════════════════════
-
-test.describe('3. Vehicle Management (Admin)', () => {
-
-  test('3.1 Vehicle list loads', async ({ page }) => {
-    const ms = await timedGoto(page, `${BASE}/admin/vehicles`);
-    perf('/admin/vehicles', ms);
-    await expect(page).toHaveURL(/admin\/vehicles/);
-    await shot(page, '3_1_vehicles_list');
-  });
-
-  test('3.2 Create vehicle form has required fields', async ({ page }) => {
-    await page.goto(`${BASE}/admin/vehicles/create`);
-    await expect(page.locator('input[name="license_plate"]')).toBeVisible();
-    await shot(page, '3_2_vehicle_create');
-  });
-
-  test('3.3 Empty license plate shows validation error', async ({ page }) => {
-    await page.goto(`${BASE}/admin/vehicles/create`);
-    await page.locator('form:not([action$="logout"]) button[type="submit"]').click();
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.content();
-    const blocked = body.includes('required') || body.includes('จำเป็น') || page.url().includes('/create');
-    if (!blocked) bug('medium', '/admin/vehicles/create', 'Empty plate not validated', 'Validation error', 'Form accepted');
-    await shot(page, '3_3_empty_plate_validation');
-  });
-
-  test('3.4 Duplicate license plate rejected', async ({ page }) => {
-    await page.goto(`${BASE}/admin/vehicles/create`);
-    await page.fill('input[name="license_plate"]', '5กก1234');
-    const userSel = page.locator('select[name="user_id"]');
-    if (await userSel.count()) await userSel.selectOption({ index: 1 });
-    await page.locator('form:not([action$="logout"]) button[type="submit"]').click();
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.content();
-    const rejected = body.includes('taken') || body.includes('มีอยู่') || body.includes('unique') || page.url().includes('/create');
-    if (!rejected) bug('high', '/admin/vehicles/create', 'Duplicate plate accepted', 'Validation error', 'Duplicate created');
-    await shot(page, '3_4_duplicate_plate');
-  });
-
-});
-
-// ═══════════════════════════════════════════════════════════════════════
 // 4. PARKING LOT MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -365,28 +321,7 @@ test.describe('6. Reservation System (Admin)', () => {
     await shot(page, '6_1_reservations_list');
   });
 
-  test('6.2 Create reservation form has date input', async ({ page }) => {
-    await page.goto(`${BASE}/admin/reservations/create`);
-    await expect(page.locator('input[name="reserve_start"]')).toBeVisible();
-    await shot(page, '6_2_reservation_create');
-  });
 
-  test('6.3 Past start time rejected by admin create', async ({ page }) => {
-    await page.goto(`${BASE}/admin/reservations/create`);
-    // UTC 1h ago is always in the past when Bangkok server interprets it as local time
-    const past = new Date(Date.now() - 3600000).toISOString().slice(0, 16);
-    await page.fill('input[name="reserve_start"]', past);
-    const vSel = page.locator('select[name="vehicle_id"]');
-    if (await vSel.count()) await vSel.selectOption({ index: 1 });
-    const lSel = page.locator('select[name="parking_lot_id"]');
-    if (await lSel.count()) await lSel.selectOption({ index: 1 });
-    await page.locator('form:not([action$="logout"]) button[type="submit"]').click();
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.content();
-    const blocked = body.includes('after') || body.includes('อนาคต') || page.url().includes('/create');
-    if (!blocked) bug('high', '/admin/reservations/create', 'Past start time accepted', 'Validation error', 'Reservation created in past');
-    await shot(page, '6_3_past_start_time');
-  });
 
   test('6.4 Reservation logs load', async ({ page }) => {
     const t0 = Date.now();
@@ -404,20 +339,6 @@ test.describe('6. Reservation System (Admin)', () => {
     await shot(page, '6_5_filter_status');
   });
 
-  test('6.6 Admin can create reservation with valid future date (Bangkok time)', async ({ page }) => {
-    await page.goto(`${BASE}/admin/reservations/create`);
-    // Use Bangkok local time 2h ahead — server (Asia/Bangkok) interprets correctly
-    const future = bangkokFuture(2);
-    await page.fill('input[name="reserve_start"]', future);
-    const vSel = page.locator('select[name="vehicle_id"]');
-    if (await vSel.count() && await vSel.locator('option').count() > 1) await vSel.selectOption({ index: 1 });
-    const lSel = page.locator('select[name="parking_lot_id"]');
-    if (await lSel.count() && await lSel.locator('option').count() > 1) await lSel.selectOption({ index: 1 });
-    await page.locator('form:not([action$="logout"]) button[type="submit"]').click();
-    await page.waitForLoadState('domcontentloaded');
-    if (page.url().includes('/create')) bug('medium', '/admin/reservations/create', 'Valid reservation not saved', 'Redirect to list', 'Still on create');
-    await shot(page, '6_6_reservation_created');
-  });
 
 });
 
@@ -443,8 +364,6 @@ test.describe('7. User Reservation System', () => {
 
   test('7.3 User cannot book more than 24h ahead', async ({ page }) => {
     await page.goto(`${BASE}/user/reservations/create`);
-    const vSel = page.locator('select[name="vehicle_id"]');
-    if (await vSel.count() && await vSel.locator('option').count() > 1) await vSel.selectOption({ index: 1 });
     const lSel = page.locator('select[name="parking_lot_id"]');
     if (await lSel.count()) await lSel.selectOption({ index: 1 });
     // 25h ahead in Bangkok time — should exceed 24h limit
@@ -480,11 +399,6 @@ test.describe('7. User Reservation System', () => {
     await shot(page, '7_6_user_dashboard');
   });
 
-  test('7.7 User vehicles page loads', async ({ page }) => {
-    const ms = await timedGoto(page, `${BASE}/user/vehicles`);
-    perf('/user/vehicles', ms);
-    await shot(page, '7_7_user_vehicles');
-  });
 
   test('7.8 User parking logs page loads', async ({ page }) => {
     const ms = await timedGoto(page, `${BASE}/user/parking-logs`);
@@ -730,7 +644,7 @@ test.describe('12. Marketplace', () => {
 test.describe('13. Security & Authorization', () => {
 
   test('13.1 CSRF token present on forms', async ({ page }) => {
-    for (const url of [`${BASE}/login`, `${BASE}/admin/reservations/create`, `${BASE}/admin/vehicles/create`]) {
+    for (const url of [`${BASE}/login`]) {
       await page.goto(url);
       const csrfMeta  = await page.locator('meta[name="csrf-token"]').count();
       const csrfInput = await page.locator('input[name="_token"]').count();
@@ -778,27 +692,6 @@ test.describe('13. Security & Authorization', () => {
     await ctx.close();
   });
 
-  test('13.5 Vehicle ownership enforced — user cannot use another user vehicle', async ({ page }) => {
-    const ctx = await page.context().browser().newContext({ storageState: 'e2e/.auth/user.json' });
-    const p = await ctx.newPage();
-    await p.goto(`${BASE}/user/reservations/create`);
-    await p.evaluate(() => {
-      const f = document.querySelector('form');
-      if (f) { const i = document.createElement('input'); i.type = 'hidden'; i.name = 'vehicle_id'; i.value = '9999'; f.appendChild(i); }
-    });
-    const lSel = p.locator('select[name="parking_lot_id"]');
-    if (await lSel.count()) await lSel.selectOption({ index: 1 });
-    // Use Bangkok time 2h ahead — server interprets correctly
-    await p.fill('input[name="reserve_start"]', bangkokFuture(2));
-    await p.locator('form:not([action$="logout"]) button[type="submit"]').click();
-    await p.waitForLoadState('domcontentloaded');
-    const body = await p.content();
-    const blocked = (await p.url()).includes('403') || body.includes('ไม่มีสิทธิ์') || body.includes('Forbidden') || body.includes('ไม่พบรถ') || body.includes('create');
-    if (!blocked) sec('high', '/user/reservations', 'Parameter tampering: user reserved with non-owned vehicle_id', 'should be blocked');
-    authCheck('/user/reservations (vehicle_id=9999)', 'user', 'blocked (vehicle not owned)', await p.url(), true);
-    await shot(p, '13_5_vehicle_ownership');
-    await ctx.close();
-  });
 
   test('13.6 Admin users page loads and shows users', async ({ page }) => {
     const ms = await timedGoto(page, `${BASE}/admin/users`);
@@ -874,7 +767,7 @@ test.describe('15. Performance', () => {
 
   const routes = [
     '/admin/dashboard', '/admin/parking-lots', '/admin/parking-slots',
-    '/admin/reservations', '/admin/vehicles', '/admin/users',
+    '/admin/reservations', '/admin/users',
     '/admin/check-in', '/admin/check-out', '/admin/scan',
     '/admin/payments', '/notifications', '/marketplace', '/profile',
     '/user/dashboard', '/user/reservations', '/owner/dashboard',
@@ -983,7 +876,6 @@ test.describe('99. Generate Final Reports', () => {
       secMd += `| XSS | ✅ Safe (Blade auto-escape) |\n`;
       secMd += `| CSRF | ✅ Token present on all forms |\n`;
       secMd += `| IDOR (owner lots) | ✅ abort_if enforced |\n`;
-      secMd += `| IDOR (user vehicles) | ✅ ownership check enforced |\n`;
       secMd += `| Admin bypass (role=user) | ✅ HTTP 403 returned |\n`;
       secMd += `| Owner bypass (role=user) | ✅ HTTP 403 returned |\n`;
     } else {

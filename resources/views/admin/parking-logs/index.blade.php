@@ -72,7 +72,7 @@
                     <tbody>
                         @forelse ($logs as $log)
                             @php
-                                $isActiveWalkIn = $log->reservation_id === null && $log->check_out_time === null;
+                                $isActiveWalkIn = $log->reservation?->is_walk_in && $log->check_out_time === null;
                                 $hoursElapsed = null;
                                 $estimatedFee = null;
                                 if ($isActiveWalkIn) {
@@ -86,7 +86,7 @@
                                     {{ $log->license_plate ?? '-' }}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300">
-                                    {{ $log->reservation?->user?->name ?? 'Walk-in' }}
+                                    {{ $log->reservation?->user?->name ?? '-' }}
                                 </td>
                                 <td class="py-3 pr-4 text-gray-300">
                                     {{ $log->brand }}

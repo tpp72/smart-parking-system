@@ -40,7 +40,7 @@
                             <th class="py-3 pr-4 text-left">สถานที่</th>
                             <th class="py-3 pr-4 text-right">ช่อง</th>
                             <th class="py-3 pr-4 text-right">เรท/ชม.</th>
-                            <th class="py-3 pr-4 text-center">สถานะ</th>
+                            <th class="py-3 pr-4 text-center">รับจอง</th>
                             <th class="py-3 pr-4 text-right">จัดการ</th>
                         </tr>
                     </thead>
@@ -52,7 +52,7 @@
                                 <td class="py-3 pr-4 text-right text-gray-200">{{ $lot->total_slots }}</td>
                                 <td class="py-3 pr-4 text-right font-bold text-red-200">{{ number_format((float)$lot->hourly_rate, 2) }}</td>
                                 <td class="py-3 pr-4 text-center">
-                                    @if($lot->is_active)
+                                    @if($lot->reservations_enabled)
                                         <span class="sp-badge sp-badge-ok">เปิด</span>
                                     @else
                                         <span class="sp-badge sp-badge-danger">ปิด</span>
@@ -62,14 +62,6 @@
                                     <div class="flex gap-2 justify-end flex-wrap">
                                         <a href="{{ route('owner.parking-lots.edit', $lot->id) }}" title="แก้ไขข้อมูลลานจอด" class="sp-btn sp-btn-outline">แก้ไข</a>
 
-                                        <form method="POST" action="{{ route('owner.parking-lots.toggle', $lot->id) }}">
-                                            @csrf @method('PATCH')
-                                            <button type="submit"
-                                                title="{{ $lot->is_active ? 'ปิดรับรถชั่วคราว' : 'เปิดรับรถ' }}"
-                                                class="sp-btn sp-btn-outline">
-                                                {{ $lot->is_active ? 'ปิด' : 'เปิด' }}
-                                            </button>
-                                        </form>
 
                                         <form method="POST" action="{{ route('owner.parking-lots.destroy', $lot->id) }}"
                                             onsubmit="return confirm('ยืนยันลบลานจอดนี้?')">

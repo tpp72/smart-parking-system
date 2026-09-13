@@ -18,13 +18,8 @@
             @endif
 
             <div class="sp-card rounded-2xl p-6" x-data="{
-                allSlots: {{ Js::from($slots) }},
                 allLots: {{ Js::from($lots) }},
                 lotId: '{{ old('parking_lot_id') }}',
-                get filteredSlots() {
-                    if (!this.lotId) return [];
-                    return this.allSlots.filter(s => String(s.parking_lot_id) === String(this.lotId));
-                },
                 get deposit() {
                     if (!this.lotId) return null;
                     const lot = this.allLots.find(l => String(l.id) === String(this.lotId));
@@ -98,7 +93,7 @@
                         <x-input-label for="parking_lot_id" value="ลานจอด (Parking Lot)" />
                         @if ($lots->isEmpty())
                             <div class="mt-2 rounded-xl border border-yellow-700/40 bg-yellow-900/10 p-3">
-                                <p class="text-yellow-300 text-sm">ขณะนี้ยังไม่มีลานจอดที่เปิดรับจองล่วงหน้า</p>
+                                <p class="text-yellow-300 text-sm">ขณะนี้ยังไม่มีลานจอดที่เปิดรับจองและมีช่องว่าง</p>
                             </div>
                         @else
                             <select id="parking_lot_id" name="parking_lot_id"
@@ -116,25 +111,14 @@
                         <x-input-error :messages="$errors->get('parking_lot_id')" class="mt-2" />
                         <div x-show="deposit !== null" x-cloak
                              class="mt-2 rounded-xl border border-yellow-700/40 bg-yellow-900/10 p-3 text-sm text-yellow-300">
-                            ค่ามัดจำ: <strong>฿<span x-text="deposit"></span></strong> (1 ชั่วโมง)
-                            — หักจากค่าจอดเมื่อ Check-Out
+                            ค่ามัดจำ: <strong>฿<span x-text="deposit"></span></strong> (ค่าจอด 1 ชั่วโมง)
+                            — ชำระแล้วรอเจ้าหน้าที่ยืนยันรับเงิน การจองจึงจะได้รับการยืนยัน · หักจากค่าจอดเมื่อ Check-Out · ยกเลิกแล้วไม่คืนเงินมัดจำ
                         </div>
                     </div>
 
-                    {{-- ช่องจอด (filter by lot) --}}
-                    <div>
-                        <x-input-label for="parking_slot_id" value="ช่องจอด — ไม่บังคับ" />
-                        <select id="parking_slot_id" name="parking_slot_id"
-                            class="sp-select mt-1 w-full @error('parking_slot_id') border-red-500 @enderror">
-                            <option value="">-- ให้ระบบจัดให้ --</option>
-                            <template x-for="slot in filteredSlots" :key="slot.id">
-                                <option :value="slot.id" :selected="slot.id == {{ old('parking_slot_id', 0) }}"
-                                    x-text="slot.slot_number">
-                                </option>
-                            </template>
-                        </select>
-                        <p class="text-xs text-gray-400 mt-1">แสดงเฉพาะช่องที่ว่างในลานที่เลือก</p>
-                        <x-input-error :messages="$errors->get('parking_slot_id')" class="mt-2" />
+                    {{-- ช่องจอด: ระบบจัดสรรให้อัตโนมัติ (User เลือกได้เฉพาะลาน) --}}
+                    <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-gray-300">
+                        ระบบจะจัดสรรช่องจอดให้อัตโนมัติเมื่อยืนยันรับเงินมัดจำแล้ว
                     </div>
 
                     {{-- เวลาเริ่ม --}}

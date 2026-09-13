@@ -39,17 +39,19 @@ class AdminSuspiciousVehicleTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.suspicious-vehicles.store'), [
-                'license_plate' => 'AB-1234',
-                'reason'        => 'Suspicious behaviour',
-                'level'         => 'high',
-                'is_active'     => '1',
+                'license_plate'  => 'กข 1234',
+                'plate_province' => 'กรุงเทพมหานคร',
+                'reason'         => 'Suspicious behaviour',
+                'level'          => 'high',
+                'is_active'      => '1',
             ])
             ->assertRedirect(route('admin.suspicious-vehicles.index'))
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('suspicious_vehicles', [
-            'license_plate' => 'AB-1234',
-            'level'         => 'high',
+            'license_plate'  => 'กข 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
+            'level'          => 'high',
         ]);
     }
 
@@ -62,10 +64,11 @@ class AdminSuspiciousVehicleTest extends TestCase
 
         $this->actingAs($admin)
             ->patch(route('admin.suspicious-vehicles.update', $entry), [
-                'license_plate' => $entry->license_plate,
-                'reason'        => 'Updated reason',
-                'level'         => 'high',
-                'is_active'     => '1',
+                'license_plate'  => $entry->license_plate,
+                'plate_province' => $entry->plate_province,
+                'reason'         => 'Updated reason',
+                'level'          => 'high',
+                'is_active'      => '1',
             ])
             ->assertRedirect(route('admin.suspicious-vehicles.index'))
             ->assertSessionHas('success');
@@ -156,7 +159,6 @@ class AdminSuspiciousVehicleTest extends TestCase
             ->get(route('admin.suspicious-vehicles.index'));
 
         $response->assertStatus(200);
-        // Page 1 has exactly 15 entries
         $this->assertSame(15, $response->viewData('entries')->count());
     }
 
@@ -168,8 +170,9 @@ class AdminSuspiciousVehicleTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.suspicious-vehicles.store'), [
-                'license_plate' => 'XY-5678',
-                'level'         => 'medium',
+                'license_plate'  => 'XY-5678',
+                'plate_province' => 'ชลบุรี',
+                'level'          => 'medium',
             ]);
 
         $this->assertDatabaseHas('suspicious_vehicles', [
@@ -178,18 +181,51 @@ class AdminSuspiciousVehicleTest extends TestCase
         ]);
     }
 
-    // ─── [9] duplicate license plate is rejected ──────────────────────────────
+    // ─── [9] duplicate license plate + province is rejected ──────────────────
 
-    public function test_duplicate_license_plate_is_rejected(): void
+    public function test_duplicate_license_plate_and_province_is_rejected(): void
     {
         $admin = $this->admin();
-        SuspiciousVehicle::factory()->create(['license_plate' => 'DUP-001']);
+        SuspiciousVehicle::factory()->create(['license_plate' => 'DUP-001', 'plate_province' => 'ภูเก็ต']);
 
         $this->actingAs($admin)
             ->post(route('admin.suspicious-vehicles.store'), [
-                'license_plate' => 'DUP-001',
-                'level'         => 'low',
+                'license_plate'  => 'DUP-001',
+                'plate_province' => 'ภูเก็ต',
+                'level'          => 'low',
             ])
             ->assertSessionHasErrors('license_plate');
+    }
+
+    // ─── [10] same plate in another province is allowed ──────────────────────
+
+    public function test_same_plate_in_different_province_is_allowed(): void
+    {
+        $admin = $this->admin();
+        SuspiciousVehicle::factory()->create(['license_plate' => 'DUP-002', 'plate_province' => 'ภูเก็ต']);
+
+        $this->actingAs($admin)
+            ->post(route('admin.suspicious-vehicles.store'), [
+                'license_plate'  => 'DUP-002',
+                'plate_province' => 'สงขลา',
+                'level'          => 'low',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('suspicious_vehicles', 2);
+    }
+
+    // ─── [11] province is required ───────────────────────────────────────────
+
+    public function test_province_is_required(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->post(route('admin.suspicious-vehicles.store'), [
+                'license_plate' => 'NO-PROV',
+                'level'         => 'low',
+            ])
+            ->assertSessionHasErrors('plate_province');
     }
 }

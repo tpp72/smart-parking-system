@@ -17,6 +17,7 @@ class SuspiciousVehicleController extends Controller
         $entries = SuspiciousVehicle::with('addedBy:id,name')
             ->when($q !== '', fn ($query) => $query->where(function ($qq) use ($q) {
                 $qq->where('license_plate', 'ilike', "%{$q}%")
+                    ->orWhere('plate_province', 'ilike', "%{$q}%")
                     ->orWhere('reason', 'ilike', "%{$q}%");
             }))
             ->orderByDesc('created_at')
@@ -35,11 +36,19 @@ class SuspiciousVehicleController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge(['license_plate' => strtoupper(trim((string) $request->input('license_plate')))]);
+
         $data = $request->validate([
-            'license_plate' => ['required', 'string', 'max:20', Rule::unique('suspicious_vehicles', 'license_plate')],
-            'reason'        => ['nullable', 'string', 'max:500'],
-            'level'         => ['required', Rule::in(['low', 'medium', 'high'])],
-            'is_active'     => ['boolean'],
+            // Blacklist ระบุรถด้วย ทะเบียน + จังหวัด
+            'license_plate'  => [
+                'required', 'string', 'max:20',
+                Rule::unique('suspicious_vehicles', 'license_plate')
+                    ->where('plate_province', (string) $request->input('plate_province')),
+            ],
+            'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
+            'reason'         => ['nullable', 'string', 'max:500'],
+            'level'          => ['required', Rule::in(['low', 'medium', 'high'])],
+            'is_active'      => ['boolean'],
         ]);
 
         $data['added_by'] = Auth::id();
@@ -48,12 +57,13 @@ class SuspiciousVehicleController extends Controller
         $entry = SuspiciousVehicle::create($data);
 
         admin_audit('suspicious_vehicle.create', $entry, [
-            'license_plate' => $entry->license_plate,
-            'level'         => $entry->level,
+            'license_plate'  => $entry->license_plate,
+            'plate_province' => $entry->plate_province,
+            'level'          => $entry->level,
         ]);
 
         return redirect()->route('admin.suspicious-vehicles.index')
-            ->with('success', "เพิ่มทะเบียน {$entry->license_plate} ในบัญชีดำเรียบร้อยแล้ว");
+            ->with('success', "เพิ่มทะเบียน {$entry->license_plate} {$entry->plate_province} ในบัญชีดำเรียบร้อยแล้ว");
     }
 
     public function edit(SuspiciousVehicle $suspiciousVehicle)
@@ -63,14 +73,19 @@ class SuspiciousVehicleController extends Controller
 
     public function update(Request $request, SuspiciousVehicle $suspiciousVehicle)
     {
+        $request->merge(['license_plate' => strtoupper(trim((string) $request->input('license_plate')))]);
+
         $data = $request->validate([
-            'license_plate' => [
+            'license_plate'  => [
                 'required', 'string', 'max:20',
-                Rule::unique('suspicious_vehicles', 'license_plate')->ignore($suspiciousVehicle->id),
+                Rule::unique('suspicious_vehicles', 'license_plate')
+                    ->where('plate_province', (string) $request->input('plate_province'))
+                    ->ignore($suspiciousVehicle->id),
             ],
-            'reason'    => ['nullable', 'string', 'max:500'],
-            'level'     => ['required', Rule::in(['low', 'medium', 'high'])],
-            'is_active' => ['boolean'],
+            'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
+            'reason'         => ['nullable', 'string', 'max:500'],
+            'level'          => ['required', Rule::in(['low', 'medium', 'high'])],
+            'is_active'      => ['boolean'],
         ]);
 
         $data['is_active'] = $request->boolean('is_active', false);
@@ -78,8 +93,9 @@ class SuspiciousVehicleController extends Controller
         $suspiciousVehicle->update($data);
 
         admin_audit('suspicious_vehicle.update', $suspiciousVehicle, [
-            'license_plate' => $suspiciousVehicle->license_plate,
-            'level'         => $suspiciousVehicle->level,
+            'license_plate'  => $suspiciousVehicle->license_plate,
+            'plate_province' => $suspiciousVehicle->plate_province,
+            'level'          => $suspiciousVehicle->level,
         ]);
 
         return redirect()->route('admin.suspicious-vehicles.index')
@@ -91,8 +107,9 @@ class SuspiciousVehicleController extends Controller
         $plate = $suspiciousVehicle->license_plate;
 
         admin_audit('suspicious_vehicle.delete', $suspiciousVehicle, [
-            'license_plate' => $plate,
-            'level'         => $suspiciousVehicle->level,
+            'license_plate'  => $plate,
+            'plate_province' => $suspiciousVehicle->plate_province,
+            'level'          => $suspiciousVehicle->level,
         ]);
 
         $suspiciousVehicle->delete();

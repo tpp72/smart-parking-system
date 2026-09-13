@@ -7,7 +7,6 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Payment;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,12 +27,10 @@ class CheckOutTest extends TestCase
 
     private function makeActiveLog(array $attrs = []): ParkingLog
     {
-        $lot     = ParkingLot::factory()->create(['hourly_rate' => 30.00]);
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
-        $vehicle = Vehicle::factory()->create();
+        $lot  = ParkingLot::factory()->create(['hourly_rate' => 30.00]);
+        $slot = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
 
         return ParkingLog::factory()->create(array_merge([
-            'vehicle_id'      => $vehicle->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'check_in_time'   => now()->subHours(2),
@@ -62,8 +59,9 @@ class CheckOutTest extends TestCase
         // check_out_time ถูก set
         $this->assertNotNull($log->fresh()->check_out_time);
 
-        // payment ถูกสร้าง
+        // checkout payment ถูกสร้าง
         $this->assertDatabaseHas('payments', [
+            'type'           => Payment::TYPE_CHECKOUT,
             'parking_log_id' => $log->id,
             'payment_status' => 'unpaid',
         ]);
@@ -98,6 +96,7 @@ class CheckOutTest extends TestCase
 
         // สมมติมี payment อยู่แล้ว (edge case จาก double-submit)
         Payment::create([
+            'type'                 => Payment::TYPE_CHECKOUT,
             'parking_log_id'       => $log->id,
             'total_hours'          => 1,
             'hourly_rate'          => 30.00,

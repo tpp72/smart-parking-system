@@ -42,7 +42,7 @@
                             <th class="py-3 pr-4 text-left">เจ้าของ</th>
                             <th class="py-3 pr-4 text-left">ช่อง</th>
                             <th class="py-3 pr-4 text-left">เรท/ชม.</th>
-                            <th class="py-3 pr-4 text-center">สถานะ</th>
+                            <th class="py-3 pr-4 text-center">รับจอง</th>
                             <th class="py-3 pr-4 text-right">จัดการ</th>
                         </tr>
                     </thead>
@@ -59,7 +59,7 @@
                                     {{ number_format((float) $lot->hourly_rate, 2) }}
                                 </td>
                                 <td class="py-3 pr-4 text-center">
-                                    @if($lot->is_active)
+                                    @if($lot->reservations_enabled)
                                         <span class="sp-badge sp-badge-ok">เปิด</span>
                                     @else
                                         <span class="sp-badge sp-badge-danger">ปิด</span>

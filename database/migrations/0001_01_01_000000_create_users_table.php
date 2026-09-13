@@ -18,8 +18,12 @@ return new class extends Migration
             $table->string('role')->default('user');
             $table->string('owner_status')->nullable();
             $table->boolean('force_password_reset')->default(false);
+            // บัญชีของระบบ (เช่น Walkin User) — ไม่ใช่ลูกค้าจริง ห้าม Login
+            $table->boolean('is_system')->default(false);
             $table->rememberToken();
             $table->timestamps(0);
+
+            $table->index('role');
         });
 
         DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('user','owner','admin'))");

@@ -3,8 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\ParkingLot;
-use App\Models\ParkingSlot;
-use App\Models\Vehicle;
+use App\Models\Reservation;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ParkingLogFactory extends Factory
@@ -14,11 +13,25 @@ class ParkingLogFactory extends Factory
         $checkIn = $this->faker->dateTimeBetween('-7 days', '-1 hour');
 
         return [
-            'vehicle_id'      => Vehicle::factory(),
             'parking_lot_id'  => ParkingLot::factory(),
             'parking_slot_id' => null,
+            'license_plate'   => $this->faker->randomElement(['กข', 'ขค', 'คง', 'งจ', 'จฉ', 'ชซ', 'พร', 'สต'])
+                . ' ' . $this->faker->unique()->numberBetween(1000, 9999),
+            'plate_province'  => $this->faker->randomElement(config('thai_provinces')),
+            'brand'           => $this->faker->randomElement(['Toyota', 'Honda', 'Isuzu', 'Ford', 'Mazda', 'Nissan']),
+            'color'           => $this->faker->randomElement(config('car_colors')),
             'check_in_time'   => $checkIn,
             'check_out_time'  => null,
+            // ทุกการจอดมาจาก Reservation — ค่าเริ่มต้นเป็น Walk-in ของรถคันเดียวกันในลานเดียวกัน (ต้องอยู่ท้ายสุด)
+            'reservation_id'  => fn (array $attrs) => Reservation::factory()->walkIn()->create([
+                'parking_lot_id' => $attrs['parking_lot_id'],
+                'license_plate'  => $attrs['license_plate'],
+                'plate_province' => $attrs['plate_province'],
+                'brand'          => $attrs['brand'],
+                'color'          => $attrs['color'],
+                'reserve_start'  => $attrs['check_in_time'],
+                'checked_in_at'  => $attrs['check_in_time'],
+            ])->id,
         ];
     }
 

@@ -50,8 +50,19 @@
                                     {{ \Carbon\Carbon::parse($r->reserve_start)->format('d/m/Y H:i') }}
                                 </td>
                                 <td class="py-3 pr-4 text-right whitespace-nowrap">
-                                    @if ($r->reservation_fee > 0)
-                                        <span class="text-yellow-300">฿{{ number_format($r->reservation_fee, 2) }}</span>
+                                    @if ((float) $r->deposit_amount > 0)
+                                        <span class="text-yellow-300">฿{{ number_format((float) $r->deposit_amount, 2) }}</span>
+                                        @php
+                                            [$depositLabel, $depositClass] = match ($r->depositPayment?->payment_status) {
+                                                'paid'   => ['ยืนยันรับเงินแล้ว', 'text-green-400'],
+                                                'void'   => ['ยกเลิก (void)', 'text-gray-500'],
+                                                'unpaid' => ['รอยืนยันรับเงิน', 'text-yellow-500'],
+                                                default  => ['', ''],
+                                            };
+                                        @endphp
+                                        @if ($depositLabel)
+                                            <span class="block text-xs {{ $depositClass }}">{{ $depositLabel }}</span>
+                                        @endif
                                     @else
                                         <span class="text-gray-600">—</span>
                                     @endif

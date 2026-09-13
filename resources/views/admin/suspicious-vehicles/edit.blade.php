@@ -8,7 +8,7 @@
                     ← กลับ
                 </a>
                 <h1 class="text-xl font-extrabold tracking-tight sp-glow-text mt-1">แก้ไขบัญชีดำ</h1>
-                <p class="text-gray-400 text-sm mt-0.5 font-mono">{{ $suspiciousVehicle->license_plate }}</p>
+                <p class="text-gray-400 text-sm mt-0.5 font-mono">{{ $suspiciousVehicle->license_plate }} {{ $suspiciousVehicle->plate_province }}</p>
             </div>
 
             <div class="sp-card rounded-2xl p-6">
@@ -24,6 +24,17 @@
                             value="{{ old('license_plate', $suspiciousVehicle->license_plate) }}"
                             required autofocus />
                         <x-input-error :messages="$errors->get('license_plate')" class="mt-1" />
+                    </div>
+
+                    {{-- Province --}}
+                    <div>
+                        <x-input-label for="plate_province" value="จังหวัด *" />
+                        <select id="plate_province" name="plate_province" required class="sp-select mt-1 w-full">
+                            @foreach (config('thai_provinces') as $province)
+                                <option value="{{ $province }}" @selected(old('plate_province', $suspiciousVehicle->plate_province) === $province)>{{ $province }}</option>
+                            @endforeach
+                        </select>
+                        <x-input-error :messages="$errors->get('plate_province')" class="mt-1" />
                     </div>
 
                     {{-- Reason --}}

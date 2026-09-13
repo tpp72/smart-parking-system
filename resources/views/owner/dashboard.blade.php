@@ -181,7 +181,7 @@
                                 <th class="py-2 pr-4 text-right">ใช้งาน</th>
                                 <th class="py-2 pr-4 text-right">ทั้งหมด</th>
                                 <th class="py-2 pr-4 text-right">เรท/ชม.</th>
-                                <th class="py-2 pr-4 text-right">สถานะ</th>
+                                <th class="py-2 pr-4 text-right">รับจอง</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -196,7 +196,7 @@
                                 <td class="py-3 pr-4 text-right text-gray-300">{{ $lot->total_slots }}</td>
                                 <td class="py-3 pr-4 text-right text-gray-300">{{ number_format((float)$lot->hourly_rate, 0) }}</td>
                                 <td class="py-3 pr-4 text-right">
-                                    @if($lot->is_active)
+                                    @if($lot->reservations_enabled)
                                         <span class="sp-badge sp-badge-ok">เปิด</span>
                                     @else
                                         <span class="sp-badge sp-badge-danger">ปิด</span>
