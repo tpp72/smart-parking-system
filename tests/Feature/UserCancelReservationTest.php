@@ -5,10 +5,10 @@ namespace Tests\Feature;
 use App\Models\Notification;
 use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
+use App\Models\Payment;
 use App\Models\Reservation;
-use App\Models\ReservationLog;
 use App\Models\User;
-use App\Models\Vehicle;
+use App\Services\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -33,11 +33,25 @@ class UserCancelReservationTest extends TestCase
 
         return Reservation::factory()->create([
             'user_id'         => $user->id,
-            'vehicle_id'      => Vehicle::factory()->create(['user_id' => $user->id])->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot?->id,
             'reserve_start'   => now()->addHour(),
             'status'          => $status,
+        ]);
+    }
+
+    /** จองผ่าน Flow จริง (มี Deposit Payment) */
+    private function bookWithDeposit(User $user): Reservation
+    {
+        $lot = ParkingLot::factory()->create(['hourly_rate' => 30]);
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
+
+        return app(ReservationService::class)->create($user, $lot, [
+            'license_plate'  => 'กข 2468',
+            'plate_province' => 'นนทบุรี',
+            'brand'          => 'Isuzu',
+            'color'          => 'เทา',
+            'reserve_start'  => now()->addHours(2),
         ]);
     }
 
@@ -167,7 +181,6 @@ class UserCancelReservationTest extends TestCase
 
         $reservation = Reservation::factory()->create([
             'user_id'         => $user->id,
-            'vehicle_id'      => Vehicle::factory()->create(['user_id' => $user->id])->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->addHour(),
@@ -218,5 +231,37 @@ class UserCancelReservationTest extends TestCase
         $notification = Notification::where('user_id', $user->id)->latest()->first();
         $this->assertNotNull($notification);
         $this->assertStringContainsString((string) $reservation->id, $notification->message);
+    }
+
+    // ─── [10] ยกเลิกก่อนชำระ → Deposit void ─────────────────────────────────
+
+    public function test_cancel_before_payment_voids_deposit(): void
+    {
+        $user        = $this->user();
+        $reservation = $this->bookWithDeposit($user);
+
+        $this->actingAs($user)->post($this->cancelRoute($reservation))->assertSessionHas('success');
+
+        $this->assertSame(Payment::STATUS_VOID, $reservation->depositPayment->fresh()->payment_status);
+    }
+
+    // ─── [11] ยกเลิกหลังชำระ → ไม่คืนเงินมัดจำ ──────────────────────────────
+
+    public function test_cancel_after_payment_does_not_refund_deposit(): void
+    {
+        $user        = $this->user();
+        $reservation = $this->bookWithDeposit($user);
+        $admin       = User::factory()->create(['role' => 'admin']);
+
+        app(ReservationService::class)->markDepositPaid($reservation->depositPayment, $admin);
+        $this->assertSame('confirmed', $reservation->fresh()->status);
+
+        $this->actingAs($user)->post($this->cancelRoute($reservation))->assertSessionHas('success');
+
+        $this->assertSame('cancelled', $reservation->fresh()->status);
+        $this->assertSame(Payment::STATUS_PAID, $reservation->depositPayment->fresh()->payment_status);
+
+        $notification = Notification::where('user_id', $user->id)->where('title', 'ยกเลิกการจองเรียบร้อยแล้ว')->first();
+        $this->assertStringContainsString('ไม่คืนเงินมัดจำ', $notification->message);
     }
 }

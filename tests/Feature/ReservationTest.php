@@ -6,7 +6,6 @@ use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,177 +30,162 @@ class ReservationTest extends TestCase
             ->post(route('user.reservations.store'), $payload);
     }
 
+    /** ข้อมูลจองแบบ Plate-based: ทะเบียน + จังหวัด + ยี่ห้อ + สี */
     private function payload(array $override = []): array
     {
         return array_merge([
-            'reserve_start' => now()->addHours(2)->format('Y-m-d\TH:i'),
+            'plate_number'   => 'กข 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
+            'brand'          => 'Toyota',
+            'color'          => 'ขาว',
+            'reserve_start'  => now()->addHours(2)->format('Y-m-d\TH:i'),
         ], $override);
     }
 
-    // ─── [1] สำเร็จ ─────────────────────────────────────────────────────────
+    // ─── [1] สำเร็จ — User เลือกได้เฉพาะลาน ─────────────────────────────────
 
     public function test_reservation_success(): void
     {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
 
-        $response = $this->postReservation($user, $this->payload([
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'parking_slot_id' => $slot->id,
-        ]));
+        $response = $this->postReservation($user, $this->payload(['parking_lot_id' => $lot->id]));
 
         $response->assertRedirect(route('user.reservations.index'));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('reservations', [
-            'vehicle_id'      => $vehicle->id,
+            'user_id'         => $user->id,
+            'license_plate'   => 'กข 1234',
+            'plate_province'  => 'กรุงเทพมหานคร',
+            'brand'           => 'Toyota',
+            'color'           => 'ขาว',
             'parking_lot_id'  => $lot->id,
-            'parking_slot_id' => $slot->id,
+            'parking_slot_id' => null,
             'status'          => 'pending',
         ]);
     }
 
-    // ─── [2] ห้ามจอง slot ชนกัน (time overlap) ──────────────────────────────
+    // ─── [2] User เลือก Slot เองไม่ได้ ──────────────────────────────────────
 
-    public function test_reservation_blocked_when_slot_time_overlaps(): void
+    public function test_user_cannot_choose_a_slot(): void
     {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
+        $slot = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
 
-        // จองแรกอยู่ที่ +2h (window +2h ถึง +3h)
-        Reservation::factory()->create([
-            'parking_slot_id' => $slot->id,
+        $form = $this->actingAs($user)->get(route('user.reservations.create'));
+        $form->assertViewMissing('slots');
+        $form->assertDontSee('name="parking_slot_id"', false);
+
+        $this->postReservation($user, $this->payload([
             'parking_lot_id'  => $lot->id,
-            'status'          => 'confirmed',
-            'reserve_start'   => now()->addHours(2),
+            'parking_slot_id' => $slot->id,
+        ]))->assertRedirect(route('user.reservations.index'));
+
+        $this->assertNull(Reservation::firstOrFail()->parking_slot_id);
+        $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);
+    }
+
+    // ─── [3] 1 Active Reservation ต่อ ทะเบียน + จังหวัด ─────────────────────
+
+    public function test_reservation_blocked_when_same_plate_and_province_is_active(): void
+    {
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
+
+        Reservation::factory()->create([
+            'parking_lot_id' => $lot->id,
+            'license_plate'  => 'กข 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
+            'status'         => 'confirmed',
         ]);
 
-        // จองที่สอง: +2.5h (ทับกัน)
-        $response = $this->postReservation($user, $this->payload([
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'parking_slot_id' => $slot->id,
-            'reserve_start'   => now()->addMinutes(150)->format('Y-m-d\TH:i'),
-        ]));
+        $response = $this->postReservation($user, $this->payload(['parking_lot_id' => $lot->id]));
 
-        $response->assertSessionHasErrors('parking_slot_id');
+        $response->assertSessionHasErrors('license_plate');
         $this->assertDatabaseCount('reservations', 1);
     }
 
-    // ─── [3] อนุญาตจอง slot เดิมได้ถ้าเวลาไม่ทับ ────────────────────────────
-
-    public function test_reservation_allowed_when_slot_times_do_not_overlap(): void
-    {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-
-        // จองแรก +2h (window: +2h to +3h)
-        Reservation::factory()->create([
-            'parking_slot_id' => $slot->id,
-            'parking_lot_id'  => $lot->id,
-            'status'          => 'confirmed',
-            'reserve_start'   => now()->addHours(2),
-        ]);
-
-        // จองที่สอง: +4h ไม่ทับ (window: +4h to +5h)
-        $response = $this->postReservation($user, $this->payload([
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'parking_slot_id' => $slot->id,
-            'reserve_start'   => now()->addHours(4)->format('Y-m-d\TH:i'),
-        ]));
-
-        $response->assertRedirect(route('user.reservations.index'));
-        $this->assertDatabaseCount('reservations', 2);
-    }
-
-    // ─── [4] slot ของ cancelled ไม่ถือว่าชน ─────────────────────────────────
-
-    public function test_cancelled_reservation_does_not_block_new_booking(): void
-    {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-
-        // จองที่ถูก cancel แล้ว
-        Reservation::factory()->create([
-            'parking_slot_id' => $slot->id,
-            'parking_lot_id'  => $lot->id,
-            'status'          => 'cancelled',
-            'reserve_start'   => now()->addHours(2),
-        ]);
-
-        // จองเวลาเดียวกันได้ เพราะของเก่า cancel แล้ว
-        $response = $this->postReservation($user, $this->payload([
-            'vehicle_id'      => $vehicle->id,
-            'parking_lot_id'  => $lot->id,
-            'parking_slot_id' => $slot->id,
-            'reserve_start'   => now()->addHours(2)->format('Y-m-d\TH:i'),
-        ]));
-
-        $response->assertRedirect(route('user.reservations.index'));
-        $this->assertDatabaseCount('reservations', 2);
-    }
-
-    // ─── [5] ห้ามจองรถของคนอื่น ─────────────────────────────────────────────
-
-    public function test_user_cannot_reserve_other_users_vehicle(): void
-    {
-        $user         = $this->user();
-        $otherUser    = $this->user();
-        $lot          = ParkingLot::factory()->create();
-        $otherVehicle = Vehicle::factory()->create(['user_id' => $otherUser->id]);
-
-        $response = $this->postReservation($user, $this->payload([
-            'vehicle_id'     => $otherVehicle->id,
-            'parking_lot_id' => $lot->id,
-        ]));
-
-        $response->assertForbidden();
-        $this->assertDatabaseCount('reservations', 0);
-    }
-
-    // ─── [6] ห้ามจองเวลาในอดีต ──────────────────────────────────────────────
+    // ─── [4] ห้ามจองเวลาในอดีต ──────────────────────────────────────────────
 
     public function test_reservation_blocked_when_start_time_in_past(): void
     {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
 
-        $response = $this->postReservation($user, [
-            'vehicle_id'    => $vehicle->id,
+        $response = $this->postReservation($user, $this->payload([
             'parking_lot_id' => $lot->id,
-            'reserve_start' => now()->subHour()->format('Y-m-d\TH:i'),
-        ]);
+            'reserve_start'  => now()->subHour()->format('Y-m-d\TH:i'),
+        ]));
 
         $response->assertSessionHasErrors('reserve_start');
         $this->assertDatabaseCount('reservations', 0);
     }
 
-    // ─── [7] ห้ามจองล่วงหน้าเกิน 24 ชั่วโมง ────────────────────────────────
+    // ─── [5] ห้ามจองล่วงหน้าเกิน 1 วัน ─────────────────────────────────────
 
-    public function test_reservation_blocked_when_start_time_more_than_24h_ahead(): void
+    public function test_reservation_blocked_when_start_time_more_than_one_day_ahead(): void
     {
-        $user    = $this->user();
-        $lot     = ParkingLot::factory()->create();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
 
-        $response = $this->postReservation($user, [
-            'vehicle_id'    => $vehicle->id,
+        $response = $this->postReservation($user, $this->payload([
             'parking_lot_id' => $lot->id,
-            'reserve_start' => now()->addDays(2)->format('Y-m-d\TH:i'),
-        ]);
+            'reserve_start'  => now()->addDays(2)->format('Y-m-d\TH:i'),
+        ]));
 
         $response->assertSessionHasErrors('reserve_start');
         $this->assertDatabaseCount('reservations', 0);
+    }
+
+    // ─── [6] สร้าง Deposit Payment = hourly_rate × 1 · pending ไม่ถือครอง Slot ─
+
+    public function test_reservation_creates_unpaid_one_hour_deposit_and_holds_no_slot(): void
+    {
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create(['hourly_rate' => 45]);
+        $slot = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
+
+        $this->postReservation($user, $this->payload(['parking_lot_id' => $lot->id]))
+            ->assertRedirect(route('user.reservations.index'))
+            ->assertSessionHas('success');
+
+        $reservation = Reservation::firstOrFail();
+
+        $this->assertSame('pending', $reservation->status);
+        $this->assertEquals(45, (float) $reservation->deposit_amount);
+        $this->assertEquals(45, (float) $reservation->reservation_fee);
+
+        $this->assertDatabaseHas('payments', [
+            'type'           => 'deposit',
+            'reservation_id' => $reservation->id,
+            'parking_log_id' => null,
+            'total_amount'   => 45,
+            'payment_status' => 'unpaid',
+        ]);
+        $this->assertDatabaseCount('payments', 1);
+
+        $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);
+    }
+
+    // ─── [7] ลานเต็มไม่แสดงให้จอง และจองไม่ได้ ───────────────────────────────
+
+    public function test_full_lot_is_hidden_and_cannot_be_booked(): void
+    {
+        $user    = $this->user();
+        $fullLot = ParkingLot::factory()->create();
+        ParkingSlot::factory()->occupied()->create(['parking_lot_id' => $fullLot->id]);
+        ParkingSlot::factory()->reserved()->create(['parking_lot_id' => $fullLot->id]);
+
+        $lots = $this->actingAs($user)->get(route('user.reservations.create'))->viewData('lots');
+        $this->assertFalse($lots->contains('id', $fullLot->id));
+
+        $this->postReservation($user, $this->payload(['parking_lot_id' => $fullLot->id]))
+            ->assertSessionHasErrors('parking_lot_id');
+
+        $this->assertDatabaseCount('reservations', 0);
+        $this->assertDatabaseCount('payments', 0);
     }
 }

@@ -92,7 +92,7 @@
                             @endphp
                             <tr class="border-b sp-divider text-sm">
                                 <td class="py-3 pr-4 text-gray-400">{{ $r->id }}</td>
-                                <td class="py-3 pr-4 font-bold text-red-300">{{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}</td>
+                                <td class="py-3 pr-4 font-bold text-red-300">{{ $r->license_plate ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->user?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-300">
                                     {{ $r->parkingLot?->name ?? '-' }}
@@ -113,12 +113,6 @@
                                 </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex justify-end gap-2 flex-wrap">
-                                        @if($r->status === 'pending')
-                                            <form method="POST" action="{{ route('owner.reservations.confirm', $r) }}">
-                                                @csrf
-                                                <button type="submit" class="sp-btn sp-btn-primary text-xs px-3 py-1">ยืนยัน</button>
-                                            </form>
-                                        @endif
                                         @if($isCheckable)
                                             <form method="POST" action="{{ route('owner.reservations.check-in', $r) }}">
                                                 @csrf
@@ -134,7 +128,7 @@
                                                 title="เช็คเอาท์รถของการจองนี้"
                                                 class="sp-btn sp-btn-outline border-yellow-600/50 text-yellow-300 hover:bg-yellow-900/30 text-xs px-3 py-1"
                                                 @click="openCheckoutModal(
-                                                    '{{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}',
+                                                    '{{ $r->license_plate ?? '-' }}',
                                                     {{ $hoursElapsed }},
                                                     {{ $estimatedFee }},
                                                     '{{ route('owner.reservations.check-out', $r) }}'
@@ -142,7 +136,7 @@
                                                 เช็คเอาท์
                                             </button>
                                         @endif
-                                        @if(!in_array($r->status, ['pending', 'checked_in'], true) && !$isCheckable)
+                                        @if($r->status !== 'checked_in' && !$isCheckable)
                                             <span class="text-gray-600 text-xs">—</span>
                                         @endif
                                     </div>

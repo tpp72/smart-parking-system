@@ -7,7 +7,6 @@ use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,16 +27,14 @@ class ExpireReservationsTest extends TestCase
 
     private function pastReservation(array $state = []): Reservation
     {
-        $user    = $this->user();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-        $lot     = ParkingLot::factory()->create();
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create();
 
         return Reservation::factory()->create(array_merge([
-            'user_id'       => $user->id,
-            'vehicle_id'    => $vehicle->id,
+            'user_id'        => $user->id,
             'parking_lot_id' => $lot->id,
-            'reserve_start' => now()->subHours(2),
-            'status'        => 'confirmed',
+            'reserve_start'  => now()->subHours(2),
+            'status'         => 'confirmed',
         ], $state));
     }
 
@@ -59,7 +56,7 @@ class ExpireReservationsTest extends TestCase
 
     public function test_reservations_within_grace_period_are_not_expired(): void
     {
-        // reserve_start 10 min ago — inside default 30-min grace
+        // reserve_start 10 min ago — inside grace period
         $r = $this->pastReservation([
             'reserve_start' => now()->subMinutes(10),
         ]);
@@ -82,12 +79,8 @@ class ExpireReservationsTest extends TestCase
             'status'         => 'reserved',
         ]);
 
-        $user    = $this->user();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-
         Reservation::factory()->create([
-            'user_id'         => $user->id,
-            'vehicle_id'      => $vehicle->id,
+            'user_id'         => $this->user()->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->subHours(2),
@@ -109,12 +102,8 @@ class ExpireReservationsTest extends TestCase
         $lot  = ParkingLot::factory()->create();
         $slot = ParkingSlot::factory()->occupied()->create(['parking_lot_id' => $lot->id]);
 
-        $user    = $this->user();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-
         Reservation::factory()->create([
-            'user_id'         => $user->id,
-            'vehicle_id'      => $vehicle->id,
+            'user_id'         => $this->user()->id,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
             'reserve_start'   => now()->subHours(2),
@@ -134,11 +123,10 @@ class ExpireReservationsTest extends TestCase
 
     public function test_already_expired_reservations_are_not_reprocessed(): void
     {
-        $r = $this->pastReservation(['status' => 'expired']);
+        $this->pastReservation(['status' => 'expired']);
 
         $this->artisan('reservations:expire')->assertExitCode(0);
 
-        // Only 1 reservation_log row ever (none added by command)
         $this->assertDatabaseCount('reservation_logs', 0);
     }
 

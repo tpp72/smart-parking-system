@@ -19,8 +19,9 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 class="text-3xl font-extrabold sp-glow-text">จัดการการจอง (Reservations)</h1>
-                    <p class="text-gray-300 mt-1">ค้นหา / กรอง / ยืนยัน / เช็คอิน-เช็คเอาท์ / แก้ไขสถานะ / ลบ</p>
+                    <p class="text-gray-300 mt-1">ค้นหา / กรอง / เช็คอิน-เช็คเอาท์ / ยกเลิก — ยืนยันการจองด้วยการยืนยันรับเงินมัดจำในหน้าชำระเงิน</p>
                 </div>
+                <a href="{{ route('admin.payments.index') }}" class="sp-btn sp-btn-outline">ยืนยันรับเงินมัดจำ →</a>
             </div>
 
             @if (session('success'))
@@ -50,7 +51,7 @@
 
                     <select name="status" class="sp-select">
                         <option value="">ทุกสถานะ</option>
-                        @foreach (['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'] as $st)
+                        @foreach (\App\Models\Reservation::STATUSES as $st)
                             <option value="{{ $st }}" @selected($status === $st)>{{ $st }}</option>
                         @endforeach
                     </select>
@@ -75,7 +76,7 @@
                             <th class="py-3 pr-4 text-left">ลาน</th>
                             <th class="py-3 pr-4 text-left">ช่อง</th>
                             <th class="py-3 pr-4 text-left">เวลาเริ่ม</th>
-                            <th class="py-3 pr-4 text-left">ค่าจอง</th>
+                            <th class="py-3 pr-4 text-left">มัดจำ</th>
                             <th class="py-3 pr-4 text-left">สถานะ</th>
                             <th class="py-3 pr-4" style="text-align:right">จัดการ</th>
                         </tr>
@@ -95,7 +96,8 @@
                             @endphp
                             <tr class="border-b sp-divider">
                                 <td class="py-3 pr-4 font-extrabold tracking-wider">
-                                    {{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}
+                                    {{ $r->license_plate ?? '-' }}
+                                    <span class="block text-xs font-normal text-gray-500">{{ $r->plate_province }}</span>
                                 </td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->user?->name ?? '-' }}</td>
                                 <td class="py-3 pr-4 text-gray-200">{{ $r->parkingLot?->name ?? '-' }}</td>
@@ -104,7 +106,10 @@
                                     {{ $r->reserve_start }}
                                 </td>
                                 <td class="py-3 pr-4 font-bold text-red-200">
-                                    {{ number_format((float) $r->reservation_fee, 2) }}
+                                    {{ number_format((float) $r->deposit_amount, 2) }}
+                                    @if ($r->depositPayment)
+                                        <span class="block text-xs font-normal text-gray-500">{{ $r->depositPayment->payment_status }}</span>
+                                    @endif
                                 </td>
                                 <td class="py-3 pr-4">
                                     @php
@@ -125,16 +130,6 @@
                                 </td>
                                 <td class="py-3 pr-4">
                                     <div class="flex justify-end gap-2 flex-wrap">
-                                        @if($r->status === 'pending')
-                                            <form method="POST" action="{{ route('admin.reservations.confirm', $r) }}">
-                                                @csrf
-                                                <button type="submit"
-                                                    title="ยืนยันและอนุมัติการจองนี้"
-                                                    class="sp-btn sp-btn-outline border-green-600/50 text-green-300 hover:bg-green-900/30">
-                                                    ✓ ยืนยัน
-                                                </button>
-                                            </form>
-                                        @endif
                                         @if($isCheckable)
                                             <form method="POST" action="{{ route('admin.reservations.check-in', $r) }}">
                                                 @csrf
@@ -150,7 +145,7 @@
                                                 title="เช็คเอาท์รถของการจองนี้"
                                                 class="sp-btn sp-btn-outline border-yellow-600/50 text-yellow-300 hover:bg-yellow-900/30"
                                                 @click="openCheckoutModal(
-                                                    '{{ $r->license_plate ?? $r->vehicle?->license_plate ?? '-' }}',
+                                                    '{{ $r->license_plate ?? '-' }}',
                                                     {{ $hoursElapsed }},
                                                     {{ $estimatedFee }},
                                                     '{{ route('admin.reservations.check-out', $r) }}'
@@ -158,14 +153,13 @@
                                                 เช็คเอาท์
                                             </button>
                                         @endif
-                                        <a href="{{ route('admin.reservations.edit', $r) }}"
-                                            class="sp-btn sp-btn-outline">แก้ไข</a>
-                                        <form method="POST" action="{{ route('admin.reservations.destroy', $r) }}"
-                                            onsubmit="return confirm('ยืนยันลบ reservation นี้? (ลบถาวร)')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" title="ลบ Reservation นี้ (ถาวร)" class="sp-btn sp-btn-danger">ลบ</button>
-                                        </form>
+                                        @if($r->canTransitionTo('cancelled'))
+                                            <form method="POST" action="{{ route('admin.reservations.cancel', $r) }}"
+                                                onsubmit="return confirm('ยืนยันยกเลิกการจอง #{{ $r->id }}? (ไม่คืนเงินมัดจำที่ชำระแล้ว)')">
+                                                @csrf
+                                                <button type="submit" title="ยกเลิกการจองนี้" class="sp-btn sp-btn-danger">ยกเลิก</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

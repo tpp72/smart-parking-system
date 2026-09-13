@@ -151,19 +151,6 @@ test.describe('Reservation Lifecycle', () => {
     await screenshot(page, 'admin_reservations_list');
   });
 
-  test('Admin reservation create form loads', async ({ page }) => {
-    await page.goto(`${BASE_URL}/admin/reservations/create`);
-    await page.waitForLoadState('domcontentloaded');
-
-    const body = await page.content();
-    expect(body).not.toContain('Whoops!');
-
-    // Has a reserve_start input
-    const hasDateInput = await page.locator('input[name="reserve_start"]').count();
-    expect(hasDateInput).toBeGreaterThan(0);
-
-    await screenshot(page, 'admin_reservation_create');
-  });
 
   test('Check-in page loads', async ({ page }) => {
     await page.goto(`${BASE_URL}/admin/check-in`);

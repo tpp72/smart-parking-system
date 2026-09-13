@@ -58,7 +58,6 @@ class ParkingLotController extends Controller
         ]);
 
         $data['owner_id']             = Auth::id();
-        $data['is_active']            = true;
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
         ParkingLot::create($data);
@@ -94,15 +93,6 @@ class ParkingLotController extends Controller
 
         return redirect()->route('owner.parking-lots.index')
             ->with('success', 'อัปเดตลานจอดเรียบร้อยแล้ว');
-    }
-
-    public function toggle(int $parking_lot)
-    {
-        $lot = $this->ownedLot($parking_lot);
-        $lot->update(['is_active' => !$lot->is_active]);
-
-        $status = $lot->is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
-        return back()->with('success', "ลานจอด \"{$lot->name}\" {$status}แล้ว");
     }
 
     public function destroy(int $parking_lot)

@@ -4,38 +4,33 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
-use App\Models\ParkingSlot;
 use App\Models\Reservation;
-use App\Models\ReservationLog;
-use App\Models\Vehicle;
 use App\Services\CheckInService;
 use App\Services\CheckOutService;
+use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
+/**
+ * Admin จัดการ Reservation ของลาน Admin (owner_id = NULL):
+ * ดู / ค้นหา / ยกเลิก — ไม่มีการสร้าง แก้ไข ลบ หรือยืนยันด้วยมือ
+ * (การยืนยันเกิดจาก Mark as Paid เงินมัดจำในหน้า Payments)
+ */
 class ReservationController extends Controller
 {
-    private array $statuses = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
-
     public function __construct(
-        private CheckInService  $checkInService,
-        private CheckOutService $checkOutService,
+        private CheckInService     $checkInService,
+        private CheckOutService    $checkOutService,
+        private ReservationService $reservations,
     ) {}
 
     /** Admin จัดการการจองได้เฉพาะของลานที่ยังไม่มีเจ้าของ */
-    private function assertLotUnowned(int $lotId): void
-    {
-        abort_unless(
-            ParkingLot::where('id', $lotId)->whereNull('owner_id')->exists(),
-            403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้'
-        );
-    }
-
     private function assertReservationLotUnowned(Reservation $reservation): void
     {
-        $this->assertLotUnowned($reservation->parking_lot_id);
+        abort_unless(
+            ParkingLot::where('id', $reservation->parking_lot_id)->whereNull('owner_id')->exists(),
+            403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้'
+        );
     }
 
     public function index(Request $request)
@@ -53,16 +48,15 @@ class ReservationController extends Controller
         $reservations = Reservation::query()
             ->with([
                 'user:id,name,email',
-                'vehicle:id,user_id,license_plate',
                 'parkingLot:id,name,hourly_rate',
                 'parkingSlot:id,parking_lot_id,slot_number',
                 'parkingLog:id,reservation_id,check_in_time',
+                'depositPayment',
             ])
             ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('license_plate', 'like', "%{$q}%")
-                        ->orWhereHas('vehicle', fn($x) => $x->where('license_plate', 'like', "%{$q}%"))
                         ->orWhereHas('user', fn($x) => $x->where('name', 'like', "%{$q}%"))
                         ->orWhereHas('user', fn($x) => $x->where('email', 'like', "%{$q}%"));
                 });
@@ -75,7 +69,7 @@ class ReservationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $checkableIds = Reservation::checkable()
+        $checkableIds = Reservation::manuallyCheckable()
             ->whereIn('id', $reservations->pluck('id'))
             ->pluck('id')
             ->all();
@@ -92,221 +86,28 @@ class ReservationController extends Controller
         ));
     }
 
-    public function create()
-    {
-        $vehicles = Vehicle::with('user:id,name')
-            ->orderBy('license_plate')
-            ->get(['id', 'license_plate', 'brand', 'user_id']);
-
-        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
-
-        $slots = ParkingSlot::where('status', 'available')
-            ->whereIn('parking_lot_id', $lots->pluck('id'))
-            ->orderBy('parking_lot_id')
-            ->orderBy('slot_number')
-            ->get(['id', 'parking_lot_id', 'slot_number']);
-
-        return view('admin.reservations.create', compact('vehicles', 'lots', 'slots'));
-    }
-
-    public function store(Request $request)
-    {
-        // Normalize reserve_start: accept UTC offset strings (e.g. from API clients) and
-        // convert to Asia/Bangkok local time so that after:now validation is consistent.
-        if ($request->has('reserve_start') && $request->input('reserve_start') !== '') {
-            try {
-                $normalized = \Carbon\Carbon::parse($request->input('reserve_start'), 'Asia/Bangkok')
-                    ->setTimezone('Asia/Bangkok')
-                    ->format('Y-m-d H:i:s');
-                $request->merge(['reserve_start' => $normalized]);
-            } catch (\Exception) {
-                // leave as-is — validation will catch the invalid format
-            }
-        }
-
-        $data = $request->validate([
-            'vehicle_id'      => ['required', 'exists:vehicles,id'],
-            'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
-            'parking_slot_id' => ['nullable', 'exists:parking_slots,id'],
-            'reserve_start'   => ['required', 'date', 'after:now'],
-            'reservation_fee' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $this->assertLotUnowned((int) $data['parking_lot_id']);
-
-        if (!empty($data['parking_slot_id'])) {
-            $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
-            if ((string) $slotLotId !== (string) $data['parking_lot_id']) {
-                return back()->withErrors(['parking_slot_id' => 'ช่องจอดนี้ไม่ได้อยู่ในลานที่เลือก'])->withInput();
-            }
-
-            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'])) {
-                return back()
-                    ->withErrors(['parking_slot_id' => 'ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว กรุณาเลือกช่องอื่นหรือเปลี่ยนเวลา'])
-                    ->withInput();
-            }
-        }
-
-        $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-
-        $reservation = Reservation::create([
-            'user_id'         => $vehicle->user_id,
-            'vehicle_id'      => $data['vehicle_id'],
-            'parking_lot_id'  => $data['parking_lot_id'],
-            'parking_slot_id' => $data['parking_slot_id'] ?? null,
-            'reserve_start'   => $data['reserve_start'],
-            'reservation_fee' => $data['reservation_fee'] ?? 0,
-            'status'          => 'pending',
-        ]);
-
-        ReservationLog::create([
-            'reservation_id' => $reservation->id,
-            'old_status'     => null,
-            'new_status'     => 'pending',
-            'changed_by'     => Auth::id(),
-            'note'           => 'Admin สร้างการจอง',
-        ]);
-
-        admin_audit('reservation.create', $reservation, []);
-
-        return redirect()->route('admin.reservations.index')
-            ->with('success', "สร้างการจองสำเร็จ #{$reservation->id} — สถานะ: pending");
-    }
-
-    public function edit(Reservation $reservation)
+    /** ยกเลิกการจองก่อน Check-in (จัดการเหตุผิดปกติ) — ไม่คืนเงินมัดจำที่ชำระแล้ว */
+    public function cancel(Reservation $reservation)
     {
         $this->assertReservationLotUnowned($reservation);
 
-        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name']);
-        $statuses = $this->statuses;
+        $result = $this->reservations->cancel($reservation, Auth::user(), 'Admin ยกเลิกการจอง');
 
-        $slots = ParkingSlot::query()
-            ->where('parking_lot_id', $reservation->parking_lot_id)
-            ->orderBy('slot_number')
-            ->get(['id', 'slot_number', 'parking_lot_id']);
-
-        $reservation->load(['user', 'vehicle', 'parkingLot', 'parkingSlot', 'parkingLog.parkingSlot']);
-
-        return view('admin.reservations.edit', compact('reservation', 'lots', 'slots', 'statuses'));
-    }
-
-    public function update(Request $request, Reservation $reservation)
-    {
-        $this->assertReservationLotUnowned($reservation);
-
-        $data = $request->validate([
-            'parking_lot_id'   => ['required', 'exists:parking_lots,id'],
-            'parking_slot_id'  => ['nullable', 'exists:parking_slots,id'],
-            'reserve_start'    => ['required', 'date'],
-            'reservation_fee'  => ['required', 'numeric', 'min:0'],
-            'status'           => ['required', Rule::in($this->statuses)],
-        ]);
-
-        $this->assertLotUnowned((int) $data['parking_lot_id']);
-
-        if (!empty($data['parking_slot_id'])) {
-            $slotLotId = ParkingSlot::where('id', $data['parking_slot_id'])->value('parking_lot_id');
-            if ((string) $slotLotId !== (string) $data['parking_lot_id']) {
-                return back()->withErrors(['parking_slot_id' => 'ช่องจอดนี้ไม่ได้อยู่ในลานที่เลือก'])->withInput();
-            }
-
-            if ($this->hasSlotConflict($data['parking_slot_id'], $data['reserve_start'], $reservation->id)) {
-                return back()
-                    ->withErrors(['parking_slot_id' => 'ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว'])
-                    ->withInput();
-            }
-        }
-
-        $oldStatus = $reservation->status;
-        $oldSlotId = $reservation->parking_slot_id;
-
-        DB::transaction(function () use ($reservation, $data, $oldStatus, $oldSlotId) {
-            $reservation->update($data);
-
-            if ($data['status'] === 'cancelled'
-                && in_array($oldStatus, ['pending', 'confirmed'], true)
-                && $oldSlotId
-            ) {
-                ParkingSlot::where('id', $oldSlotId)
-                    ->where('status', 'reserved')
-                    ->update(['status' => 'available']);
-            }
-
-            if ($oldStatus !== $data['status']) {
-                ReservationLog::create([
-                    'reservation_id' => $reservation->id,
-                    'old_status'     => $oldStatus,
-                    'new_status'     => $data['status'],
-                    'changed_by'     => Auth::id(),
-                    'note'           => 'Admin แก้ไขสถานะ',
-                ]);
-            }
-        });
-
-        if ($oldStatus !== $data['status'] && $data['status'] === 'cancelled') {
-            notify_user(
-                $reservation->user_id,
-                'การจองถูกยกเลิก',
-                "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
-            );
-        }
-
-        admin_audit('reservation.update', $reservation, [
-            'changed' => array_keys($data),
-        ]);
-
-        return redirect()->route('admin.reservations.edit', $reservation)
-            ->with('success', 'อัปเดต Reservation เรียบร้อยแล้ว');
-    }
-
-    public function confirm(Reservation $reservation)
-    {
-        $this->assertReservationLotUnowned($reservation);
-
-        if ($reservation->status !== 'pending') {
-            return back()->withErrors(['error' => "ไม่สามารถยืนยันได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
-        }
-
-        $slotError = null;
-
-        DB::transaction(function () use ($reservation, &$slotError) {
-            if ($reservation->parking_slot_id) {
-                $slot = ParkingSlot::where('id', $reservation->parking_slot_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$slot || $slot->status !== 'available') {
-                    $slotError = "ช่องจอดที่จองไว้ไม่พร้อมใช้งาน (สถานะ: {$slot?->status})";
-                    return;
-                }
-
-                $slot->update(['status' => 'reserved']);
-            }
-
-            $reservation->update(['status' => 'confirmed']);
-
-            ReservationLog::create([
-                'reservation_id' => $reservation->id,
-                'old_status'     => 'pending',
-                'new_status'     => 'confirmed',
-                'changed_by'     => Auth::id(),
-                'note'           => 'Admin ยืนยันการจอง',
-            ]);
-        });
-
-        if ($slotError) {
-            return back()->withErrors(['error' => $slotError]);
+        if (!$result['success']) {
+            return back()->withErrors(['error' => $result['error']]);
         }
 
         notify_user(
             $reservation->user_id,
-            'การจองได้รับการยืนยัน',
-            "การจอง #{$reservation->id} ของคุณได้รับการยืนยันแล้ว กรุณาเช็คอินภายในเวลาที่กำหนด"
+            'การจองถูกยกเลิก',
+            "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
         );
 
-        admin_audit('reservation.confirm', $reservation, ['status' => 'confirmed']);
+        admin_audit('reservation.cancel', $reservation, [
+            'deposit_forfeited' => $result['deposit_forfeited'],
+        ]);
 
-        return back()->with('success', "ยืนยันการจอง #{$reservation->id} เรียบร้อยแล้ว");
+        return back()->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว");
     }
 
     /** Check-In รถของการจองนี้โดยตรง (แทนหน้า Manual Check-In แยก) */
@@ -314,24 +115,8 @@ class ReservationController extends Controller
     {
         $this->assertReservationLotUnowned($reservation);
 
-        if ($reservation->status !== 'confirmed') {
-            return back()->withErrors(['error' => "ไม่สามารถเช็คอินได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
-        }
-
-        if (!Reservation::checkable()->where('id', $reservation->id)->exists()) {
-            return back()->withErrors(['error' => 'อยู่นอกช่วงเวลาเช็คอิน (เร็วเกินไปหรือเกินเวลากำหนด)']);
-        }
-
-        $allowedLotIds = ParkingLot::unowned()->pluck('id')->all();
-
-        $result = $this->checkInService->checkIn(
-            $reservation->license_plate,
-            $reservation->brand,
-            $reservation->color,
-            $reservation->parking_lot_id,
-            $allowedLotIds,
-            $reservation->vehicle_id
-        );
+        // Manual Check-in (Fallback) — เฉพาะการจองที่ confirmed · รถที่มาก่อนเวลาจองเข้าได้หลังเจ้าหน้าที่ตรวจสอบ
+        $result = $this->checkInService->checkInReservation($reservation, Auth::user(), allowEarly: true);
 
         if (!$result['success']) {
             return back()->withErrors(['error' => $result['error']]);
@@ -388,32 +173,5 @@ class ReservationController extends Controller
             $result['parkingFee'],
             $result['totalAmount'],
         ));
-    }
-
-    public function destroy(Reservation $reservation)
-    {
-        $this->assertReservationLotUnowned($reservation);
-
-        $reservation->delete();
-        admin_audit('reservation.delete', $reservation, []);
-        return redirect()->route('admin.reservations.index')->with('success', 'ลบ Reservation แล้ว');
-    }
-
-    /**
-     * ตรวจสอบ time overlap สำหรับ slot ที่ระบุ
-     * แต่ละการจองมีหน้าต่าง [reserve_start, reserve_start + 1 ชั่วโมง]
-     *
-     * @param int|null $excludeId  reservation id ที่ต้อง exclude (กรณี update)
-     */
-    private function hasSlotConflict(int $slotId, string $start, ?int $excludeId = null): bool
-    {
-        $end = \Carbon\Carbon::parse($start)->addHour()->toDateTimeString();
-
-        return Reservation::where('parking_slot_id', $slotId)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
-            ->where('reserve_start', '<', $end)
-            ->whereRaw("reserve_start + INTERVAL '1 hour' > ?", [$start])
-            ->exists();
     }
 }

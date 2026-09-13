@@ -16,11 +16,6 @@ class ParkingLog extends Model
         'check_out_time' => 'datetime',
     ];
 
-    public function vehicle()
-    {
-        return $this->belongsTo(Vehicle::class);
-    }
-
     public function parkingLot()
     {
         return $this->belongsTo(ParkingLot::class);

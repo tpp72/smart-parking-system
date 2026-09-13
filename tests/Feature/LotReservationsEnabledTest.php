@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\ParkingLot;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class LotReservationsEnabledTest extends TestCase
@@ -36,6 +36,7 @@ class LotReservationsEnabledTest extends TestCase
     {
         $user = $this->user();
         $lot  = ParkingLot::factory()->create(['reservations_enabled' => true]);
+        \App\Models\ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
 
         $response = $this->actingAs($user)->get(route('user.reservations.create'));
 
@@ -61,12 +62,14 @@ class LotReservationsEnabledTest extends TestCase
 
     public function test_store_blocked_for_non_reservable_lot(): void
     {
-        $user    = $this->user();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-        $lot     = ParkingLot::factory()->create(['reservations_enabled' => false]);
+        $user = $this->user();
+        $lot  = ParkingLot::factory()->create(['reservations_enabled' => false]);
 
         $response = $this->actingAs($user)->post(route('user.reservations.store'), [
-            'vehicle_id'     => $vehicle->id,
+            'plate_number'   => 'กข 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
+            'brand'          => 'Toyota',
+            'color'          => 'ขาว',
             'parking_lot_id' => $lot->id,
             'reserve_start'  => now()->addMinutes(30)->format('Y-m-d H:i'),
         ]);
@@ -86,7 +89,6 @@ class LotReservationsEnabledTest extends TestCase
             'name'                 => $lot->name,
             'total_slots'          => $lot->total_slots,
             'hourly_rate'          => $lot->hourly_rate,
-            'is_active'            => '1',
             'reservations_enabled' => '0',  // hidden input sends "0"
         ]);
 
@@ -104,7 +106,6 @@ class LotReservationsEnabledTest extends TestCase
             'name'                 => $lot->name,
             'total_slots'          => $lot->total_slots,
             'hourly_rate'          => $lot->hourly_rate,
-            'is_active'            => '1',
             'reservations_enabled' => '1',
         ]);
 
@@ -120,5 +121,13 @@ class LotReservationsEnabledTest extends TestCase
         $lot = ParkingLot::factory()->create();
 
         $this->assertTrue((bool) $lot->reservations_enabled);
+    }
+
+    // ─── [7] ลานไม่มีสถานะเปิด/ปิดลาน ────────────────────────────────────
+
+    public function test_parking_lot_has_no_open_close_status(): void
+    {
+        $this->assertFalse(Schema::hasColumn('parking_lots', 'is_active'));
+        $this->assertFalse(\Illuminate\Support\Facades\Route::has('owner.parking-lots.toggle'));
     }
 }

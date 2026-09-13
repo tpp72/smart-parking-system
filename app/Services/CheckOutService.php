@@ -6,7 +6,6 @@ use App\Models\ParkingLog;
 use App\Models\Payment;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
-use App\Models\Vehicle;
 use Illuminate\Support\Facades\DB;
 
 class CheckOutService
@@ -48,6 +47,7 @@ class CheckOutService
             $log->update(['check_out_time' => $checkOut]);
 
             Payment::create([
+                'type'                 => Payment::TYPE_CHECKOUT,
                 'parking_log_id'       => $log->id,
                 'reservation_id'       => $log->reservation_id,
                 'total_hours'          => $totalHours,
@@ -55,7 +55,8 @@ class CheckOutService
                 'parking_fee'          => $parkingFee,
                 'reservation_discount' => $deposit,
                 'total_amount'         => $totalAmount,
-                'payment_status'       => $totalAmount <= 0 ? 'paid' : 'unpaid',
+                'payment_status'       => $totalAmount <= 0 ? Payment::STATUS_PAID : Payment::STATUS_UNPAID,
+                'paid_at'              => $totalAmount <= 0 ? $checkOut : null,
             ]);
 
             if ($log->parkingSlot) {
@@ -84,8 +85,8 @@ class CheckOutService
             ->where('reserve_start', '<=', now()->subMinutes(Reservation::gracePeriodMinutes()))
             ->update(['status' => 'expired']);
 
-        $notifyUserId = $linkedReservation?->user_id
-            ?? ($log->vehicle_id ? Vehicle::find($log->vehicle_id)?->user_id : null);
+        // Walkin User ไม่ได้รับ Notification
+        $notifyUserId = $linkedReservation?->is_walk_in ? null : $linkedReservation?->user_id;
 
         if ($notifyUserId) {
             $msg = $deposit > 0

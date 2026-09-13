@@ -90,10 +90,10 @@ class DashboardController extends Controller
         $lotsOverview = DB::table('parking_lots as lot')
             ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
             ->where('lot.owner_id', $ownerId)
-            ->groupBy('lot.id', 'lot.name', 'lot.total_slots', 'lot.hourly_rate', 'lot.is_active')
+            ->groupBy('lot.id', 'lot.name', 'lot.total_slots', 'lot.hourly_rate', 'lot.reservations_enabled')
             ->orderBy('lot.name')
             ->selectRaw("
-                lot.id, lot.name, lot.total_slots, lot.hourly_rate, lot.is_active,
+                lot.id, lot.name, lot.total_slots, lot.hourly_rate, lot.reservations_enabled,
                 SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END) as available,
                 SUM(CASE WHEN s.status='occupied' THEN 1 ELSE 0 END) as occupied,
                 SUM(CASE WHEN s.status='reserved' THEN 1 ELSE 0 END) as reserved
@@ -101,24 +101,22 @@ class DashboardController extends Controller
             ->get();
 
         $recentReservations = DB::table('reservations as r')
-            ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
             ->join('users as u', 'u.id', '=', 'r.user_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->whereIn('r.parking_lot_id', $lotIds)
             ->orderByDesc('r.created_at')
             ->limit(8)
-            ->select(['r.id', 'v.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
+            ->select(['r.id', 'r.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
             ->get();
 
         $activeNow = DB::table('parking_logs as pl')
-            ->join('vehicles as v', 'v.id', '=', 'pl.vehicle_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
             ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
             ->whereIn('pl.parking_lot_id', $lotIds)
             ->whereNull('pl.check_out_time')
             ->orderByDesc('pl.check_in_time')
             ->limit(8)
-            ->select(['pl.id as log_id', 'v.license_plate', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
+            ->select(['pl.id as log_id', 'pl.license_plate', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
             ->get();
 
         // ── Chart data ─────────────────────────────────────────────────────

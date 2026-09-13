@@ -20,9 +20,21 @@
                         <x-text-input id="license_plate" name="license_plate" type="text"
                             class="mt-1 block w-full uppercase font-mono tracking-wider"
                             value="{{ old('license_plate') }}"
-                            placeholder="กข-1234"
+                            placeholder="กข 1234"
                             required autofocus />
                         <x-input-error :messages="$errors->get('license_plate')" class="mt-1" />
+                    </div>
+
+                    {{-- Province --}}
+                    <div>
+                        <x-input-label for="plate_province" value="จังหวัด *" />
+                        <select id="plate_province" name="plate_province" required class="sp-select mt-1 w-full">
+                            <option value="">— เลือกจังหวัด —</option>
+                            @foreach (config('thai_provinces') as $province)
+                                <option value="{{ $province }}" @selected(old('plate_province') === $province)>{{ $province }}</option>
+                            @endforeach
+                        </select>
+                        <x-input-error :messages="$errors->get('plate_province')" class="mt-1" />
                     </div>
 
                     {{-- Reason --}}

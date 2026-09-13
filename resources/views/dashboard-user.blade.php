@@ -93,8 +93,8 @@
 
                             <div class="mt-3 flex items-center gap-2 text-sm">
                                 <span class="sp-badge sp-badge-warn">{{ $activeReservation->status }}</span>
-                                <span class="text-gray-300">ค่าจอง: <span
-                                        class="text-white font-bold">{{ number_format((float) $activeReservation->reservation_fee, 2) }}
+                                <span class="text-gray-300">มัดจำ: <span
+                                        class="text-white font-bold">{{ number_format((float) $activeReservation->deposit_amount, 2) }}
                                         ฿</span></span>
                             </div>
                         </div>

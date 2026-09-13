@@ -17,4 +17,21 @@ return [
     | Recommended: claude-haiku-4-5 (fast + cheap), claude-opus-4-8 (best accuracy)
     */
     'model' => env('CARSCAN_MODEL', 'claude-opus-4-8'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accuracy Threshold
+    |--------------------------------------------------------------------------
+    | ผล AI ผ่านเกณฑ์เมื่อ Accuracy "มากกว่า" ค่านี้ (project-plan.md §10.3 — > 85%)
+    */
+    'accuracy_threshold' => 85,
+
+    /*
+    |--------------------------------------------------------------------------
+    | SSL Verification
+    |--------------------------------------------------------------------------
+    | ตรวจสอบใบรับรอง SSL ของ AI API — เปิดไว้เสมอใน Production
+    | ปิดได้เฉพาะเครื่อง dev ที่ยังไม่ได้ตั้งค่า CA bundle: CARSCAN_VERIFY_SSL=false
+    */
+    'verify_ssl' => env('CARSCAN_VERIFY_SSL', true),
 ];

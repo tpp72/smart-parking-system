@@ -13,9 +13,13 @@ return new class extends Migration
             $table->foreignId('reservation_id')->constrained('reservations')->cascadeOnDelete();
             $table->string('old_status')->nullable();
             $table->string('new_status');
+            // NULL = ระบบเป็นผู้เปลี่ยนสถานะ
             $table->foreignId('changed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('note')->nullable();
             $table->timestamps(0);
+
+            $table->index(['reservation_id', 'created_at']);
+            $table->index('changed_by');
         });
     }
 

@@ -4,13 +4,13 @@ namespace App\Services;
 
 use Anthropic\Client;
 use Anthropic\RequestOptions;
+use App\Models\AdminAction;
 use App\Models\LicensePlateScan;
-use App\Models\Reservation;
 use App\Models\SuspiciousVehicle;
-use App\Models\Vehicle;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class CarScanService
 {
@@ -19,8 +19,7 @@ class CarScanService
 
     public function __construct()
     {
-        // Windows local dev: disable SSL verify (CA bundle not configured)
-        $guzzle = new GuzzleClient(['verify' => false]);
+        $guzzle = new GuzzleClient(['verify' => (bool) config('carscan.verify_ssl', true)]);
 
         $this->client = new Client(
             apiKey: config('carscan.anthropic_api_key', ''),
@@ -31,7 +30,7 @@ class CarScanService
 
     /**
      * Send car image to Claude Vision API and extract detection data.
-     * Returns: license_plate, color, brand, confidence
+     * Returns: license_plate, province, color, brand, confidence
      */
     public function detect(string $absoluteImagePath): array
     {
@@ -139,10 +138,10 @@ PROMPT;
     }
 
     /**
-     * Store the uploaded image, call Claude Vision API, persist scan record.
-     * Returns the saved LicensePlateScan model.
+     * AI Scan pipeline: เก็บรูป → AI อ่านข้อมูล → จัดผลตามเกณฑ์ Accuracy → ตรวจ Blacklist → บันทึก Scan
+     * (ผู้เรียกแจ้งเตือนด้วย alertStaff() หลังรู้ผล Auto Check-in — ลานเต็มใช้ discardForFullLot() แทน)
      *
-     * @param int $parkingLotId ลานที่กล้อง/ผู้สแกนอยู่ (ระบบจริงกล้องติดอยู่ที่ลานใดลานหนึ่งเสมอ)
+     * @param int $parkingLotId ลานที่กล้องติดตั้ง (Upload จำลอง Camera Input)
      */
     public function scanAndSave(UploadedFile $file, int $userId, int $parkingLotId): LicensePlateScan
     {
@@ -153,124 +152,132 @@ PROMPT;
         // 2. Run AI (Claude Vision)
         $result = $this->detect($absolutePath);
 
-        $licensePlate = trim($result['license_plate'] ?? '');
-        $province     = trim($result['province'] ?? '') ?: null;
+        $licensePlate = trim((string) ($result['license_plate'] ?? '')) ?: null;
+        $province     = trim((string) ($result['province'] ?? '')) ?: null;
         $color        = $result['color']       ?? null;
         $brand        = $result['brand']       ?? null;
-        $confidence   = isset($result['confidence']) ? (float) $result['confidence'] : null;
+        $confidence   = isset($result['confidence']) && is_numeric($result['confidence'])
+            ? max(0.0, min(100.0, (float) $result['confidence']))
+            : null;
 
-        // 3. Match vehicle in DB
-        $vehicleId = null;
-        if ($licensePlate !== '') {
-            $vehicle   = $this->platePrefixMatch(Vehicle::query(), $licensePlate)->first();
-            $vehicleId = $vehicle?->id;
+        // 3. จัดผลการตรวจ: passed (> เกณฑ์) / low_accuracy / unreadable (อ่านทะเบียนหรือจังหวัดไม่ได้)
+        $scanResult = LicensePlateScan::classify($licensePlate, $province, $confidence);
 
-            if ($vehicle) {
-                $updates = [];
-                if ($color && !$vehicle->color) $updates['color'] = $color;
-                if ($brand && !$vehicle->brand) $updates['brand'] = $brand;
-                if ($updates) $vehicle->update($updates);
-            }
-        }
+        // 4. Check blacklist (active entries only) — ตรวจด้วย ทะเบียน + จังหวัด
+        $isSuspicious = $licensePlate !== null && $province !== null
+            && SuspiciousVehicle::active()
+                ->where('license_plate', $licensePlate)
+                ->where('plate_province', $province)
+                ->exists();
 
-        // 4. Check blacklist (active entries only)
-        $isSuspicious = $licensePlate !== ''
-            && $this->platePrefixMatch(SuspiciousVehicle::active(), $licensePlate)->exists();
-
-        // 5. Persist scan record
+        // 5. Persist scan record (AI Scan Log)
         $scan = LicensePlateScan::create([
             'user_id'        => $userId,
-            'vehicle_id'     => $vehicleId,
             'parking_lot_id' => $parkingLotId,
             'license_plate'  => $licensePlate,
-            'province'       => $province,
+            'plate_province' => $province,
             'color'          => $color,
             'brand'          => $brand,
             'confidence'     => $confidence,
+            'result'         => $scanResult,
             'is_suspicious'  => $isSuspicious,
             'source'         => 'manual_upload',
             'image_path'     => $storedPath,
             'scan_time'      => now(),
         ]);
 
-        return $scan->load(['vehicle.user']);
+        return $scan;
     }
 
     /**
-     * Find an active reservation (confirmed or checked_in) for a given license plate.
-     * Returns the earliest upcoming reservation, or null if none found.
+     * แจ้ง Owner ของลาน (ถ้ามี) + Admin ทุกคน เมื่อ AI Accuracy ไม่ผ่านเกณฑ์ / อ่านทะเบียนไม่ได้ / พบรถ Blacklist
+     * (Blacklist ไม่ Block การเข้าจอด — แจ้งเตือนเพื่อเฝ้าระวังเท่านั้น)
      */
-    public function findMatchingReservation(string $licensePlate): ?Reservation
+    public function alertStaff(LicensePlateScan $scan): void
     {
-        $plate = trim($licensePlate);
-        if ($plate === '') {
-            return null;
+        $lot = $scan->parkingLot;
+        $lotName = $lot->name;
+        $when = $scan->scan_time->format('d/m/Y H:i');
+
+        $carDetail = $this->carDetail($scan);
+        $accuracy = $scan->confidence !== null ? number_format($scan->confidence, 1) . '%' : 'ไม่ทราบ';
+
+        $alerts = [];
+
+        if ($scan->result === LicensePlateScan::RESULT_UNREADABLE) {
+            $alerts[] = ['AI อ่านทะเบียนไม่ได้', "สแกน #{$scan->id} ที่ลาน {$lotName} เวลา {$when} — AI อ่านทะเบียนไม่ได้ (Accuracy {$accuracy}) กรุณาตรวจสอบรถคันนี้"];
+        } elseif ($scan->result === LicensePlateScan::RESULT_LOW_ACCURACY) {
+            $alerts[] = ['AI Accuracy ไม่ผ่านเกณฑ์', sprintf(
+                'สแกน #%d ที่ลาน %s เวลา %s — %s · Accuracy %s ไม่เกินเกณฑ์ %s%% จึงไม่เช็คอินอัตโนมัติจากผลนี้',
+                $scan->id, $lotName, $when, $carDetail, $accuracy, rtrim(rtrim(number_format((float) config('carscan.accuracy_threshold', 85), 2), '0'), '.')
+            )];
         }
 
-        // จับคู่ด้วยป้ายทะเบียนที่กรอกตอนจองโดยตรง (flow หลัก) หรือผ่าน vehicle_id (legacy/admin check-in)
-        $vehicle = $this->platePrefixMatch(Vehicle::query(), $plate)->first();
+        if ($scan->is_suspicious) {
+            $alerts[] = ['⚠ พบรถต้องสงสัย (Blacklist)', "{$carDetail} ตรวจพบที่ลาน {$lotName} เวลา {$when} (สแกน #{$scan->id})"];
+        }
 
-        return Reservation::with(['vehicle', 'parkingLot:id,name,owner_id', 'parkingSlot:id,slot_number', 'user:id,name'])
-            ->where(function ($q) use ($plate, $vehicle) {
-                $q->where('license_plate', $plate)
-                    ->orWhere('license_plate', 'like', $plate . ' %');
-                if ($vehicle) {
-                    $q->orWhere('vehicle_id', $vehicle->id);
-                }
-            })
-            ->whereIn('status', ['confirmed', 'checked_in'])
-            ->orderBy('reserve_start')
-            ->first();
+        if (!$alerts) {
+            return;
+        }
+
+        foreach ($lot->staffRecipientIds() as $recipientId) {
+            foreach ($alerts as [$title, $message]) {
+                notify_user($recipientId, $title, $message);
+            }
+        }
     }
 
     /**
-     * เทียบป้ายทะเบียนแบบ "ขึ้นต้นด้วย" แทน exact match — เพราะ Claude Vision อ่านได้แค่ตัวเลขทะเบียน
-     * (เช่น "กพ 961") โดยไม่มีจังหวัดต่อท้าย ในขณะที่ข้อมูลที่เก็บจริงในระบบ (Vehicle/Reservation/
-     * SuspiciousVehicle) อาจมีจังหวัดต่อท้ายด้วย (เช่น "กพ 961 กาญจนบุรี")
+     * Walk-in เข้าลานเต็ม: ไม่บันทึกผล Scan (ลบทั้ง record และรูป) ยกเว้นเหตุการณ์ Blacklist
+     * ที่ต้องแจ้ง Admin + Owner และบันทึกลง Audit Log (project-plan.md §11.5)
      */
-    private function platePrefixMatch($query, string $plate)
+    public function discardForFullLot(LicensePlateScan $scan): void
     {
-        return $query->where(function ($q) use ($plate) {
-            $q->where('license_plate', $plate)
-                ->orWhere('license_plate', 'like', $plate . ' %');
-        });
+        $lot = $scan->parkingLot;
+
+        if ($scan->is_suspicious) {
+            $blacklist = SuspiciousVehicle::active()
+                ->where('license_plate', $scan->license_plate)
+                ->where('plate_province', $scan->plate_province)
+                ->first();
+
+            $lot->notifyStaff('⚠ พบรถต้องสงสัย (Blacklist)', sprintf(
+                '%s ตรวจพบที่ลาน %s เวลา %s — ลานเต็ม รถไม่ได้เข้าจอด',
+                $this->carDetail($scan), $lot->name, $scan->scan_time->format('d/m/Y H:i')
+            ));
+
+            AdminAction::create([
+                'actor_id'     => null,
+                'actor_role'   => 'system',
+                'action'       => 'blacklist.detected',
+                'subject_type' => 'SuspiciousVehicle',
+                'subject_id'   => $blacklist?->id,
+                'meta'         => [
+                    'license_plate'  => $scan->license_plate,
+                    'plate_province' => $scan->plate_province,
+                    'brand'          => $scan->brand,
+                    'color'          => $scan->color,
+                    'confidence'     => $scan->confidence,
+                    'parking_lot_id' => $lot->id,
+                    'lot_full'       => true,
+                ],
+            ]);
+        }
+
+        if ($scan->image_path) {
+            Storage::disk('public')->delete($scan->image_path);
+        }
+
+        $scan->delete();
     }
 
-    /**
-     * เทียบจังหวัด/ยี่ห้อ/สีที่ผู้ใช้แจ้งไว้ตอนจอง กับผลสแกน AI — ป้องกันเช็คอินรถผิดคันที่บังเอิญ
-     * ทะเบียนคล้ายกัน ต้องผ่านทั้ง 2 เงื่อนไข: (1) ทะเบียน+จังหวัดตรง (ทะเบียนตรงอยู่แล้วเพราะเป็นตัว
-     * ที่ใช้หา reservation นี้มา จึงเหลือแค่ต้องตรวจจังหวัดเพิ่ม) และ (2) ยี่ห้อหรือสีตรงอย่างน้อย 1
-     * อย่าง — จองใหม่ทุกรายการบังคับกรอกจังหวัด/ยี่ห้อ/สีอยู่แล้ว จึงไม่ต้องมี fallback สำหรับข้อมูลว่าง
-     *
-     * @return array{passed: bool, mismatches: array<string>}
-     */
-    public function matchScanAgainstReservation(
-        Reservation $reservation,
-        ?string $scannedProvince,
-        ?string $scannedBrand,
-        ?string $scannedColor
-    ): array {
-        $mismatches = [];
+    private function carDetail(LicensePlateScan $scan): string
+    {
+        $car = trim(($scan->license_plate ?? '') . ' ' . ($scan->plate_province ?? ''));
 
-        $province = $reservation->resolvedProvince();
-        $provinceOk = $scannedProvince && trim($province) === trim($scannedProvince);
-        if (!$provinceOk) {
-            $mismatches[] = "จังหวัดไม่ตรง: แจ้งไว้ \"{$province}\" แต่สแกนได้ \"" . ($scannedProvince ?: 'ไม่พบ') . '"';
-        }
-
-        $brandOk = $reservation->brand && $scannedBrand
-            && strcasecmp(trim($reservation->brand), trim($scannedBrand)) === 0;
-        $colorOk = $reservation->color && $scannedColor
-            && trim($reservation->color) === trim($scannedColor);
-
-        if (!$brandOk && !$colorOk) {
-            $mismatches[] = "ยี่ห้อและสีไม่ตรงทั้งคู่: แจ้งไว้ยี่ห้อ \"{$reservation->brand}\" สี \"{$reservation->color}\" แต่สแกนได้ยี่ห้อ \""
-                . ($scannedBrand ?: 'ไม่พบ') . "\" สี \"" . ($scannedColor ?: 'ไม่พบ') . '"';
-        }
-
-        return [
-            'passed'     => $provinceOk && ($brandOk || $colorOk),
-            'mismatches' => $mismatches,
-        ];
+        return ($car !== '' ? "ทะเบียน {$car}" : 'ทะเบียนอ่านไม่ได้')
+            . ($scan->brand ? " ยี่ห้อ {$scan->brand}" : '')
+            . ($scan->color ? " สี {$scan->color}" : '');
     }
 }

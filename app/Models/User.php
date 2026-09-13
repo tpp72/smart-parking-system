@@ -10,11 +10,20 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
+
+    /** อีเมลของ System User ที่ใช้เป็นเจ้าของ Reservation แบบ Walk-in */
+    const WALKIN_EMAIL = 'walkin@system.local';
+
     protected $guarded = [];
 
-    public function vehicles()
+    protected $casts = [
+        'is_system' => 'boolean',
+    ];
+
+    /** System User "Walkin User" (สร้างโดย migration) */
+    public static function walkin(): self
     {
-        return $this->hasMany(Vehicle::class);
+        return static::where('email', self::WALKIN_EMAIL)->where('is_system', true)->firstOrFail();
     }
 
     public function reservations()
@@ -27,9 +36,10 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
-    public function adminActions()
+    /** Audit log ที่ผู้ใช้คนนี้เป็นผู้กระทำ */
+    public function auditActions()
     {
-        return $this->hasMany(AdminAction::class, 'admin_id');
+        return $this->hasMany(AdminAction::class, 'actor_id');
     }
 
     public function reservationChanges()

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ParkingLog;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -142,22 +141,13 @@ class UserController extends Controller
             ]);
         }
 
-        // กันลบถ้ารถของ user นี้ (ในฐานะผู้จอง) มีประวัติ check-in/out ผูกอยู่ — ป้องกัน FK error และรักษาประวัติการเงิน
-        $vehicleIds = Vehicle::where('user_id', $user->id)->pluck('id');
-        if ($vehicleIds->isNotEmpty() && ParkingLog::whereIn('vehicle_id', $vehicleIds)->exists()) {
-            return back()->withErrors([
-                'error' => 'ไม่สามารถลบผู้ใช้นี้ได้ เนื่องจากมีประวัติการจอดรถ (Parking Log) ผูกกับรถของผู้ใช้นี้อยู่',
-            ]);
-        }
-
         $deletedLotsCount = 0;
         $cancelledReservationsCount = 0;
 
         DB::transaction(function () use ($user, $ownedLots, &$deletedLotsCount, &$cancelledReservationsCount) {
             foreach ($ownedLots as $lot) {
                 // แจ้งเตือนผู้จองที่ยัง pending/confirmed ก่อนลบลาน — ตัว reservation เองจะถูก
-                // cascade delete ไปพร้อม parking_lot (FK parking_lot_id ไม่ใช่ nullable) จึงไม่ต้อง
-                // อัปเดตสถานะ/คืน slot/บันทึก log ให้ reservation ที่กำลังจะหายไปพร้อมกันอยู่ดี
+                // cascade delete ไปพร้อม parking_lot จึงไม่ต้องอัปเดตสถานะ/คืน slot/บันทึก log
                 $affectedReservations = Reservation::where('parking_lot_id', $lot->id)
                     ->whereIn('status', ['pending', 'confirmed'])
                     ->get(['id', 'user_id']);
@@ -171,10 +161,7 @@ class UserController extends Controller
                     $cancelledReservationsCount++;
                 }
 
-                // ลบประวัติ check-in/out ของลานนี้ก่อน (parking_logs อ้างอิง parking_lot_id แบบไม่มี cascade)
-                ParkingLog::where('parking_lot_id', $lot->id)->delete();
-
-                // ลบลานจอด — cascade ลบช่องจอด + reservation ทั้งหมดของลานนี้โดยอัตโนมัติ
+                // ลบลานจอด — cascade ลบช่องจอด, reservation, parking log และ payment ของลานนี้
                 $lot->delete();
 
                 $deletedLotsCount++;

@@ -11,7 +11,8 @@ class ParkingSlotFactory extends Factory
     {
         return [
             'parking_lot_id' => ParkingLot::factory(),
-            'slot_number'    => strtoupper($this->faker->bothify('?##')),
+            // (parking_lot_id, slot_number) ต้องไม่ซ้ำ
+            'slot_number'    => strtoupper($this->faker->unique()->bothify('?###')),
             'status'         => 'available',
         ];
     }
