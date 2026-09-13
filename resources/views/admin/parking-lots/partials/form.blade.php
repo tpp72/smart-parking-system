@@ -97,13 +97,6 @@
             @enderror
         </div>
 
-        <div class="flex items-center gap-3 pt-5">
-            <input type="hidden" name="is_active" value="0" />
-            <input type="checkbox" name="is_active" value="1" id="is_active"
-                @checked(old('is_active', $lot?->is_active ?? true))
-                class="w-4 h-4 rounded border-red-900/60 bg-black/40 text-red-600 focus:ring-red-600" />
-            <label for="is_active" class="text-sm text-gray-200">เปิดใช้งาน (แสดงในตลาด)</label>
-        </div>
 
         <div class="flex items-center gap-3 pt-1">
             <input type="hidden" name="reservations_enabled" value="0" />

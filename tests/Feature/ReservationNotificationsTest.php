@@ -8,7 +8,7 @@ use App\Models\ParkingLog;
 use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\User;
-use App\Models\Vehicle;
+use App\Services\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,54 +38,46 @@ class ReservationNotificationsTest extends TestCase
 
     private function pendingReservation(User $user): Reservation
     {
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-        $lot     = ParkingLot::factory()->create();
+        $lot = ParkingLot::factory()->create();
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);
 
-        return Reservation::factory()->create([
-            'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
-            'parking_lot_id' => $lot->id,
+        return app(ReservationService::class)->create($user, $lot, [
+            'license_plate'  => 'กข 3333',
+            'plate_province' => 'ภูเก็ต',
+            'brand'          => 'Mazda',
+            'color'          => 'แดง',
             'reserve_start'  => now()->addHour(),
-            'status'         => 'pending',
         ]);
     }
 
-    // ─── [1] confirm sends notification to user ─────────────────────────────
+    // ─── [1] ยืนยันรับเงินมัดจำ → แจ้ง User ────────────────────────────────
 
-    public function test_confirm_reservation_sends_notification_to_user(): void
+    public function test_deposit_mark_paid_sends_confirmation_notification_to_user(): void
     {
         $admin       = $this->admin();
         $user        = $this->regularUser();
         $reservation = $this->pendingReservation($user);
 
         $this->actingAs($admin)
-            ->post(route('admin.reservations.confirm', $reservation))
+            ->post(route('admin.payments.mark-paid', $reservation->depositPayment))
             ->assertRedirect();
 
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $user->id,
-        ]);
-
         $notification = Notification::where('user_id', $user->id)->first();
+        $this->assertNotNull($notification);
+        $this->assertSame('การจองได้รับการยืนยัน', $notification->title);
         $this->assertStringContainsString("#{$reservation->id}", $notification->message);
     }
 
-    // ─── [2] cancel via update sends notification ───────────────────────────
+    // ─── [2] Admin ยกเลิก → แจ้ง User ─────────────────────────────────────
 
-    public function test_cancel_via_update_sends_notification_to_user(): void
+    public function test_admin_cancel_sends_notification_to_user(): void
     {
         $admin       = $this->admin();
         $user        = $this->regularUser();
         $reservation = $this->pendingReservation($user);
 
         $this->actingAs($admin)
-            ->put(route('admin.reservations.update', $reservation), [
-                'parking_lot_id'  => $reservation->parking_lot_id,
-                'parking_slot_id' => null,
-                'reserve_start'   => now()->addHour()->format('Y-m-d H:i:s'),
-                'reservation_fee' => 0,
-                'status'          => 'cancelled',
-            ])
+            ->post(route('admin.reservations.cancel', $reservation))
             ->assertRedirect();
 
         $notification = Notification::where('user_id', $user->id)->first();
@@ -93,50 +85,21 @@ class ReservationNotificationsTest extends TestCase
         $this->assertStringContainsString("#{$reservation->id}", $notification->message);
     }
 
-    // ─── [3] update to non-cancelled status does NOT send notification ───────
-
-    public function test_update_to_confirmed_does_not_send_cancel_notification(): void
-    {
-        $admin       = $this->admin();
-        $user        = $this->regularUser();
-        $reservation = $this->pendingReservation($user);
-
-        $this->actingAs($admin)
-            ->put(route('admin.reservations.update', $reservation), [
-                'parking_lot_id'  => $reservation->parking_lot_id,
-                'parking_slot_id' => null,
-                'reserve_start'   => now()->addHour()->format('Y-m-d H:i:s'),
-                'reservation_fee' => 0,
-                'status'          => 'confirmed',
-            ]);
-
-        // No "cancelled" notification; confirm() route sends a different one
-        $cancelNotif = Notification::where('user_id', $user->id)
-            ->where('title', 'การจองถูกยกเลิก')
-            ->first();
-        $this->assertNull($cancelNotif);
-    }
-
-    // ─── [4] check-in sends notification ────────────────────────────────────
+    // ─── [3] check-in sends notification ────────────────────────────────────
 
     public function test_check_in_sends_notification_when_reservation_exists(): void
     {
-        $admin   = $this->admin();
-        $user    = $this->regularUser();
-        $lot     = ParkingLot::factory()->create();
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $admin = $this->admin();
+        $user  = $this->regularUser();
+        $lot   = ParkingLot::factory()->create();
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
 
         // Reservation within check-in window
         $reservation = Reservation::factory()->create([
             'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
             'parking_lot_id' => $lot->id,
             'reserve_start'  => now()->subMinutes(5),
             'status'         => 'confirmed',
-            'license_plate'  => $vehicle->license_plate,
-            'brand'          => $vehicle->brand,
-            'color'          => $vehicle->color,
         ]);
 
         $this->actingAs($admin)
@@ -148,21 +111,26 @@ class ReservationNotificationsTest extends TestCase
         ]);
     }
 
-    // ─── [5] check-out sends notification ───────────────────────────────────
+    // ─── [4] check-out sends notification to reservation owner ──────────────
 
-    public function test_check_out_sends_notification_to_vehicle_owner(): void
+    public function test_check_out_sends_notification_to_reservation_owner(): void
     {
-        $admin   = $this->admin();
-        $user    = $this->regularUser();
-        $lot     = ParkingLot::factory()->create(['hourly_rate' => 40]);
-        $slot    = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
+        $admin = $this->admin();
+        $user  = $this->regularUser();
+        $lot   = ParkingLot::factory()->create(['hourly_rate' => 40]);
+        $slot  = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
+
+        $reservation = Reservation::factory()->checkedIn()->create([
+            'user_id'        => $user->id,
+            'parking_lot_id' => $lot->id,
+        ]);
 
         $log = ParkingLog::factory()->create([
-            'vehicle_id'      => $vehicle->id,
-            'license_plate'   => $vehicle->license_plate,
+            'license_plate'   => $reservation->license_plate,
+            'plate_province'  => $reservation->plate_province,
             'parking_lot_id'  => $lot->id,
             'parking_slot_id' => $slot->id,
+            'reservation_id'  => $reservation->id,
             'check_in_time'   => now()->subHours(2),
             'check_out_time'  => null,
         ]);
@@ -171,25 +139,20 @@ class ReservationNotificationsTest extends TestCase
             ->post(route('admin.parking-logs.check-out', $log))
             ->assertRedirect();
 
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $user->id,
-        ]);
-
         $notification = Notification::where('user_id', $user->id)->first();
-        $this->assertStringContainsString($vehicle->license_plate, $notification->message);
+        $this->assertNotNull($notification);
+        $this->assertStringContainsString($reservation->license_plate, $notification->message);
     }
 
-    // ─── [6] expiry command sends notification ───────────────────────────────
+    // ─── [5] expiry command sends notification ───────────────────────────────
 
     public function test_expire_command_sends_notification(): void
     {
-        $user    = $this->regularUser();
-        $vehicle = Vehicle::factory()->create(['user_id' => $user->id]);
-        $lot     = ParkingLot::factory()->create();
+        $user = $this->regularUser();
+        $lot  = ParkingLot::factory()->create();
 
         Reservation::factory()->create([
             'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
             'parking_lot_id' => $lot->id,
             'reserve_start'  => now()->subHours(2),
             'status'         => 'confirmed',

@@ -21,7 +21,6 @@ class ReservationLogController extends Controller
             ->join('reservations as r', 'r.id', '=', 'rl.reservation_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->join('users as u', 'u.id', '=', 'rl.changed_by')
-            ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
             ->whereNull('lot.owner_id')
             ->select([
                 'rl.id',
@@ -32,13 +31,13 @@ class ReservationLogController extends Controller
                 'rl.created_at',
                 'u.name as changed_by_name',
                 'u.email as changed_by_email',
-                'v.license_plate',
+                'r.license_plate',
             ])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('u.name', 'like', "%{$q}%")
                         ->orWhere('u.email', 'like', "%{$q}%")
-                        ->orWhere('v.license_plate', 'like', "%{$q}%")
+                        ->orWhere('r.license_plate', 'like', "%{$q}%")
                         ->orWhere('rl.old_status', 'like', "%{$q}%")
                         ->orWhere('rl.new_status', 'like', "%{$q}%");
                 });
@@ -74,12 +73,11 @@ class ReservationLogController extends Controller
             ->join('reservations as r', 'r.id', '=', 'rl.reservation_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
             ->join('users as u', 'u.id', '=', 'rl.changed_by')
-            ->join('vehicles as v', 'v.id', '=', 'r.vehicle_id')
             ->whereNull('lot.owner_id')
             ->select([
                 'rl.id',
                 'rl.reservation_id',
-                'v.license_plate',
+                'r.license_plate',
                 'rl.old_status',
                 'rl.new_status',
                 'u.name as changed_by_name',
@@ -90,7 +88,7 @@ class ReservationLogController extends Controller
                 $qq->where(function ($x) use ($q) {
                     $x->where('u.name', 'like', "%{$q}%")
                         ->orWhere('u.email', 'like', "%{$q}%")
-                        ->orWhere('v.license_plate', 'like', "%{$q}%")
+                        ->orWhere('r.license_plate', 'like', "%{$q}%")
                         ->orWhere('rl.old_status', 'like', "%{$q}%")
                         ->orWhere('rl.new_status', 'like', "%{$q}%");
                 });

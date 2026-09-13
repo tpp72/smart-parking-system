@@ -34,14 +34,6 @@
                                 <option value="list">ใส่เป็นรายการ (List)</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-sm text-gray-200 mb-1">สถานะ *</label>
-                            <select name="status" class="sp-select w-full">
-                                @foreach($statuses as $st)
-                                    <option value="{{ $st }}" @selected(old('status', 'available') === $st)>{{ $st }}</option>
-                                @endforeach
-                            </select>
-                        </div>
                     </div>
                 </div>
 

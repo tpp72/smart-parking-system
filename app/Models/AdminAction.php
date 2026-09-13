@@ -12,8 +12,9 @@ class AdminAction extends Model
         'meta' => 'array',
     ];
 
-    public function admin()
+    /** ผู้กระทำ (user / owner / admin) — null เมื่อเป็นระบบ */
+    public function actor()
     {
-        return $this->belongsTo(User::class, 'admin_id');
+        return $this->belongsTo(User::class, 'actor_id');
     }
 }

@@ -55,6 +55,18 @@
                         </div>
                     @endif
 
+                    {{-- AI Result Gate (Accuracy > เกณฑ์ / อ่านทะเบียนไม่ได้) --}}
+                    @if(!$scan->passed())
+                        <div class="mb-5 rounded-2xl border border-yellow-500/60 bg-yellow-950/20 p-4">
+                            <p class="font-extrabold text-yellow-300 text-sm">
+                                {{ $scan->result === \App\Models\LicensePlateScan::RESULT_UNREADABLE ? 'AI อ่านทะเบียนไม่ได้' : 'AI Accuracy ไม่ผ่านเกณฑ์' }}
+                            </p>
+                            <p class="text-yellow-400 text-xs mt-0.5">
+                                ผลต้องมี Accuracy มากกว่า {{ config('carscan.accuracy_threshold', 85) }}% จึงเช็คอินอัตโนมัติได้ — ระบบบันทึกผลและแจ้ง Owner / Admin แล้ว
+                            </p>
+                        </div>
+                    @endif
+
                     {{-- Result Content --}}
                     <div class="sp-card rounded-2xl p-6 mb-6">
                         <div class="flex items-center gap-2 mb-5">
@@ -76,8 +88,8 @@
                                 <p class="text-3xl font-extrabold tracking-widest sp-glow-text">
                                     {{ $scan->license_plate ?: '—' }}
                                 </p>
-                                @if($scan->province)
-                                    <p class="text-sm text-gray-400 mt-1">{{ $scan->province }}</p>
+                                @if($scan->plate_province)
+                                    <p class="text-sm text-gray-400 mt-1">{{ $scan->plate_province }}</p>
                                 @endif
                                 @if($scan->confidence)
                                     <p class="text-xs text-gray-600 mt-1">
@@ -143,11 +155,26 @@
                 @endif
             @endif
 
-            {{-- ── Reservation Match + Auto Check-In Result ────────── --}}
-            @if(session('scan_reservation_id') || (session('scan_result') && !session('scan_reservation_id')))
+            {{-- ── ลานเต็ม: ไม่บันทึกผล Scan (ยกเว้นเหตุการณ์ Blacklist) ── --}}
+            @if(session('scan_lot_full'))
+                @php $lotFull = session('scan_lot_full'); @endphp
+                <div class="mb-5 rounded-2xl border border-red-500/60 bg-red-950/30 p-4">
+                    <p class="font-extrabold text-red-300 text-sm">ลานเต็ม</p>
+                    <p class="text-red-400 text-xs mt-0.5">{{ $lotFull['message'] }} — ระบบไม่บันทึกผลการสแกนครั้งนี้</p>
+                    <p class="text-gray-300 text-xs mt-2">
+                        ทะเบียน <span class="font-bold">{{ $lotFull['license_plate'] }}</span> {{ $lotFull['plate_province'] }}
+                    </p>
+                    @if($lotFull['is_suspicious'])
+                        <p class="text-red-300 text-xs font-bold mt-2">⚠ รถอยู่ใน Blacklist — แจ้ง Owner / Admin และบันทึกเหตุการณ์แล้ว</p>
+                    @endif
+                </div>
+            @endif
+
+            {{-- ── Auto Check-In / Walk-in Result ──────────────────── --}}
+            @if(session('scan_check_in'))
                 @php
                     $matchedReservation = session('scan_reservation_id')
-                        ? \App\Models\Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'vehicle:id,license_plate', 'user:id,name'])
+                        ? \App\Models\Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name'])
                             ->find(session('scan_reservation_id'))
                         : null;
                     $checkIn = session('scan_check_in');
@@ -163,10 +190,13 @@
                                 </svg>
                             </div>
                             <div>
-                                <p class="font-extrabold text-green-300 text-sm">เช็คอินอัตโนมัติสำเร็จ</p>
-                                <p class="text-green-400 text-xs mt-0.5">
-                                    รถเข้าจอดที่ช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> เรียบร้อยแล้ว
+                                <p class="font-extrabold text-green-300 text-sm">
+                                    {{ $checkIn['outcome'] === 'walk_in' ? 'เช็คอินอัตโนมัติสำเร็จ (Walk-in)' : 'เช็คอินอัตโนมัติสำเร็จ' }}
                                 </p>
+                                <p class="text-green-400 text-xs mt-0.5">
+                                    ระบบจัดสรรช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — รถเข้าจอดเรียบร้อยแล้ว
+                                </p>
+                                <p class="{{ $checkIn['staff_notified'] ? 'text-yellow-300' : 'text-gray-400' }} text-xs mt-1">{{ $checkIn['message'] }}</p>
                             </div>
                         </div>
                     @else
@@ -178,7 +208,7 @@
                             </div>
                             <div>
                                 <p class="font-extrabold text-yellow-300 text-sm">ไม่สามารถเช็คอินอัตโนมัติได้</p>
-                                <p class="text-yellow-400 text-xs mt-0.5">{{ $checkIn['error'] }}</p>
+                                <p class="text-yellow-400 text-xs mt-0.5">{{ $checkIn['message'] }}</p>
                             </div>
                         </div>
                     @endif
@@ -201,12 +231,16 @@
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="font-extrabold text-white text-sm">พบการจอง #{{ $matchedReservation->id }}</h3>
+                                <h3 class="font-extrabold text-white text-sm">
+                                    {{ $matchedReservation->is_walk_in ? 'Walk-in' : 'การจอง' }} #{{ $matchedReservation->id }}
+                                </h3>
                                 <p class="text-xs text-gray-500">
                                     @if($matchedReservation->status === 'confirmed')
                                         <span class="text-green-400">● ยืนยันแล้ว</span>
                                     @elseif($matchedReservation->status === 'checked_in')
                                         <span class="text-sky-400">● เช็คอินแล้ว</span>
+                                    @elseif($matchedReservation->status === 'pending')
+                                        <span class="text-yellow-400">● รอยืนยันรับเงินมัดจำ</span>
                                     @endif
                                 </p>
                             </div>
@@ -219,12 +253,12 @@
                             </div>
                             <div>
                                 <dt class="text-gray-500">ทะเบียน</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->license_plate ?? $matchedReservation->vehicle?->license_plate ?? '—' }}</dd>
+                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->license_plate ?? '—' }}</dd>
                             </div>
-                            @if($matchedReservation->resolvedProvince())
+                            @if($matchedReservation->plate_province)
                                 <div>
                                     <dt class="text-gray-500">จังหวัดที่แจ้งไว้</dt>
-                                    <dd class="font-semibold text-gray-200">{{ $matchedReservation->resolvedProvince() }}</dd>
+                                    <dd class="font-semibold text-gray-200">{{ $matchedReservation->plate_province }}</dd>
                                 </div>
                             @endif
                             @if($matchedReservation->brand || $matchedReservation->color)

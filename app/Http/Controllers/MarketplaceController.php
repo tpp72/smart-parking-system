@@ -16,7 +16,6 @@ class MarketplaceController extends Controller
         $lots = DB::table('parking_lots as lot')
             ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
             ->leftJoin('users as u', 'u.id', '=', 'lot.owner_id')
-            ->where('lot.is_active', true)
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
                 $qq->where('lot.name', 'like', "%{$q}%")
                     ->orWhere('lot.location', 'like', "%{$q}%")

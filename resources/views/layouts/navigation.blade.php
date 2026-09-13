@@ -307,8 +307,6 @@
 
                 <div class="border-t border-red-900/30 mt-2 pt-2">
                 <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 px-2 pb-1">จัดการ</p>
-                <a href="{{ route('admin.vehicles.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.vehicles.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h6l2-2zM13 10h4l3 6H13v-6z"/></svg> รถ</a>
                 <a href="{{ route('admin.parking-slots.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.parking-slots.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg> ช่องจอด</a>
                 <a href="{{ route('admin.parking-logs.index') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold {{ request()->routeIs('admin.parking-logs.*') ? 'bg-red-600/20 text-red-200' : 'text-gray-300 hover:bg-white/[0.06]' }}">

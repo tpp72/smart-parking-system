@@ -31,14 +31,13 @@ class CheckInTest extends TestCase
             ->post(route('admin.reservations.check-in', $reservation));
     }
 
-    /** การจองแบบพิมพ์ทะเบียนเอง (ไม่มี Vehicle) พร้อมเช็คอินทันที */
+    /** การจองแบบ Plate-based พร้อมเช็คอินทันที */
     private function checkableReservation(array $overrides = []): Reservation
     {
         return Reservation::factory()->create(array_merge([
-            'vehicle_id'     => null,
             'status'         => 'confirmed',
             'reserve_start'  => now(),
-            'license_plate'  => 'กก 1234 กรุงเทพมหานคร',
+            'license_plate'  => 'กก 1234',
             'plate_province' => 'กรุงเทพมหานคร',
             'brand'          => 'Toyota',
             'color'          => 'ขาว',
@@ -60,13 +59,14 @@ class CheckInTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success');
 
-        // log ถูกสร้างพร้อมทะเบียน/ยี่ห้อ/สี แม้ไม่มี Vehicle record
+        // log ถูกสร้างพร้อม ทะเบียน/จังหวัด/ยี่ห้อ/สี
         $this->assertDatabaseHas('parking_logs', [
-            'vehicle_id'     => null,
-            'license_plate'  => $reservation->license_plate,
+            'license_plate'  => 'กก 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
             'brand'          => 'Toyota',
             'color'          => 'ขาว',
             'parking_lot_id' => $lot->id,
+            'reservation_id' => $reservation->id,
             'check_out_time' => null,
         ]);
 
@@ -83,28 +83,24 @@ class CheckInTest extends TestCase
         ]);
     }
 
-    // ─── [2] ห้าม check-in ซ้ำ (ทะเบียนนี้ยังอยู่ในลาน) ────────────────────
+    // ─── [2] ห้าม check-in ซ้ำ (รถคันนี้ยังอยู่ในลาน) ──────────────────────
 
     public function test_check_in_blocked_when_plate_already_parked(): void
     {
         $admin = $this->admin();
         $lot   = ParkingLot::factory()->create();
-        $plate = 'กก 1234 กรุงเทพมหานคร';
 
-        // ทะเบียนนี้มี active log อยู่แล้ว
+        // รถคันนี้มี active log อยู่แล้ว
         ParkingLog::factory()->create([
-            'vehicle_id'     => null,
-            'license_plate'  => $plate,
+            'license_plate'  => 'กก 1234',
+            'plate_province' => 'กรุงเทพมหานคร',
             'parking_lot_id' => $lot->id,
             'check_out_time' => null,
         ]);
 
         ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
 
-        $reservation = $this->checkableReservation([
-            'parking_lot_id' => $lot->id,
-            'license_plate'  => $plate,
-        ]);
+        $reservation = $this->checkableReservation(['parking_lot_id' => $lot->id]);
 
         $response = $this->postCheckIn($admin, $reservation);
 
@@ -160,5 +156,63 @@ class CheckInTest extends TestCase
 
         $this->post(route('admin.reservations.check-in', $reservation))
             ->assertRedirect(route('login'));
+    }
+
+    // ─── [6] Manual Check-in รับรถที่มาก่อนเวลาจองได้ ──────────────────────
+
+    public function test_manual_check_in_allows_early_arrival(): void
+    {
+        $admin = $this->admin();
+        $lot   = ParkingLot::factory()->create();
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
+
+        $reservation = $this->checkableReservation([
+            'parking_lot_id' => $lot->id,
+            'reserve_start'  => now()->addHours(5),
+        ]);
+
+        $this->postCheckIn($admin, $reservation)->assertSessionHas('success');
+
+        $this->assertDatabaseHas('reservations', ['id' => $reservation->id, 'status' => 'checked_in']);
+    }
+
+    // ─── [7] Manual Check-in ไม่ได้เมื่อเลยเวลาเช็คอินแล้ว ──────────────────
+
+    public function test_manual_check_in_rejects_reservation_past_grace_period(): void
+    {
+        $admin = $this->admin();
+        $lot   = ParkingLot::factory()->create();
+        ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'available']);
+
+        $reservation = $this->checkableReservation([
+            'parking_lot_id' => $lot->id,
+            'reserve_start'  => now()->subMinutes(Reservation::gracePeriodMinutes() + 5),
+        ]);
+
+        $this->postCheckIn($admin, $reservation)->assertSessionHasErrors('error');
+
+        $this->assertDatabaseCount('parking_logs', 0);
+    }
+
+    // ─── [8] Owner เช็คอินการจองของลานอื่นไม่ได้ ───────────────────────────
+
+    public function test_owner_cannot_check_in_reservation_of_another_owners_lot(): void
+    {
+        $owner = User::factory()->create([
+            'role'                 => 'owner',
+            'owner_status'         => 'approved',
+            'force_password_reset' => false,
+            'email_verified_at'    => now(),
+        ]);
+        $otherLot = ParkingLot::factory()->create(['owner_id' => User::factory()->create(['role' => 'owner'])->id]);
+        ParkingSlot::factory()->create(['parking_lot_id' => $otherLot->id, 'status' => 'available']);
+
+        $reservation = $this->checkableReservation(['parking_lot_id' => $otherLot->id]);
+
+        $this->actingAs($owner)
+            ->post(route('owner.reservations.check-in', $reservation))
+            ->assertForbidden();
+
+        $this->assertSame('confirmed', $reservation->fresh()->status);
     }
 }
