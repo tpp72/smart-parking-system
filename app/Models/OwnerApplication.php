@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class OwnerApplication extends Model
 {
+    /** เอกสารแนบเก็บเป็นไฟล์ส่วนตัว (ไม่เปิดสาธารณะ) — project-plan.md §19.3 */
+    const DOCUMENT_DISK = 'local';
+
     protected $guarded = [];
 
     protected $casts = [

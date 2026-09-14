@@ -19,7 +19,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 class="text-3xl font-extrabold sp-glow-text">ประวัติการจอด (Parking Logs)</h1>
-                    <p class="text-gray-300 mt-1">ค้นหาตามทะเบียนรถ / กรองตามวันที่ — รถ Walk-in ที่ยังไม่เช็คเอาท์ เช็คเอาท์ได้จากที่นี่</p>
+                    <p class="text-gray-300 mt-1">ค้นหาตามทะเบียนรถ / กรองตามวันที่ — รถที่ยังไม่เช็คเอาท์ ทำ Manual Check-out ได้จากที่นี่</p>
                 </div>
             </div>
 
@@ -72,13 +72,13 @@
                     <tbody>
                         @forelse ($logs as $log)
                             @php
-                                $isActiveWalkIn = $log->reservation?->is_walk_in && $log->check_out_time === null;
+                                $isParked = $log->check_out_time === null;
                                 $hoursElapsed = null;
                                 $estimatedFee = null;
-                                if ($isActiveWalkIn) {
+                                if ($isParked) {
                                     $minutes = (int) \Carbon\Carbon::parse($log->check_in_time)->diffInMinutes(now());
                                     $hoursElapsed = max(1, (int) ceil($minutes / 60));
-                                    $estimatedFee = $hoursElapsed * (float) ($log->parkingLot->hourly_rate ?? 0);
+                                    $estimatedFee = $hoursElapsed * (float) $log->hourly_rate;
                                 }
                             @endphp
                             <tr class="border-b sp-divider hover:bg-white/5 transition">
@@ -116,15 +116,15 @@
                                     @endif
                                 </td>
                                 <td class="py-3 pr-4 text-right">
-                                    @if($isActiveWalkIn)
+                                    @if($isParked)
                                         <button type="button"
-                                            title="เช็คเอาท์รถ Walk-in คันนี้"
+                                            title="เช็คเอาท์รถคันนี้ (Manual Check-out)"
                                             class="sp-btn sp-btn-outline border-yellow-600/50 text-yellow-300 hover:bg-yellow-900/30 text-xs px-3 py-1"
                                             @click="openCheckoutModal(
                                                 '{{ $log->license_plate }}',
                                                 {{ $hoursElapsed }},
                                                 {{ $estimatedFee }},
-                                                '{{ route('admin.parking-logs.check-out', $log) }}'
+                                                '{{ route('admin.reservations.check-out', $log->reservation_id) }}'
                                             )">
                                             เช็คเอาท์
                                         </button>

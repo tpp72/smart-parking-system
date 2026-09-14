@@ -26,6 +26,8 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        $before = $request->user()->only(array_keys($request->validated()));
+
         $request->user()->fill($request->validated());
 
         if ($request->user()->isDirty('email')) {
@@ -33,6 +35,8 @@ class ProfileController extends Controller
         }
 
         $request->user()->save();
+
+        audit_log('profile.update', $request->user(), ['changes' => audit_changes($before, $request->user())]);
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
@@ -47,6 +51,8 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        audit_log('profile.delete', $user, ['email' => $user->email, 'role' => $user->role]);
 
         Auth::logout();
 

@@ -114,7 +114,7 @@ class SlotReservationLifecycleTest extends TestCase
     public function test_expire_releases_reserved_slot(): void
     {
         $user         = $this->regularUser();
-        $graceMinutes = (int) config('parking.grace_period', 30);
+        $graceMinutes = Reservation::gracePeriodMinutes();
         $lot          = ParkingLot::factory()->create();
         $slot         = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id, 'status' => 'reserved']);
 
@@ -169,7 +169,7 @@ class SlotReservationLifecycleTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.parking-logs.check-out', $log))
+            ->post(route('admin.reservations.check-out', $log->reservation_id))
             ->assertRedirect();
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'status' => 'available']);

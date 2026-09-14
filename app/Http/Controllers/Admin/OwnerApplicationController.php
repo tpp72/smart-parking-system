@@ -65,7 +65,7 @@ class OwnerApplicationController extends Controller
             ])->save();
         });
 
-        admin_audit('owner_application.approve', $ownerApplication, []);
+        audit_log('owner_application.approve', $ownerApplication, []);
 
         notify_user($ownerApplication->user_id, 'คำขอเจ้าของลานจอดได้รับการอนุมัติ! 🎉',
             'ยินดีด้วย! คำขอของคุณได้รับการอนุมัติแล้ว คุณสามารถเริ่มเพิ่มลานจอดได้ทันที');
@@ -98,7 +98,7 @@ class OwnerApplicationController extends Controller
             ])->save();
         });
 
-        admin_audit('owner_application.reject', $ownerApplication, [
+        audit_log('owner_application.reject', $ownerApplication, [
             'reason' => $data['rejection_reason'],
         ]);
 

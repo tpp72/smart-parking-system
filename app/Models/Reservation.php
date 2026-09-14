@@ -39,10 +39,13 @@ class Reservation extends Model
         'expired'    => [],
     ];
 
-    /** Minutes after reserve_start that check-in is still allowed (from config) */
+    /** สถานะที่หมดอายุได้เมื่อไม่ Check-in ภายในเวลา */
+    const EXPIRABLE_STATUSES = ['pending', 'confirmed'];
+
+    /** ต้อง Check-in ภายในกี่นาทีหลัง reserve_start (1 ชั่วโมง) */
     public static function gracePeriodMinutes(): int
     {
-        return (int) config('parking.grace_period', 30);
+        return (int) config('parking.grace_period', 60);
     }
 
     /** Deposit = hourly_rate × 1 ชั่วโมง */
@@ -112,6 +115,22 @@ class Reservation extends Model
         return $query->where('status', 'confirmed')
             ->where('reserve_start', '<=', now())
             ->where('reserve_start', '>=', now()->subMinutes(self::gracePeriodMinutes()));
+    }
+
+    /**
+     * เลยช่วง Check-in แล้ว (เกิน reserve_start + 60 นาที) และยังไม่ Check-in → ต้อง Expire
+     * ขอบเวลาเป็นส่วนเติมเต็มของ checkable(): ครบ 60 นาทีพอดียังเช็คอินได้
+     */
+    public function scopeOverdue($query)
+    {
+        return $query->whereIn('status', self::EXPIRABLE_STATUSES)
+            ->where('reserve_start', '<', now()->subMinutes(self::gracePeriodMinutes()));
+    }
+
+    public function isOverdue(): bool
+    {
+        return in_array($this->status, self::EXPIRABLE_STATUSES, true)
+            && $this->reserve_start->lt(now()->subMinutes(self::gracePeriodMinutes()));
     }
 
     /** Manual Check-in ได้ตอนนี้: confirmed + ยังไม่เลย grace period (มาก่อนเวลาจองได้) */

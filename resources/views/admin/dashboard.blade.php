@@ -45,6 +45,9 @@
                     <a href="{{ route('admin.owner-applications.index') }}" class="text-xs {{ $pendingApplications > 0 ? 'text-yellow-400 border-yellow-500/40 hover:border-yellow-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
                         คำขอ Owner{{ $pendingApplications > 0 ? ' ('.$pendingApplications.')' : '' }}
                     </a>
+                    <a href="{{ route('admin.owner-resignations.index') }}" class="text-xs {{ $pendingResignations > 0 ? 'text-yellow-400 border-yellow-500/40 hover:border-yellow-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
+                        คำร้องลาออก Owner{{ $pendingResignations > 0 ? ' ('.$pendingResignations.')' : '' }}
+                    </a>
                     <a href="{{ route('admin.suspicious-vehicles.index') }}" class="text-xs {{ ($stats['blacklist_active'] ?? 0) > 0 ? 'text-red-400 border-red-600/40 hover:border-red-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
                         บัญชีดำ{{ ($stats['blacklist_active'] ?? 0) > 0 ? ' ('.$stats['blacklist_active'].')' : '' }}
                     </a>

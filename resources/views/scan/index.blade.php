@@ -191,10 +191,18 @@
                             </div>
                             <div>
                                 <p class="font-extrabold text-green-300 text-sm">
-                                    {{ $checkIn['outcome'] === 'walk_in' ? 'เช็คอินอัตโนมัติสำเร็จ (Walk-in)' : 'เช็คอินอัตโนมัติสำเร็จ' }}
+                                    {{ match ($checkIn['outcome']) {
+                                        'walk_in'     => 'เช็คอินอัตโนมัติสำเร็จ (Walk-in)',
+                                        'checked_out' => 'เช็คเอาท์อัตโนมัติสำเร็จ',
+                                        default       => 'เช็คอินอัตโนมัติสำเร็จ',
+                                    } }}
                                 </p>
                                 <p class="text-green-400 text-xs mt-0.5">
-                                    ระบบจัดสรรช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — รถเข้าจอดเรียบร้อยแล้ว
+                                    @if($checkIn['outcome'] === 'checked_out')
+                                        รถออกจากช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — ระบบคืนช่องจอดแล้ว
+                                    @else
+                                        ระบบจัดสรรช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — รถเข้าจอดเรียบร้อยแล้ว
+                                    @endif
                                 </p>
                                 <p class="{{ $checkIn['staff_notified'] ? 'text-yellow-300' : 'text-gray-400' }} text-xs mt-1">{{ $checkIn['message'] }}</p>
                             </div>
@@ -207,7 +215,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <p class="font-extrabold text-yellow-300 text-sm">ไม่สามารถเช็คอินอัตโนมัติได้</p>
+                                <p class="font-extrabold text-yellow-300 text-sm">ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติได้</p>
                                 <p class="text-yellow-400 text-xs mt-0.5">{{ $checkIn['message'] }}</p>
                             </div>
                         </div>

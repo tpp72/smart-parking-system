@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OwnerApplicationDocumentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\User\ReservationController as UserReservationController;
 use App\Http\Controllers\User\ParkingLogController as UserParkingLogController;
@@ -16,6 +17,8 @@ use App\Http\Controllers\Admin\SuspiciousVehicleController;
 use App\Http\Controllers\CarScanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicationController;
+use App\Http\Controllers\Admin\OwnerResignationController as AdminOwnerResignationController;
+use App\Http\Controllers\Owner\ResignationController as OwnerResignationController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\Owner\ApplicationController as OwnerApplicationController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
@@ -24,6 +27,7 @@ use App\Http\Controllers\Owner\ParkingLotController as OwnerParkingLotController
 use App\Http\Controllers\Owner\ParkingSlotController as OwnerParkingSlotController;
 use App\Http\Controllers\Owner\PaymentController as OwnerPaymentController;
 use App\Http\Controllers\Owner\ReservationController as OwnerReservationController;
+use App\Http\Controllers\Owner\ReservationLogController as OwnerReservationLogController;
 use App\Http\Controllers\Owner\RevenueController as OwnerRevenueController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,9 +45,10 @@ Route::get('/dashboard', function () {
         return redirect()->route('owner.dashboard');
     }
     return redirect()->route('user.dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'force.password.reset'])->name('dashboard');
 
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin'])->group(function () {
+// ===== Admin Routes (role: admin) — Force Password Reset ครอบคลุม Admin ด้วย =====
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.password.reset', 'role:admin'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'admin'])->name('dashboard');
 
     // Parking Lots CRUD
@@ -75,7 +80,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('admin-actions/export', [AdminActionController::class, 'export'])->name('admin-actions.export');
     // Parking Log History
     Route::get('parking-logs', [ParkingLogController::class, 'index'])->name('parking-logs.index');
-    Route::post('parking-logs/{log}/check-out', [ParkingLogController::class, 'checkOut'])->name('parking-logs.check-out');
     // Payments
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [PaymentController::class, 'markPaid'])->name('payments.mark-paid');
@@ -91,19 +95,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::get('owner-applications/{ownerApplication}', [AdminOwnerApplicationController::class, 'show'])->name('owner-applications.show');
     Route::post('owner-applications/{ownerApplication}/approve', [AdminOwnerApplicationController::class, 'approve'])->name('owner-applications.approve');
     Route::post('owner-applications/{ownerApplication}/reject', [AdminOwnerApplicationController::class, 'reject'])->name('owner-applications.reject');
+
+    // Owner Resignations
+    Route::get('owner-resignations', [AdminOwnerResignationController::class, 'index'])->name('owner-resignations.index');
+    Route::post('owner-resignations/{ownerResignation}/approve', [AdminOwnerResignationController::class, 'approve'])->name('owner-resignations.approve');
+    Route::post('owner-resignations/{ownerResignation}/reject', [AdminOwnerResignationController::class, 'reject'])->name('owner-resignations.reject');
 });
 
 // ===== Public Marketplace =====
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
 
 // ===== Owner Routes — Dashboard + Self-demotion (role: owner) =====
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'owner'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'role:owner'])->group(function () {
     Route::get('dashboard', [OwnerDashboardController::class, 'index'])->name('dashboard');
-    Route::post('demote-self', [OwnerApplicationController::class, 'demoteSelf'])->name('demote-self');
+    // คำร้องลาออก — มีผลเมื่อ Admin อนุมัติ
+    Route::post('resignation', [OwnerResignationController::class, 'store'])->name('resignation.store');
 });
 
 // ===== Owner Routes — Management (approved owners only) =====
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'owner', 'owner.approved'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'role:owner', 'owner.approved'])->group(function () {
     // Parking Lots
     Route::get('parking-lots', [OwnerParkingLotController::class, 'index'])->name('parking-lots.index');
     Route::get('parking-lots/create', [OwnerParkingLotController::class, 'create'])->name('parking-lots.create');
@@ -121,13 +131,14 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
     Route::get('reservations', [OwnerReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations/{reservation}/check-in', [OwnerReservationController::class, 'checkIn'])->name('reservations.check-in');
     Route::post('reservations/{reservation}/check-out', [OwnerReservationController::class, 'checkOut'])->name('reservations.check-out');
+    // Reservation Log ของลานตัวเอง (ไม่มี CSV Export)
+    Route::get('reservation-logs', [OwnerReservationLogController::class, 'index'])->name('reservation-logs.index');
 
     // Payments
     Route::get('payments', [OwnerPaymentController::class, 'index'])->name('payments.index');
     Route::post('payments/{payment}/mark-paid', [OwnerPaymentController::class, 'markPaid'])->name('payments.mark-paid');
     // Parking Log History
     Route::get('parking-logs', [OwnerParkingLogController::class, 'index'])->name('parking-logs.index');
-    Route::post('parking-logs/{log}/check-out', [OwnerParkingLogController::class, 'checkOut'])->name('parking-logs.check-out');
 
     // Revenue
     Route::get('revenue', [OwnerRevenueController::class, 'index'])->name('revenue.index');
@@ -171,6 +182,9 @@ Route::middleware(['auth', 'verified', 'force.password.reset'])->group(function 
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
+    // เอกสารแนบคำขอเป็น Owner (ไฟล์ส่วนตัว) — Controller ตรวจสิทธิ์: ผู้ยื่นคำขอหรือ Admin เท่านั้น
+    Route::get('owner-applications/{ownerApplication}/document', [OwnerApplicationDocumentController::class, 'show'])->name('owner-applications.document');
 });
 
 // ===== Profile (ทุก role) =====

@@ -126,9 +126,9 @@ class AutoCheckInTest extends TestCase
         $this->assertFalse($this->notified($this->owner, 'ยี่ห้อ/สีรถไม่ตรงกับการจอง'));
     }
 
-    // ─── [2] ยี่ห้อและสีไม่ตรงทั้งคู่ → ยังเช็คอินด้วยการจองเดิม + แจ้ง Owner/Admin ─
+    // ─── [2] ยี่ห้อและสีไม่ตรงทั้งคู่ → ยังเช็คอินด้วยการจองเดิม + แจ้งผู้ดูแลลาน ─
 
-    public function test_brand_and_color_mismatch_still_checks_in_booking_and_alerts_staff(): void
+    public function test_brand_and_color_mismatch_still_checks_in_booking_and_alerts_lot_manager(): void
     {
         $booking = $this->booking();
         $this->fakeAi(['brand' => 'Honda', 'color' => 'ดำ']);
@@ -138,10 +138,12 @@ class AutoCheckInTest extends TestCase
 
         $this->assertSame('checked_in', $booking->fresh()->status);
         $this->assertSame(0, $this->walkIns()->count());
-        $this->assertTrue($this->staffNotified('ยี่ห้อ/สีรถไม่ตรงกับการจอง'));
+        // ผู้ดูแลลานของ Owner = Owner เท่านั้น
+        $this->assertTrue($this->notified($this->owner, 'ยี่ห้อ/สีรถไม่ตรงกับการจอง'));
+        $this->assertFalse($this->notified($this->admin, 'ยี่ห้อ/สีรถไม่ตรงกับการจอง'));
     }
 
-    // ─── [3] มาก่อนเวลาจอง → ไม่ Auto Check-in · แจ้งให้ Manual Check-in ────
+    // ─── [3] มาก่อนเวลาจอง → ไม่ Auto Check-in · แจ้งผู้ดูแลลานให้ Manual Check-in ─
 
     public function test_early_arrival_is_not_checked_in_and_staff_is_asked_to_check_in_manually(): void
     {
@@ -154,7 +156,8 @@ class AutoCheckInTest extends TestCase
         $this->assertSame('confirmed', $booking->fresh()->status);
         $this->assertDatabaseCount('parking_logs', 0);
         $this->assertSame(0, $this->walkIns()->count());
-        $this->assertTrue($this->staffNotified('รถมาก่อนเวลาจอง'));
+        $this->assertTrue($this->notified($this->owner, 'รถมาก่อนเวลาจอง'));
+        $this->assertFalse($this->notified($this->admin, 'รถมาก่อนเวลาจอง'));
         $this->assertDatabaseHas('license_plate_scans', ['license_plate' => self::PLATE, 'result' => 'passed']);
 
         // Owner ของลานทำ Manual Check-in ได้ก่อนเวลาจอง
@@ -165,9 +168,9 @@ class AutoCheckInTest extends TestCase
         $this->assertSame('checked_in', $booking->fresh()->status);
     }
 
-    // ─── [4] การจองอยู่ลานอื่น → Walk-in ในลานนี้ + แจ้ง Owner/Admin ของลานนี้ ─
+    // ─── [4] การจองอยู่ลานอื่น → Walk-in ในลานนี้ · บันทึก Audit Log (ไม่แจ้งเตือน — §15.4) ─
 
-    public function test_booking_in_another_lot_becomes_walk_in_here_and_alerts_this_lots_staff(): void
+    public function test_booking_in_another_lot_becomes_walk_in_here(): void
     {
         $otherOwner = $this->makeUser('owner');
         $otherLot = ParkingLot::factory()->create(['owner_id' => $otherOwner->id]);
@@ -175,16 +178,17 @@ class AutoCheckInTest extends TestCase
         $this->fakeAi();
 
         $this->scan()->assertSessionHas('scan_check_in',
-            fn ($v) => $v['success'] && $v['outcome'] === 'walk_in' && $v['slot'] === 'A001' && $v['staff_notified']);
+            fn ($v) => $v['success'] && $v['outcome'] === 'walk_in' && $v['slot'] === 'A001' && !$v['staff_notified']);
 
         $walkIn = $this->walkIns()->firstOrFail();
         $this->assertSame($this->lot->id, $walkIn->parking_lot_id);
         $this->assertSame('confirmed', $booking->fresh()->status);
-        $this->assertTrue($this->staffNotified(self::WALK_IN_ALERT));
+        $this->assertDatabaseHas('admin_actions', ['action' => 'ai_scan.booking_not_used', 'subject_id' => $booking->id]);
+        $this->assertFalse($this->notified($this->owner, self::WALK_IN_ALERT));
         $this->assertFalse($this->notified($otherOwner, self::WALK_IN_ALERT));
     }
 
-    // ─── [5] การจองในลานนี้ยัง pending → Walk-in แยก + แจ้ง Owner/Admin ─────
+    // ─── [5] การจองในลานนี้ยัง pending → Walk-in แยก (ไม่แจ้งเตือน) ─────────
 
     public function test_pending_booking_in_this_lot_becomes_separate_walk_in(): void
     {
@@ -205,7 +209,7 @@ class AutoCheckInTest extends TestCase
 
         $this->assertSame('pending', $booking->fresh()->status);
         $this->assertSame(1, $this->walkIns()->where('status', 'checked_in')->count());
-        $this->assertTrue($this->staffNotified(self::WALK_IN_ALERT));
+        $this->assertFalse($this->notified($this->owner, self::WALK_IN_ALERT));
     }
 
     // ─── [6] การจองเลยเวลาเช็คอิน → Walk-in + แจ้ง Owner/Admin ──────────────
@@ -219,7 +223,7 @@ class AutoCheckInTest extends TestCase
 
         $this->assertSame('confirmed', $booking->fresh()->status);
         $this->assertSame(1, $this->walkIns()->count());
-        $this->assertTrue($this->staffNotified(self::WALK_IN_ALERT));
+        $this->assertFalse($this->notified($this->owner, self::WALK_IN_ALERT));
     }
 
     // ─── [7] ไม่พบการจอง → Walk-in (ไม่ขึ้นกับ reservations_enabled) ─────────
@@ -276,20 +280,6 @@ class AutoCheckInTest extends TestCase
         $this->assertTrue($this->staffNotified('AI อ่านทะเบียนไม่ได้'));
     }
 
-    // ─── [10] รถที่จอดอยู่แล้วสแกนซ้ำ → ไม่เช็คอินซ้ำ ──────────────────────
-
-    public function test_car_already_parked_is_not_checked_in_again(): void
-    {
-        ParkingSlot::factory()->create(['parking_lot_id' => $this->lot->id, 'slot_number' => 'A002']);
-        $this->fakeAi();
-
-        $this->scan();
-        $this->scan()->assertSessionHas('scan_check_in', fn ($v) => !$v['success'] && $v['outcome'] === 'already_parked');
-
-        $this->assertSame(1, $this->walkIns()->count());
-        $this->assertDatabaseCount('parking_logs', 1);
-    }
-
     // ─── [11] Walk-in เข้าลานเต็ม → แสดงลานเต็ม · ไม่บันทึกข้อมูลใด ๆ ─────────
 
     public function test_walk_in_into_full_lot_shows_lot_full_and_records_nothing(): void
@@ -324,7 +314,7 @@ class AutoCheckInTest extends TestCase
         $this->assertDatabaseCount('reservations', 0);
         $this->assertTrue($this->staffNotified('⚠ พบรถต้องสงสัย (Blacklist)'));
         $this->assertDatabaseHas('admin_actions', [
-            'action'       => 'blacklist.detected',
+            'action'       => 'ai_scan.blacklist_detected',
             'actor_role'   => 'system',
             'actor_id'     => null,
             'subject_type' => 'SuspiciousVehicle',

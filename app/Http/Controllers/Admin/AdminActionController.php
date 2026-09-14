@@ -3,71 +3,77 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/** Audit Log ทั้งระบบ — การกระทำของทุก Role และเหตุการณ์ที่ระบบดำเนินการ (project-plan.md §18) */
 class AdminActionController extends Controller
 {
+    private const ROLES = ['user', 'owner', 'admin', 'system'];
+
     public function index(Request $request)
     {
-        $q = trim((string) $request->query('q', ''));
-        $action = $request->query('action');
-        $subjectType = $request->query('subject_type');
-        $from = $request->query('from'); // YYYY-MM-DD
-        $to = $request->query('to');     // YYYY-MM-DD
-
-        $base = DB::table('admin_actions as aa')
-            ->leftJoin('users as u', 'u.id', '=', 'aa.actor_id')
-            ->select([
-                'aa.id',
-                'aa.action',
-                'aa.actor_role',
-                'aa.subject_type',
-                'aa.subject_id',
-                'aa.meta',
-                'aa.ip_address',
-                'aa.created_at',
-                'u.name as admin_name',
-                'u.email as admin_email',
-            ])
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('aa.action', 'like', "%{$q}%")
-                        ->orWhere('aa.subject_type', 'like', "%{$q}%")
-                        ->orWhere('aa.subject_id', '::text', 'like', "%{$q}%"); // pgsql
-                })
-                    ->orWhere('u.name', 'like', "%{$q}%")
-                    ->orWhere('u.email', 'like', "%{$q}%");
-            })
-            ->when($action, fn($query) => $query->where('aa.action', $action))
-            ->when($subjectType, fn($query) => $query->where('aa.subject_type', $subjectType))
-            ->when($from, fn($query) => $query->whereDate('aa.created_at', '>=', $from))
-            ->when($to, fn($query) => $query->whereDate('aa.created_at', '<=', $to))
-            ->orderByDesc('aa.id');
-
-        $rows = (clone $base)->paginate(20)->withQueryString();
-
-        // dropdowns จากข้อมูลจริง (ไม่เดา)
-        $actions = DB::table('admin_actions')->select('action')->distinct()->orderBy('action')->pluck('action');
-        $subjectTypes = DB::table('admin_actions')->select('subject_type')->whereNotNull('subject_type')->distinct()->orderBy('subject_type')->pluck('subject_type');
-
-        return view('admin.admin-actions.index', compact('rows', 'q', 'action', 'subjectType', 'from', 'to', 'actions', 'subjectTypes'));
+        return view('admin.admin-actions.index', [
+            'rows'         => $this->query($request)->paginate(20)->withQueryString(),
+            'actions'      => DB::table('admin_actions')->distinct()->orderBy('action')->pluck('action'),
+            'subjectTypes' => DB::table('admin_actions')->whereNotNull('subject_type')->distinct()->orderBy('subject_type')->pluck('subject_type'),
+            'roles'        => self::ROLES,
+            'filters'      => $request->query(),
+        ]);
     }
 
     public function export(Request $request): StreamedResponse
     {
-        $q = trim((string) $request->query('q', ''));
-        $action = $request->query('action');
-        $subjectType = $request->query('subject_type');
-        $from = $request->query('from');
-        $to = $request->query('to');
+        $query = $this->query($request);
+        $filename = 'audit_log_' . now()->format('Ymd_His') . '.csv';
 
-        $query = DB::table('admin_actions as aa')
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
+
+            fputcsv($out, ['id', 'created_at', 'actor_role', 'actor_name', 'actor_email', 'action', 'subject_type', 'subject_id', 'ip', 'user_agent', 'meta']);
+
+            $query->chunk(1000, function ($rows) use ($out) {
+                foreach ($rows as $r) {
+                    fputcsv($out, [
+                        $r->id,
+                        $r->created_at,
+                        $r->actor_role,
+                        $r->actor_role === 'system' ? 'ระบบ' : ($r->actor_name ?? 'บัญชีถูกลบ'),
+                        $r->actor_email,
+                        $r->action,
+                        $r->subject_type,
+                        $r->subject_id,
+                        $r->ip_address,
+                        $r->user_agent,
+                        self::metaText($r->meta),
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** Meta สำหรับแสดงผล (คงภาษาไทยไว้ ไม่ escape เป็น \uXXXX) */
+    public static function metaText(?string $meta): string
+    {
+        return $meta ? json_encode(json_decode($meta, true), JSON_UNESCAPED_UNICODE) : '';
+    }
+
+    private function query(Request $request): Builder
+    {
+        $q = trim((string) $request->query('q', ''));
+        $role = $request->query('actor_role');
+
+        return DB::table('admin_actions as aa')
             ->leftJoin('users as u', 'u.id', '=', 'aa.actor_id')
             ->select([
                 'aa.id',
                 'aa.action',
+                'aa.actor_id',
                 'aa.actor_role',
                 'aa.subject_type',
                 'aa.subject_id',
@@ -75,47 +81,23 @@ class AdminActionController extends Controller
                 'aa.ip_address',
                 'aa.user_agent',
                 'aa.created_at',
-                'u.name as admin_name',
-                'u.email as admin_email',
+                'u.name as actor_name',
+                'u.email as actor_email',
             ])
-            ->when($q !== '', function ($qq) use ($q) {
-                $qq->where('aa.action', 'like', "%{$q}%")
-                    ->orWhere('aa.subject_type', 'like', "%{$q}%")
-                    ->orWhere('u.name', 'like', "%{$q}%")
-                    ->orWhere('u.email', 'like', "%{$q}%");
-            })
-            ->when($action, fn($qq) => $qq->where('aa.action', $action))
-            ->when($subjectType, fn($qq) => $qq->where('aa.subject_type', $subjectType))
-            ->when($from, fn($qq) => $qq->whereDate('aa.created_at', '>=', $from))
-            ->when($to, fn($qq) => $qq->whereDate('aa.created_at', '<=', $to))
+            ->when($q !== '', fn ($query) => $query->where(function ($qq) use ($q) {
+                $qq->where('aa.action', 'ilike', "%{$q}%")
+                    ->orWhere('aa.subject_type', 'ilike', "%{$q}%")
+                    ->orWhere('u.name', 'ilike', "%{$q}%")
+                    ->orWhere('u.email', 'ilike', "%{$q}%")
+                    ->orWhereRaw('CAST(aa.subject_id AS TEXT) = ?', [ltrim($q, '#')])
+                    // jsonb แปลง \uXXXX กลับเป็นตัวอักษร จึงค้นหาภาษาไทยใน Meta ได้
+                    ->orWhereRaw('CAST(CAST(aa.meta AS JSONB) AS TEXT) ILIKE ?', ["%{$q}%"]);
+            }))
+            ->when(in_array($role, self::ROLES, true), fn ($query) => $query->where('aa.actor_role', $role))
+            ->when($request->query('action'), fn ($query, $action) => $query->where('aa.action', $action))
+            ->when($request->query('subject_type'), fn ($query, $type) => $query->where('aa.subject_type', $type))
+            ->when($request->query('from'), fn ($query, $date) => $query->whereDate('aa.created_at', '>=', $date))
+            ->when($request->query('to'), fn ($query, $date) => $query->whereDate('aa.created_at', '<=', $date))
             ->orderByDesc('aa.id');
-
-        $filename = 'admin_actions_' . now()->format('Ymd_His') . '.csv';
-
-        return response()->streamDownload(function () use ($query) {
-            $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
-
-            fputcsv($out, ['id', 'action', 'actor_role', 'subject_type', 'subject_id', 'actor_name', 'actor_email', 'ip', 'created_at', 'meta']);
-
-            $query->chunk(1000, function ($rows) use ($out) {
-                foreach ($rows as $r) {
-                    fputcsv($out, [
-                        $r->id,
-                        $r->action,
-                        $r->actor_role,
-                        $r->subject_type,
-                        $r->subject_id,
-                        $r->admin_name,
-                        $r->admin_email,
-                        $r->ip_address,
-                        $r->created_at,
-                        is_string($r->meta) ? $r->meta : json_encode($r->meta, JSON_UNESCAPED_UNICODE),
-                    ]);
-                }
-            });
-
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

@@ -171,7 +171,7 @@ class SlotAllocationTest extends TestCase
         $this->assertDatabaseHas('parking_slots', ['id' => $locked->id, 'status' => 'occupied']);
         $this->assertSame(1, ParkingSlot::where('status', 'available')->count());
 
-        app(CheckOutService::class)->checkOut($checkIn['log']->fresh());
+        app(CheckOutService::class)->checkOut($reservation);
 
         $this->assertDatabaseHas('parking_slots', ['id' => $locked->id, 'status' => 'available']);
     }
@@ -189,8 +189,9 @@ class SlotAllocationTest extends TestCase
         app(ReservationService::class)->cancel($cancelled, $cancelled->user, 'User ยกเลิกการจอง');
         $this->assertDatabaseHas('parking_slots', ['id' => $cancelledSlot->id, 'status' => 'available']);
 
-        $expiring = $this->book($lot, ['reserve_start' => now()->subHours(3)]);
+        $expiring = $this->book($lot, ['reserve_start' => now()]);
         $expiringSlot = $this->confirm($expiring)['slot'];
+        $this->travel(Reservation::gracePeriodMinutes() + 1)->minutes();
         $this->artisan('reservations:expire')->assertSuccessful();
 
         $this->assertSame('expired', $expiring->fresh()->status);

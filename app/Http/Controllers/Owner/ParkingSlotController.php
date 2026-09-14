@@ -63,7 +63,9 @@ class ParkingSlotController extends Controller
         ]);
 
         $this->assertLotOwned((int) $data['parking_lot_id']);
-        ParkingSlot::create($data + ['status' => 'available']);
+        $slot = ParkingSlot::create($data + ['status' => 'available']);
+
+        audit_log('parking_slot.create', $slot, ['parking_lot_id' => $slot->parking_lot_id, 'slot_number' => $slot->slot_number]);
 
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'เพิ่มช่องจอดเรียบร้อยแล้ว');
@@ -97,7 +99,10 @@ class ParkingSlotController extends Controller
             return back()->withErrors(['parking_lot_id' => 'ย้ายช่องจอดที่ถูกจองหรือมีรถจอดอยู่ไปลานอื่นไม่ได้'])->withInput();
         }
 
+        $before = $parking_slot->only(array_keys($data));
         $parking_slot->update($data);
+
+        audit_log('parking_slot.update', $parking_slot, ['changes' => audit_changes($before, $parking_slot)]);
 
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'อัปเดตช่องจอดเรียบร้อยแล้ว');
@@ -124,6 +129,8 @@ class ParkingSlotController extends Controller
         if ($error) {
             return back()->withErrors(['error' => $error]);
         }
+
+        audit_log('parking_slot.delete', $parking_slot, ['parking_lot_id' => $parking_slot->parking_lot_id, 'slot_number' => $parking_slot->slot_number]);
 
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'ลบช่องจอดเรียบร้อยแล้ว');
@@ -203,6 +210,11 @@ class ParkingSlotController extends Controller
             }
             ParkingSlot::insert($rows);
         });
+
+        audit_log('parking_slot.bulk_create', ParkingLot::find($data['parking_lot_id']), [
+            'count'        => count($slotNumbers),
+            'slot_numbers' => array_slice($slotNumbers, 0, 50),
+        ]);
 
         return redirect()->route('owner.parking-slots.index')
             ->with('success', 'เพิ่มช่องจอดแบบหลายรายการเรียบร้อยแล้ว (' . count($slotNumbers) . ' ช่อง)');

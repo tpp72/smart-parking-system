@@ -27,6 +27,7 @@ class PasswordController extends Controller
             'force_password_reset' => false,
         ])->save();
 
+        audit_log('auth.password_change', $request->user());
 
         return back()->with('status', 'password-updated');
     }

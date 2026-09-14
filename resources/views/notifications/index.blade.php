@@ -8,13 +8,13 @@
                     <p class="text-gray-300 mt-1">
                         ยังไม่ได้อ่าน
                         <span class="font-bold text-red-300">
-                            {{ $notifications->where('is_read', false)->count() }}
+                            {{ $unreadCount }}
                         </span>
                         รายการ
                     </p>
                 </div>
 
-                @if ($notifications->where('is_read', false)->count() > 0)
+                @if ($unreadCount > 0)
                     <form method="POST" action="{{ route('notifications.read-all') }}">
                         @csrf
                         <button type="submit" class="sp-btn sp-btn-outline">

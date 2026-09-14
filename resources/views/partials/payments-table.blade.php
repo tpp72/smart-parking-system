@@ -11,7 +11,7 @@
                     <th class="px-5 py-4 text-left">ลาน</th>
                     <th class="px-5 py-4 text-right">ชั่วโมง</th>
                     <th class="px-5 py-4 text-right">ค่าจอด</th>
-                    <th class="px-5 py-4 text-right">ส่วนลด</th>
+                    <th class="px-5 py-4 text-right">หักมัดจำ / ส่วนลด</th>
                     <th class="px-5 py-4 text-right">ยอดรวม</th>
                     <th class="px-5 py-4 text-center">สถานะ</th>
                     <th class="px-5 py-4 text-left">วันที่</th>
@@ -63,10 +63,14 @@
                                 ฿{{ number_format((float)$payment->parking_fee, 2) }}
                             @endif
                         </td>
-                        <td class="px-5 py-3 text-right">
+                        <td class="px-5 py-3 text-right text-xs">
+                            @if((float)$payment->deposit_deduction > 0)
+                                <span class="block text-sky-300">มัดจำ -฿{{ number_format((float)$payment->deposit_deduction, 2) }}</span>
+                            @endif
                             @if((float)$payment->reservation_discount > 0)
-                                <span class="text-green-400">-฿{{ number_format((float)$payment->reservation_discount, 2) }}</span>
-                            @else
+                                <span class="block text-green-400">ส่วนลด -฿{{ number_format((float)$payment->reservation_discount, 2) }}</span>
+                            @endif
+                            @if((float)$payment->deposit_deduction <= 0 && (float)$payment->reservation_discount <= 0)
                                 <span class="text-gray-600">—</span>
                             @endif
                         </td>

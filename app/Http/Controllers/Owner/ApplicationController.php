@@ -74,11 +74,11 @@ class ApplicationController extends Controller
         $documentPath = null;
         if ($request->hasFile('document')) {
             $documentPath = $request->file('document')
-                ->store('owner-applications', 'public');
+                ->store('owner-applications', OwnerApplication::DOCUMENT_DISK);
         }
 
-        DB::transaction(function () use ($user, $data, $documentPath) {
-            OwnerApplication::create([
+        $application = DB::transaction(function () use ($user, $data, $documentPath) {
+            $application = OwnerApplication::create([
                 'user_id'          => $user->id,
                 'applicant_type'   => $data['applicant_type'],
                 'business_name'    => $data['business_name'] ?? null,
@@ -97,7 +97,14 @@ class ApplicationController extends Controller
 
             // Role stays 'user' — only set owner_status to 'pending'
             $user->forceFill(['owner_status' => 'pending'])->save();
+
+            return $application;
         });
+
+        audit_log('owner_application.submit', $application, [
+            'applicant_type'   => $application->applicant_type,
+            'parking_lot_name' => $application->parking_lot_name,
+        ]);
 
         // Notify the user
         notify_user($user->id, 'ส่งคำขอเป็นเจ้าของลานจอดแล้ว',
@@ -138,38 +145,6 @@ class ApplicationController extends Controller
         return view('owner.application.edit', compact('application', 'user'));
     }
 
-    public function demoteSelf(Request $request)
-    {
-        $user = Auth::user();
-
-        if ($user->role !== 'owner') {
-            return redirect()->route('owner.dashboard');
-        }
-
-        $data = $request->validate([
-            'reason' => ['required', 'string', 'max:1000'],
-        ]);
-
-        DB::transaction(function () use ($user) {
-            $user->forceFill([
-                'role'         => 'user',
-                'owner_status' => null,
-            ])->save();
-        });
-
-        notify_user($user->id, 'ลาออกจากการเป็นเจ้าของลานจอดแล้ว',
-            'บัญชีของคุณได้เปลี่ยนกลับเป็น User เรียบร้อย');
-
-        $adminIds = User::where('role', 'admin')->pluck('id');
-        foreach ($adminIds as $adminId) {
-            notify_user($adminId, 'Owner ลาออกเอง',
-                "{$user->name} ({$user->email}) ส่งคำร้องปลดตัวเองกลับเป็น User เหตุผล: {$data['reason']}");
-        }
-
-        return redirect()->route('user.dashboard')
-            ->with('success', 'ลาออกจากการเป็นเจ้าของลานจอดเรียบร้อยแล้ว บัญชีของคุณกลับเป็น User แล้ว');
-    }
-
     public function update(Request $request)
     {
         $user = Auth::user();
@@ -199,9 +174,9 @@ class ApplicationController extends Controller
         $documentPath = $application->document_path;
         if ($request->hasFile('document')) {
             if ($documentPath) {
-                Storage::disk('public')->delete($documentPath);
+                Storage::disk(OwnerApplication::DOCUMENT_DISK)->delete($documentPath);
             }
-            $documentPath = $request->file('document')->store('owner-applications', 'public');
+            $documentPath = $request->file('document')->store('owner-applications', OwnerApplication::DOCUMENT_DISK);
         }
 
         DB::transaction(function () use ($user, $application, $data, $documentPath) {
@@ -226,6 +201,11 @@ class ApplicationController extends Controller
 
             $user->forceFill(['owner_status' => 'pending'])->save();
         });
+
+        audit_log('owner_application.resubmit', $application, [
+            'applicant_type'   => $application->applicant_type,
+            'parking_lot_name' => $application->parking_lot_name,
+        ]);
 
         // Notify user
         notify_user($user->id, 'ส่งคำขอใหม่แล้ว', 'คำขอที่แก้ไขของคุณอยู่ระหว่างการพิจารณาอีกครั้ง');

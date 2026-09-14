@@ -136,7 +136,7 @@ class ReservationNotificationsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.parking-logs.check-out', $log))
+            ->post(route('admin.reservations.check-out', $log->reservation_id))
             ->assertRedirect();
 
         $notification = Notification::where('user_id', $user->id)->first();

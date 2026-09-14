@@ -26,6 +26,9 @@ class ParkingLogController extends Controller
                 'pl.check_in_time',
                 'pl.check_out_time',
                 'p.total_hours',
+                'p.parking_fee',
+                'p.deposit_deduction',
+                'p.reservation_discount',
                 'p.total_amount',
                 'p.payment_status',
             ])

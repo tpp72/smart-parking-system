@@ -22,6 +22,8 @@ class ParkingLogFactory extends Factory
             'color'           => $this->faker->randomElement(config('car_colors')),
             'check_in_time'   => $checkIn,
             'check_out_time'  => null,
+            // อัตราค่าจอด ณ ตอน Check-in = อัตราปัจจุบันของลาน
+            'hourly_rate'     => fn (array $attrs) => ParkingLot::whereKey($attrs['parking_lot_id'])->value('hourly_rate') ?? 0,
             // ทุกการจอดมาจาก Reservation — ค่าเริ่มต้นเป็น Walk-in ของรถคันเดียวกันในลานเดียวกัน (ต้องอยู่ท้ายสุด)
             'reservation_id'  => fn (array $attrs) => Reservation::factory()->walkIn()->create([
                 'parking_lot_id' => $attrs['parking_lot_id'],

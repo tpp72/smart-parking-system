@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * reservation_fee = ส่วนลด (= hourly_rate) — แยกจาก Deposit
- * (สูตรหัก Deposit ตอน Checkout ทำใน Phase 7 — test ชุดนี้ใช้ deposit_amount = 0)
+ * (test ชุดนี้ไม่มี Deposit Payment ที่ชำระแล้ว จึงหักเฉพาะส่วนลด — การหัก Deposit อยู่ใน CheckoutPaymentTest)
  */
 class CheckoutReservationFeeTest extends TestCase
 {

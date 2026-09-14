@@ -6,14 +6,15 @@ use App\Models\LicensePlateScan;
 use App\Models\ParkingLot;
 use App\Services\AutoCheckInService;
 use App\Services\CarScanService;
+use App\Services\ScanGateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class CarScanController extends Controller
 {
     public function __construct(
-        private CarScanService     $scanService,
-        private AutoCheckInService $autoCheckIn,
+        private CarScanService  $scanService,
+        private ScanGateService $gate,
     ) {}
 
     /**
@@ -78,7 +79,7 @@ class CarScanController extends Controller
                 ->withInput();
         }
 
-        // ─── AI ไม่ผ่านเกณฑ์ → บันทึกผล + แจ้ง Owner/Admin · ไม่ Matching / ไม่ Auto Check-in ─
+        // ─── AI ไม่ผ่านเกณฑ์ → บันทึกผล + แจ้ง Owner/Admin · ไม่ Matching / ไม่ Check-in / Check-out อัตโนมัติ ─
         if (!$scan->passed()) {
             $this->scanService->alertStaff($scan);
 
@@ -90,14 +91,15 @@ class CarScanController extends Controller
                     'message'        => $this->rejectionMessage($scan),
                     'slot'           => null,
                     'staff_notified' => true,
+                    'payment_id'     => null,
                 ],
             ]);
         }
 
-        // ─── Matching → Auto Check-in / Walk-in ─────────────────────
-        $outcome = $this->autoCheckIn->handle($scan);
+        // ─── ระบบตรวจทิศทางเอง: รถจอดอยู่ในลานนี้ → Auto Check-out · ไม่ได้จอด → Auto Check-in / Walk-in ─
+        $outcome = $this->gate->handle($scan);
 
-        // ─── ลานเต็ม → ไม่บันทึกผล Scan (ยกเว้นเหตุการณ์ Blacklist) ────
+        // ─── Walk-in เข้าลานเต็ม → ไม่บันทึกผล Scan (ยกเว้นเหตุการณ์ Blacklist) ────
         if ($outcome['outcome'] === AutoCheckInService::OUTCOME_LOT_FULL) {
             $lotFull = [
                 'message'        => $outcome['message'],
@@ -122,6 +124,7 @@ class CarScanController extends Controller
                 'message'        => $outcome['message'],
                 'slot'           => $outcome['slot'],
                 'staff_notified' => $outcome['staff_notified'],
+                'payment_id'     => $outcome['payment']?->id,
             ],
         ]);
     }
@@ -130,11 +133,11 @@ class CarScanController extends Controller
     private function rejectionMessage(LicensePlateScan $scan): string
     {
         if ($scan->result === LicensePlateScan::RESULT_UNREADABLE) {
-            return 'AI อ่านทะเบียนหรือจังหวัดไม่ได้ — ไม่สามารถเช็คอินอัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)';
+            return 'AI อ่านทะเบียนหรือจังหวัดไม่ได้ — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)';
         }
 
         return sprintf(
-            'ความแม่นยำของ AI %s ไม่เกินเกณฑ์ %s%% — ไม่สามารถเช็คอินอัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)',
+            'ความแม่นยำของ AI %s ไม่เกินเกณฑ์ %s%% — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)',
             $scan->confidence !== null ? number_format($scan->confidence, 1) . '%' : 'ไม่ทราบค่า',
             config('carscan.accuracy_threshold', 85)
         );

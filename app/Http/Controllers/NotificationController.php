@@ -16,7 +16,10 @@ class NotificationController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return view('notifications.index', compact('notifications'));
+        // นับทั้งหมด ไม่ใช่เฉพาะหน้าที่แสดง
+        $unreadCount = Notification::where('user_id', Auth::id())->unread()->count();
+
+        return view('notifications.index', compact('notifications', 'unreadCount'));
     }
 
     /** Mark เดี่ยว */
@@ -33,7 +36,7 @@ class NotificationController extends Controller
     public function markAllRead()
     {
         Notification::where('user_id', Auth::id())
-            ->where('is_read', false)
+            ->unread()
             ->update(['is_read' => true]);
 
         return back()->with('success', 'อ่านทั้งหมดแล้ว');

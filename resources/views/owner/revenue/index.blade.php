@@ -36,10 +36,11 @@
                 <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
                     <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">รายได้รวม</p>
                     <p class="text-3xl font-extrabold text-green-400">{{ number_format($revenueTotal, 0) }}</p>
-                    <p class="text-xs text-gray-500">บาท (ชำระแล้ว)</p>
+                    <p class="text-xs text-gray-500">บาท (รับเงินแล้ว)</p>
+                    <p class="text-xs text-gray-400">มัดจำ ฿{{ number_format($depositRevenue, 0) }} · ค่าจอด ฿{{ number_format($parkingRevenue, 0) }}</p>
                 </div>
                 <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">ค้างชำระ</p>
+                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">ค่าจอดค้างชำระ</p>
                     <p class="text-3xl font-extrabold text-yellow-400">{{ number_format($unpaidTotal, 0) }}</p>
                     <p class="text-xs text-gray-500">บาท</p>
                 </div>

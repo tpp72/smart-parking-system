@@ -91,7 +91,7 @@
                                 if ($r->status === 'checked_in' && $r->parkingLog) {
                                     $minutes = (int) \Carbon\Carbon::parse($r->parkingLog->check_in_time)->diffInMinutes(now());
                                     $hoursElapsed = max(1, (int) ceil($minutes / 60));
-                                    $estimatedFee = $hoursElapsed * (float) ($r->parkingLot->hourly_rate ?? 0);
+                                    $estimatedFee = $hoursElapsed * (float) $r->parkingLog->hourly_rate;
                                 }
                             @endphp
                             <tr class="border-b sp-divider">

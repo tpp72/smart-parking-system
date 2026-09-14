@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\OwnerApplication;
+use App\Models\OwnerResignation;
+use App\Queries\RevenueQuery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +22,7 @@ class DashboardController extends Controller
             return view('owner.dashboard', [
                 'ownerStatus' => $user->owner_status,
                 'application' => $application,
+                'resignation' => null,
                 'stats'              => null,
                 'lotsOverview'       => collect(),
                 'recentReservations' => collect(),
@@ -48,20 +51,15 @@ class DashboardController extends Controller
             ->whereNull('check_out_time')
             ->count();
 
+        // รายได้ = เงินที่รับจริง (มัดจำ + ค่าจอด) นับตามเวลาที่ยืนยันรับเงิน
         $today = now();
-        $revenueToday = (float) DB::table('payments as p')
-            ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-            ->whereIn('pl.parking_lot_id', $lotIds)
-            ->where('p.payment_status', 'paid')
-            ->whereDate('p.created_at', $today->toDateString())
+        $revenueToday = (float) RevenueQuery::paid($lotIds)
+            ->whereDate('p.paid_at', $today->toDateString())
             ->sum('p.total_amount');
 
-        $revenueMonth = (float) DB::table('payments as p')
-            ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-            ->whereIn('pl.parking_lot_id', $lotIds)
-            ->where('p.payment_status', 'paid')
-            ->whereYear('p.created_at', $today->year)
-            ->whereMonth('p.created_at', $today->month)
+        $revenueMonth = (float) RevenueQuery::paid($lotIds)
+            ->whereYear('p.paid_at', $today->year)
+            ->whereMonth('p.paid_at', $today->month)
             ->sum('p.total_amount');
 
         $reservationsToday = DB::table('reservations')
@@ -148,13 +146,10 @@ class DashboardController extends Controller
         ];
 
         $rawRevenue = $lotIds->isNotEmpty()
-            ? DB::table('payments as p')
-                ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-                ->whereIn('pl.parking_lot_id', $lotIds)
-                ->where('p.payment_status', 'paid')
-                ->where('p.created_at', '>=', now()->subMonths(11)->startOfMonth())
-                ->groupByRaw("TO_CHAR(p.created_at, 'YYYY-MM')")
-                ->selectRaw("TO_CHAR(p.created_at, 'YYYY-MM') as month_key, SUM(p.total_amount) as revenue")
+            ? RevenueQuery::paid($lotIds)
+                ->where('p.paid_at', '>=', now()->subMonths(11)->startOfMonth())
+                ->groupByRaw("TO_CHAR(p.paid_at, 'YYYY-MM')")
+                ->selectRaw("TO_CHAR(p.paid_at, 'YYYY-MM') as month_key, SUM(p.total_amount) as revenue")
                 ->pluck('revenue', 'month_key')
                 ->toArray()
             : [];
@@ -201,6 +196,9 @@ class DashboardController extends Controller
             ]],
         ];
 
+        // คำร้องลาออกล่าสุด (รอพิจารณา / ไม่อนุมัติ)
+        $resignation = OwnerResignation::where('user_id', $ownerId)->latest('id')->first();
+
         return view('owner.dashboard', compact(
             'stats',
             'lotsOverview',
@@ -209,6 +207,7 @@ class DashboardController extends Controller
             'chartReservationStatus',
             'chartRevenueTrend',
             'chartSlotOccupancy',
+            'resignation',
         ) + ['ownerStatus' => 'approved', 'application' => null]);
     }
 }

@@ -618,6 +618,7 @@ class DatabaseSeeder extends Seeder
             'plate_province' => $reservation->plate_province,
             'brand' => $reservation->brand,
             'color' => $reservation->color,
+            'hourly_rate' => ParkingLot::whereKey($reservation->parking_lot_id)->value('hourly_rate'),
             'check_in_time' => $checkIn,
             'check_out_time' => $checkOut,
             'created_at' => $checkIn,
@@ -903,6 +904,14 @@ class DatabaseSeeder extends Seeder
             $actor = $users[$log->changed_by];
             $action = $log->new_status === 'pending' ? 'reservation.create' : 'reservation.cancel';
             $this->audit($actor, $action, 'Reservation', $log->reservation_id, [], $log->created_at);
+
+            // Payment Log: Deposit เกิดพร้อมการจอง · ยกเลิกก่อนชำระ → void
+            $deposit = Payment::where('reservation_id', $log->reservation_id)->where('type', Payment::TYPE_DEPOSIT)->first();
+            if ($deposit && $log->new_status === 'pending') {
+                $this->audit($actor, 'payment.deposit_created', 'Payment', $deposit->id, ['reservation_id' => $log->reservation_id, 'total_amount' => $deposit->total_amount], $log->created_at);
+            } elseif ($deposit?->payment_status === Payment::STATUS_VOID) {
+                $this->audit($actor, 'payment.void', 'Payment', $deposit->id, ['reservation_id' => $log->reservation_id, 'reason' => 'reservation_cancelled'], $log->created_at);
+            }
         }
 
         // Admin / Owner: ยืนยันรับเงิน (Mark as Paid)
@@ -914,13 +923,18 @@ class DatabaseSeeder extends Seeder
             ], $payment->paid_at);
         }
 
-        // System: Auto check-in / Auto expire
+        // System: Walk-in / Auto check-in / Auto check-out / Expire
         $systemLogs = ReservationLog::whereNull('changed_by')
-            ->whereIn('new_status', ['checked_in', 'expired'])
+            ->whereIn('new_status', ['checked_in', 'completed', 'expired'])
             ->get();
         foreach ($systemLogs as $log) {
-            $action = $log->new_status === 'checked_in' ? 'reservation.auto_check_in' : 'reservation.expire';
-            $this->audit(null, $action, 'Reservation', $log->reservation_id, [], $log->created_at);
+            [$action, $meta] = match (true) {
+                $log->new_status === 'expired'   => ['reservation.expire', []],
+                $log->new_status === 'completed' => ['reservation.check_out', ['mode' => 'auto']],
+                $log->old_status === null        => ['reservation.walk_in', []],
+                default                          => ['reservation.check_in', ['mode' => 'auto']],
+            };
+            $this->audit(null, $action, 'Reservation', $log->reservation_id, $meta, $log->created_at);
         }
 
         // Admin: ตัวอย่างประวัติการเพิ่ม/ลบผู้ใช้ (audit trail ของบัญชีที่ไม่มีอยู่แล้ว)

@@ -5,14 +5,12 @@ namespace App\Http\Controllers\Owner;
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLog;
 use App\Models\ParkingLot;
-use App\Services\CheckOutService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
+/** ประวัติการจอดของลาน Owner — Manual Check-out ใช้ปุ่มของการจอง (reservations.check-out) */
 class ParkingLogController extends Controller
 {
-    public function __construct(private CheckOutService $checkOutService) {}
-
     public function index(Request $request)
     {
         $q    = trim((string) $request->query('q', ''));
@@ -23,9 +21,9 @@ class ParkingLogController extends Controller
 
         $logs = ParkingLog::query()
             ->with([
-                'parkingLot:id,name,hourly_rate',
+                'parkingLot:id,name',
                 'parkingSlot:id,slot_number',
-                'reservation:id,user_id',
+                'reservation:id,user_id,is_walk_in',
                 'reservation.user:id,name',
             ])
             ->whereIn('parking_lot_id', $ownedLotIds)
@@ -43,24 +41,5 @@ class ParkingLogController extends Controller
             ->withQueryString();
 
         return view('owner.parking-logs.index', compact('logs', 'q', 'from', 'to'));
-    }
-
-    /** Check-Out สำหรับรถ walk-in (ไม่มี reservation ผูกอยู่ — เช็คอินผ่าน AI scan หรือกรณีไม่ได้จองล่วงหน้า) */
-    public function checkOut(ParkingLog $log)
-    {
-        $ownedLotIds = ParkingLot::ownedBy(Auth::id())->pluck('id')->all();
-        $result = $this->checkOutService->checkOut($log, $ownedLotIds);
-
-        if (!$result['success']) {
-            return back()->withErrors(['error' => $result['error']]);
-        }
-
-        return back()->with('success', sprintf(
-            'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
-            $log->license_plate,
-            $result['totalHours'],
-            $result['parkingFee'],
-            $result['totalAmount'],
-        ));
     }
 }

@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
 use App\Models\Payment;
+use App\Services\CheckOutService;
 use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PaymentController extends Controller
 {
-    public function __construct(private ReservationService $reservations) {}
+    public function __construct(
+        private ReservationService $reservations,
+        private CheckOutService $checkOut,
+    ) {}
 
     public function index(Request $request)
     {
@@ -37,7 +41,10 @@ class PaymentController extends Controller
         return view('admin.payments.index', compact('payments', 'status'));
     }
 
-    /** ยืนยันรับเงิน (Mark as Paid) — Deposit: ยืนยันการจอง + Lock Slot · Checkout: ปิดยอดค้างชำระ */
+    /**
+     * ยืนยันรับเงิน (Mark as Paid) — Deposit: ยืนยันการจอง + Lock Slot · Checkout: ปิดยอดค้างชำระ
+     * (Payment Log / Audit Log บันทึกใน Service)
+     */
     public function markPaid(Payment $payment)
     {
         $lotId = $payment->type === Payment::TYPE_DEPOSIT
@@ -56,13 +63,6 @@ class PaymentController extends Controller
                 return back()->withErrors(['error' => $result['error']]);
             }
 
-            admin_audit('payment.mark_paid', $payment, [
-                'type'           => Payment::TYPE_DEPOSIT,
-                'reservation_id' => $payment->reservation_id,
-                'total_amount'   => $payment->total_amount,
-                'outcome'        => $result['outcome'],
-            ]);
-
             if ($result['outcome'] === ReservationService::OUTCOME_LOT_FULL) {
                 return back()->withErrors(['error' => "ลานจอดเต็ม — ยกเลิกการจอง #{$payment->reservation_id} อัตโนมัติและเปลี่ยนเงินมัดจำเป็น void"]);
             }
@@ -75,20 +75,11 @@ class PaymentController extends Controller
             ));
         }
 
-        if ($payment->payment_status !== Payment::STATUS_UNPAID) {
-            return back()->withErrors(['error' => 'รายการนี้ไม่อยู่ในสถานะรอชำระ']);
+        $result = $this->checkOut->markCheckoutPaid($payment, Auth::user());
+
+        if (!$result['success']) {
+            return back()->withErrors(['error' => $result['error']]);
         }
-
-        $payment->update([
-            'payment_status' => Payment::STATUS_PAID,
-            'paid_by'        => Auth::id(),
-            'paid_at'        => now(),
-        ]);
-
-        admin_audit('payment.mark_paid', $payment, [
-            'type'         => Payment::TYPE_CHECKOUT,
-            'total_amount' => $payment->total_amount,
-        ]);
 
         return back()->with('success', sprintf(
             'บันทึกการชำระเงิน ฿%s เรียบร้อยแล้ว',

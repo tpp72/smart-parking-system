@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
+use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -60,7 +61,13 @@ class ParkingLotController extends Controller
         $data['owner_id']             = Auth::id();
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
-        ParkingLot::create($data);
+        $lot = ParkingLot::create($data);
+
+        audit_log('parking_lot.create', $lot, [
+            'name'                 => $lot->name,
+            'hourly_rate'          => $lot->hourly_rate,
+            'reservations_enabled' => $lot->reservations_enabled,
+        ]);
 
         return redirect()->route('owner.parking-lots.index')
             ->with('success', 'เพิ่มลานจอดเรียบร้อยแล้ว');
@@ -89,7 +96,11 @@ class ParkingLotController extends Controller
         ]);
 
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
+
+        $before = $lot->only(array_keys($data));
         $lot->update($data);
+
+        audit_log('parking_lot.update', $lot, ['changes' => audit_changes($before, $lot)]);
 
         return redirect()->route('owner.parking-lots.index')
             ->with('success', 'อัปเดตลานจอดเรียบร้อยแล้ว');
@@ -99,11 +110,14 @@ class ParkingLotController extends Controller
     {
         $lot = $this->ownedLot($parking_lot);
 
-        if ($lot->slots()->whereIn('status', ['occupied', 'reserved'])->exists()) {
-            return back()->withErrors(['error' => 'ไม่สามารถลบลานจอดที่มีรถจอดหรือมีการจองอยู่']);
+        // ลบไม่ได้ถ้ายังมีการจองค้าง (รอยืนยันมัดจำ / ยืนยันแล้ว / กำลังจอด) — กันการจองหายโดยผู้จองไม่รู้ (project-plan.md §16.1)
+        if ($lot->reservations()->whereIn('status', Reservation::ACTIVE_STATUSES)->exists()) {
+            return back()->withErrors(['error' => 'ไม่สามารถลบลานจอดที่ยังมีการจองค้างอยู่ (รอยืนยันมัดจำ / ยืนยันแล้ว / กำลังจอด) — ปิดรับการจองแล้วรอให้การจองเสร็จสิ้นก่อน']);
         }
 
         $lot->delete();
+
+        audit_log('parking_lot.delete', $lot, ['name' => $lot->name]);
 
         return redirect()->route('owner.parking-lots.index')
             ->with('success', 'ลบลานจอดเรียบร้อยแล้ว');
