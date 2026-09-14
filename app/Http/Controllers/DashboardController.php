@@ -305,6 +305,7 @@ class DashboardController extends Controller
             ->get();
 
         $pendingApplications = OwnerApplication::where('status', 'pending')->count();
+        $pendingResignations = \App\Models\OwnerResignation::pending()->count();
 
         // ── Chart data ─────────────────────────────────────────────────────
         $statusKeys   = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
@@ -384,6 +385,7 @@ class DashboardController extends Controller
             'recentHistory',
             'slotsPreview',
             'pendingApplications',
+            'pendingResignations',
             'chartReservationStatus',
             'chartSlotOccupancy',
             'chartTopLots'

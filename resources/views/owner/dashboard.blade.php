@@ -265,20 +265,37 @@
             </div>
 
             {{-- ============================================================ --}}
-            {{--  Self-Demotion Section (แสดงเฉพาะ owner ที่ approved)       --}}
+            {{--  คำร้องลาออก — มีผลเมื่อ Admin อนุมัติ (project-plan.md §16)   --}}
             {{-- ============================================================ --}}
-            @if($ownerStatus === 'approved')
+            @if($ownerStatus === 'approved' && $resignation?->isPending())
+            <div class="sp-card rounded-2xl p-6 border border-yellow-600/40">
+                <h2 class="text-sm font-bold text-yellow-300">คำร้องลาออกรอการพิจารณา</h2>
+                <p class="text-xs text-gray-400 mt-1">
+                    ส่งเมื่อ {{ $resignation->created_at->format('d/m/Y H:i') }} — คุณยังคงเป็นเจ้าของลานจอดและใช้งานได้ตามปกติจนกว่า Admin จะอนุมัติ
+                </p>
+                <p class="text-sm text-gray-300 mt-2">เหตุผล: {{ $resignation->reason }}</p>
+            </div>
+            @elseif($ownerStatus === 'approved')
             <div class="sp-card rounded-2xl p-6 border border-red-900/40"
-                 x-data="{ open: false, reason: '' }">
-                <div class="flex items-center justify-between">
+                 x-data="{ open: {{ $errors->has('reason') ? 'true' : 'false' }}, reason: @js(old('reason', '')) }">
+                @if($resignation?->status === 'rejected')
+                    <div class="mb-4 rounded-xl border border-red-500/30 p-3 text-sm">
+                        <p class="text-red-300 font-semibold">คำร้องลาออกครั้งล่าสุดไม่ได้รับการอนุมัติ</p>
+                        <p class="text-gray-300 mt-1">เหตุผล: {{ $resignation->rejection_reason }}</p>
+                    </div>
+                @endif
+                <div class="flex items-center justify-between gap-4">
                     <div>
                         <h2 class="text-sm font-bold text-gray-300">ลาออกจากการเป็นเจ้าของลานจอด</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">บัญชีจะเปลี่ยนกลับเป็น User — ลานจอดของคุณจะยังคงอยู่ในระบบ</p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            ต้องได้รับอนุมัติจาก Admin — เมื่ออนุมัติ การจองที่ยังไม่ Check-in จะถูกยกเลิก รถที่จอดอยู่จะถูกเช็คเอาท์
+                            ลานจอดทั้งหมดของคุณจะถูกลบ และบัญชีกลับเป็น User
+                        </p>
                     </div>
                     <button type="button" @click="open = true"
-                        title="ส่งคำร้องขอลาออกจาก Owner กลับเป็น User"
-                        class="sp-btn sp-btn-danger text-sm">
-                        ลาออกจาก Owner
+                        title="ยื่นคำร้องลาออกให้ Admin พิจารณา"
+                        class="sp-btn sp-btn-danger text-sm whitespace-nowrap">
+                        ยื่นคำร้องลาออก
                     </button>
                 </div>
 
@@ -288,12 +305,15 @@
                     @keydown.escape.window="open = false">
                     <div class="sp-card rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-red-700/50"
                         @click.stop>
-                        <h3 class="text-lg font-extrabold text-red-300 mb-2">ยืนยันการลาออกจาก Owner</h3>
+                        <h3 class="text-lg font-extrabold text-red-300 mb-2">ยื่นคำร้องลาออกจาก Owner</h3>
                         <p class="text-sm text-gray-400 mb-4">
-                            หลังจากนี้คุณจะไม่สามารถจัดการลานจอดได้ จนกว่าจะสมัคร Owner ใหม่อีกครั้ง
+                            คำร้องจะมีผลเมื่อ Admin อนุมัติ ระหว่างนี้คุณยังจัดการลานจอดได้ตามปกติ
                         </p>
+                        @error('reason')
+                            <p class="text-sm text-red-300 mb-3">{{ $message }}</p>
+                        @enderror
 
-                        <form method="POST" action="{{ route('owner.demote-self') }}">
+                        <form method="POST" action="{{ route('owner.resignation.store') }}">
                             @csrf
                             <div class="mb-4">
                                 <label class="block text-sm text-red-300 font-semibold mb-1">

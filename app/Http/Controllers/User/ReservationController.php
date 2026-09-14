@@ -216,6 +216,13 @@ class ReservationController extends Controller
             'note'           => "User แก้ไขข้อมูลรถเป็น {$plate} {$province}" . ($brand ? " ยี่ห้อ {$brand}" : '') . ($color ? " สี {$color}" : ''),
         ]);
 
+        audit_log('reservation.update_vehicle', $reservation, [
+            'license_plate'  => $plate,
+            'plate_province' => $province,
+            'brand'          => $brand,
+            'color'          => $color,
+        ]);
+
         return redirect()->route('user.reservations.index')
             ->with('success', "อัปเดตข้อมูลรถเรียบร้อยแล้ว");
     }
@@ -231,13 +238,6 @@ class ReservationController extends Controller
             return redirect()->route('user.reservations.index')
                 ->withErrors(['error' => $result['error']]);
         }
-
-        notify_user(
-            Auth::id(),
-            'ยกเลิกการจองเรียบร้อยแล้ว',
-            "การจอง #{$reservation->id} ถูกยกเลิกเรียบร้อยแล้ว"
-                . ($result['deposit_forfeited'] ? ' (ไม่คืนเงินมัดจำ)' : '')
-        );
 
         return redirect()->route('user.reservations.index')
             ->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว"

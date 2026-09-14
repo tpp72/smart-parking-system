@@ -2,9 +2,9 @@
 
 return [
     /*
-     | Minutes after reserve_start that check-in is still allowed.
-     | After this window the scheduler auto-expires the reservation.
-     | Set RESERVATION_GRACE_PERIOD in .env to override.
+     | ช่วงเวลา Check-in หลัง reserve_start (นาที) — project-plan.md §7.2, §23
+     | ต้อง Check-in ภายใน 1 ชั่วโมง (ครบ 60 นาทีพอดียังเช็คอินได้) เกินกว่านั้น Scheduler เปลี่ยนการจองเป็น expired
+     | เป็น Business Rule คงที่ จึงไม่อ่านค่าจาก .env
      */
-    'grace_period' => (int) env('RESERVATION_GRACE_PERIOD', 30),
+    'grace_period' => 60,
 ];

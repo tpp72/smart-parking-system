@@ -32,7 +32,7 @@ class ParkingLot extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
-    /** ผู้รับแจ้งเตือนของลาน: Owner ของลาน (ถ้ามี) + Admin ทุกคน */
+    /** ผู้รับแจ้งเตือน AI ผิดปกติ / Blacklist: Owner ของลาน (ถ้ามี) + Admin ทุกคน — project-plan.md §15.4 */
     public function staffRecipientIds(): Collection
     {
         $ids = User::where('role', 'admin')->pluck('id');
@@ -44,10 +44,26 @@ class ParkingLot extends Model
         return $ids->unique()->values();
     }
 
-    /** แจ้งเตือน Owner ของลาน + Admin */
+    /** แจ้งเตือน Owner ของลาน + Admin ทุกคน */
     public function notifyStaff(string $title, string $message): void
     {
         foreach ($this->staffRecipientIds() as $recipientId) {
+            notify_user($recipientId, $title, $message);
+        }
+    }
+
+    /** ผู้ดูแลลาน: Owner ของลาน · ลานของ Admin (owner_id ว่าง) = Admin ทุกคน */
+    public function managerIds(): Collection
+    {
+        return $this->owner_id
+            ? collect([$this->owner_id])
+            : User::where('role', 'admin')->pluck('id');
+    }
+
+    /** แจ้งเตือนผู้ดูแลลาน — เหตุการณ์ Auto Check-in / Check-out ที่ต้องให้เจ้าหน้าที่ตรวจสอบ */
+    public function notifyManagers(string $title, string $message): void
+    {
+        foreach ($this->managerIds() as $recipientId) {
             notify_user($recipientId, $title, $message);
         }
     }

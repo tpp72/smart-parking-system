@@ -55,7 +55,14 @@ class ParkingLotController extends Controller
         ]);
 
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
-        ParkingLot::create($data);
+        $lot = ParkingLot::create($data);
+
+        audit_log('parking_lot.create', $lot, [
+            'name'                 => $lot->name,
+            'owner_id'             => $lot->owner_id,
+            'hourly_rate'          => $lot->hourly_rate,
+            'reservations_enabled' => $lot->reservations_enabled,
+        ]);
 
         return redirect()->route('admin.parking-lots.index')
             ->with('success', 'เพิ่มลานจอดเรียบร้อยแล้ว');
@@ -87,7 +94,11 @@ class ParkingLotController extends Controller
         ]);
 
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
+
+        $before = $parking_lot->only(array_keys($data));
         $parking_lot->update($data);
+
+        audit_log('parking_lot.update', $parking_lot, ['changes' => audit_changes($before, $parking_lot)]);
 
         return redirect()->route('admin.parking-lots.index')
             ->with('success', 'อัปเดตลานจอดเรียบร้อยแล้ว');
@@ -98,6 +109,8 @@ class ParkingLotController extends Controller
         abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
 
         $parking_lot->delete();
+
+        audit_log('parking_lot.delete', $parking_lot, ['name' => $parking_lot->name]);
 
         return redirect()->route('admin.parking-lots.index')
             ->with('success', 'ลบลานจอดเรียบร้อยแล้ว');

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Anthropic\Client;
 use Anthropic\RequestOptions;
-use App\Models\AdminAction;
 use App\Models\LicensePlateScan;
 use App\Models\SuspiciousVehicle;
 use GuzzleHttp\Client as GuzzleClient;
@@ -208,13 +207,30 @@ PROMPT;
             $alerts[] = ['AI อ่านทะเบียนไม่ได้', "สแกน #{$scan->id} ที่ลาน {$lotName} เวลา {$when} — AI อ่านทะเบียนไม่ได้ (Accuracy {$accuracy}) กรุณาตรวจสอบรถคันนี้"];
         } elseif ($scan->result === LicensePlateScan::RESULT_LOW_ACCURACY) {
             $alerts[] = ['AI Accuracy ไม่ผ่านเกณฑ์', sprintf(
-                'สแกน #%d ที่ลาน %s เวลา %s — %s · Accuracy %s ไม่เกินเกณฑ์ %s%% จึงไม่เช็คอินอัตโนมัติจากผลนี้',
+                'สแกน #%d ที่ลาน %s เวลา %s — %s · Accuracy %s ไม่เกินเกณฑ์ %s%% จึงไม่เช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้',
                 $scan->id, $lotName, $when, $carDetail, $accuracy, rtrim(rtrim(number_format((float) config('carscan.accuracy_threshold', 85), 2), '0'), '.')
             )];
         }
 
         if ($scan->is_suspicious) {
             $alerts[] = ['⚠ พบรถต้องสงสัย (Blacklist)', "{$carDetail} ตรวจพบที่ลาน {$lotName} เวลา {$when} (สแกน #{$scan->id})"];
+        }
+
+        // เหตุการณ์ AI ผิดปกติ → Audit Log (ระบบเป็นผู้ตรวจพบ ไม่ใช่ผู้อัปโหลด)
+        $auditMeta = [
+            'parking_lot_id' => $lot->id,
+            'license_plate'  => $scan->license_plate,
+            'plate_province' => $scan->plate_province,
+            'confidence'     => $scan->confidence,
+            'uploaded_by'    => $scan->user_id,
+        ];
+
+        if (!$scan->passed()) {
+            audit_by(null, "ai_scan.{$scan->result}", $scan, $auditMeta);
+        }
+
+        if ($scan->is_suspicious) {
+            audit_by(null, 'ai_scan.blacklist_detected', $scan, $auditMeta);
         }
 
         if (!$alerts) {
@@ -247,21 +263,16 @@ PROMPT;
                 $this->carDetail($scan), $lot->name, $scan->scan_time->format('d/m/Y H:i')
             ));
 
-            AdminAction::create([
-                'actor_id'     => null,
-                'actor_role'   => 'system',
-                'action'       => 'blacklist.detected',
-                'subject_type' => 'SuspiciousVehicle',
-                'subject_id'   => $blacklist?->id,
-                'meta'         => [
-                    'license_plate'  => $scan->license_plate,
-                    'plate_province' => $scan->plate_province,
-                    'brand'          => $scan->brand,
-                    'color'          => $scan->color,
-                    'confidence'     => $scan->confidence,
-                    'parking_lot_id' => $lot->id,
-                    'lot_full'       => true,
-                ],
+            // ผล Scan ไม่ถูกบันทึก จึงผูกเหตุการณ์กับรายการ Blacklist แทน
+            audit_by(null, 'ai_scan.blacklist_detected', $blacklist, [
+                'license_plate'  => $scan->license_plate,
+                'plate_province' => $scan->plate_province,
+                'brand'          => $scan->brand,
+                'color'          => $scan->color,
+                'confidence'     => $scan->confidence,
+                'parking_lot_id' => $lot->id,
+                'uploaded_by'    => $scan->user_id,
+                'lot_full'       => true,
             ]);
         }
 

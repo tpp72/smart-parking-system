@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Admin จัดการ Reservation ของลาน Admin (owner_id = NULL):
  * ดู / ค้นหา / ยกเลิก — ไม่มีการสร้าง แก้ไข ลบ หรือยืนยันด้วยมือ
- * (การยืนยันเกิดจาก Mark as Paid เงินมัดจำในหน้า Payments)
+ * (การยืนยันเกิดจาก Mark as Paid เงินมัดจำในหน้า Payments · Audit Log บันทึกใน Service)
  */
 class ReservationController extends Controller
 {
@@ -50,7 +50,7 @@ class ReservationController extends Controller
                 'user:id,name,email',
                 'parkingLot:id,name,hourly_rate',
                 'parkingSlot:id,parking_lot_id,slot_number',
-                'parkingLog:id,reservation_id,check_in_time',
+                'parkingLog:id,reservation_id,check_in_time,hourly_rate',
                 'depositPayment',
             ])
             ->whereIn('parking_lot_id', $lotIds)
@@ -97,25 +97,14 @@ class ReservationController extends Controller
             return back()->withErrors(['error' => $result['error']]);
         }
 
-        notify_user(
-            $reservation->user_id,
-            'การจองถูกยกเลิก',
-            "การจอง #{$reservation->id} ถูกยกเลิกโดยผู้ดูแลระบบ"
-        );
-
-        admin_audit('reservation.cancel', $reservation, [
-            'deposit_forfeited' => $result['deposit_forfeited'],
-        ]);
-
         return back()->with('success', "ยกเลิกการจอง #{$reservation->id} เรียบร้อยแล้ว");
     }
 
-    /** Check-In รถของการจองนี้โดยตรง (แทนหน้า Manual Check-In แยก) */
+    /** Manual Check-in (Fallback) — เฉพาะการจองที่ confirmed · รถที่มาก่อนเวลาจองเข้าได้หลังเจ้าหน้าที่ตรวจสอบ */
     public function checkIn(Reservation $reservation)
     {
         $this->assertReservationLotUnowned($reservation);
 
-        // Manual Check-in (Fallback) — เฉพาะการจองที่ confirmed · รถที่มาก่อนเวลาจองเข้าได้หลังเจ้าหน้าที่ตรวจสอบ
         $result = $this->checkInService->checkInReservation($reservation, Auth::user(), allowEarly: true);
 
         if (!$result['success']) {
@@ -124,54 +113,22 @@ class ReservationController extends Controller
 
         $slot = $result['slot'];
 
-        notify_user(
-            $reservation->user_id,
-            'เช็คอินสำเร็จ',
-            "รถทะเบียน {$reservation->license_plate} เข้าจอดที่ช่อง {$slot->slot_number} แล้ว (การจอง #{$reservation->id})"
-        );
-
-        admin_audit('parking_log.check_in', $reservation, [
-            'parking_lot_id'  => $slot->parking_lot_id,
-            'parking_slot_id' => $slot->id,
-        ]);
-
         return back()->with('success',
             "Check-In สำเร็จ! ทะเบียน {$reservation->license_plate} → ช่อง {$slot->slot_number}"
         );
     }
 
-    /** Check-Out รถของการจองนี้โดยตรง (แทนหน้า Manual Check-Out แยก) */
+    /** Manual Check-out (Fallback) — เข้าสู่ Checkout Flow เดียวกับ Auto Check-out */
     public function checkOut(Reservation $reservation)
     {
         $this->assertReservationLotUnowned($reservation);
 
-        if ($reservation->status !== 'checked_in') {
-            return back()->withErrors(['error' => "ไม่สามารถเช็คเอาท์ได้ สถานะปัจจุบันคือ '{$reservation->status}'"]);
-        }
-
-        $log = $reservation->parkingLog;
-        abort_if(!$log, 404, 'ไม่พบ Parking Log ของการจองนี้');
-
-        $allowedLotIds = ParkingLot::unowned()->pluck('id')->all();
-        $result = $this->checkOutService->checkOut($log, $allowedLotIds);
+        $result = $this->checkOutService->checkOut($reservation, Auth::user());
 
         if (!$result['success']) {
             return back()->withErrors(['error' => $result['error']]);
         }
 
-        admin_audit('parking_log.check_out', $log, [
-            'total_hours'          => $result['totalHours'],
-            'parking_fee'          => $result['parkingFee'],
-            'reservation_discount' => $result['deposit'],
-            'total_amount'         => $result['totalAmount'],
-        ]);
-
-        return back()->with('success', sprintf(
-            'Check-Out สำเร็จ! ทะเบียน %s | %d ชม. | ค่าจอด ฿%.2f | คงเหลือ ฿%.2f',
-            $reservation->license_plate,
-            $result['totalHours'],
-            $result['parkingFee'],
-            $result['totalAmount'],
-        ));
+        return back()->with('success', "Check-Out สำเร็จ! ทะเบียน {$reservation->license_plate} | " . CheckOutService::summary($result['payment']));
     }
 }

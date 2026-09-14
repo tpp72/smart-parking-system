@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Owner;
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
 use App\Models\Payment;
+use App\Services\CheckOutService;
 use App\Services\ReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PaymentController extends Controller
 {
-    public function __construct(private ReservationService $reservations) {}
+    public function __construct(
+        private ReservationService $reservations,
+        private CheckOutService $checkOut,
+    ) {}
 
     public function index(Request $request)
     {
@@ -68,15 +72,11 @@ class PaymentController extends Controller
             ));
         }
 
-        if ($payment->payment_status !== Payment::STATUS_UNPAID) {
-            return back()->withErrors(['error' => 'รายการนี้ไม่อยู่ในสถานะรอชำระ']);
-        }
+        $result = $this->checkOut->markCheckoutPaid($payment, Auth::user());
 
-        $payment->update([
-            'payment_status' => Payment::STATUS_PAID,
-            'paid_by'        => Auth::id(),
-            'paid_at'        => now(),
-        ]);
+        if (!$result['success']) {
+            return back()->withErrors(['error' => $result['error']]);
+        }
 
         return back()->with('success', sprintf(
             'บันทึกการชำระเงิน ฿%s เรียบร้อยแล้ว',

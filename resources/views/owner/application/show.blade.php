@@ -83,7 +83,7 @@
                     @if($application->document_path)
                     <div class="sm:col-span-2">
                         <dt class="text-gray-400 mb-1">เอกสารแนบ</dt>
-                        <dd><a href="{{ Storage::url($application->document_path) }}" target="_blank"
+                        <dd><a href="{{ route('owner-applications.document', $application) }}" target="_blank"
                             class="text-red-400 hover:text-red-300 underline text-sm">ดูเอกสาร →</a></dd>
                     </div>
                     @endif

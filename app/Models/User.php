@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+/** ต้องยืนยัน Email ก่อนใช้งานระบบหลัก (project-plan.md §5.3, §19.4) */
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
@@ -60,6 +61,11 @@ class User extends Authenticatable
     public function ownerApplication()
     {
         return $this->hasOne(OwnerApplication::class);
+    }
+
+    public function ownerResignations()
+    {
+        return $this->hasMany(OwnerResignation::class);
     }
 
     public function isApprovedOwner(): bool

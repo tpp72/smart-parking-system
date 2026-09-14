@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PasswordResetLinkController extends Controller
@@ -28,6 +30,12 @@ class PasswordResetLinkController extends Controller
         $request->validate([
             'email' => ['required', 'email'],
         ]);
+
+        // บัญชีระบบ (เช่น Walkin User) ไม่มีการรีเซ็ตรหัสผ่าน — ตอบเหมือนไม่พบผู้ใช้
+        if (User::where('email', Str::lower($request->input('email')))->where('is_system', true)->exists()) {
+            return back()->withInput($request->only('email'))
+                ->withErrors(['email' => __(Password::INVALID_USER)]);
+        }
 
         // We will send the password reset link to this user. Once we have attempted
         // to send the link, we will examine the response then see the message we

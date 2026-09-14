@@ -44,7 +44,14 @@
                                     <td class="px-5 py-4 text-gray-300">
                                         @if($log->total_amount !== null)
                                             ฿{{ number_format((float)$log->total_amount, 2) }}
-                                            <span class="text-xs text-gray-500">({{ $log->total_hours }}h)</span>
+                                            <span class="text-xs text-gray-500">({{ (int) $log->total_hours }}h)</span>
+                                            <span class="block text-xs text-gray-500">ค่าจอด ฿{{ number_format((float)$log->parking_fee, 2) }}</span>
+                                            @if((float)$log->deposit_deduction > 0)
+                                                <span class="block text-xs text-sky-300">หักมัดจำ -฿{{ number_format((float)$log->deposit_deduction, 2) }}</span>
+                                            @endif
+                                            @if((float)$log->reservation_discount > 0)
+                                                <span class="block text-xs text-green-400">ส่วนลด -฿{{ number_format((float)$log->reservation_discount, 2) }}</span>
+                                            @endif
                                         @else
                                             <span class="text-gray-600">—</span>
                                         @endif

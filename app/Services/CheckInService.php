@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Check-in รถเข้าลาน — ทุกการจอดต้องมาจาก Reservation (project-plan.md §10–11)
- * - Reservation ที่ confirmed เข้าช่องที่ระบบ Lock ไว้ให้
- * - Walk-in สร้าง Reservation ของ Walkin User แล้วเช็คอินทันที
+ * - Reservation ที่ confirmed เข้าช่องที่ระบบ Lock ไว้ให้ · แจ้ง User เจ้าของการจอง
+ * - Walk-in สร้าง Reservation ของ Walkin User แล้วเช็คอินทันที (ไม่มีการแจ้งเตือน)
  */
 class CheckInService
 {
@@ -49,7 +49,7 @@ class CheckInService
         }
 
         try {
-            return DB::transaction(function () use ($reservation, $actor, $allowEarly) {
+            $result = DB::transaction(function () use ($reservation, $actor, $allowEarly) {
                 $reservation = Reservation::lockForUpdate()->findOrFail($reservation->id);
 
                 if ($reservation->status !== 'confirmed') {
@@ -89,11 +89,25 @@ class CheckInService
                     'note'           => ($actor ? 'Manual check-in' : 'Auto check-in') . ": รถเข้าจอดที่ช่อง {$slot->slot_number}",
                 ]);
 
+                audit_by($actor, 'reservation.check_in', $reservation, [
+                    'mode'            => $actor ? 'manual' : 'auto',
+                    'parking_log_id'  => $log->id,
+                    'parking_slot_id' => $slot->id,
+                    'slot_number'     => $slot->slot_number,
+                    'early_arrival'   => $reservation->reserve_start->isAfter($now),
+                ]);
+
                 return $this->success($reservation, $slot, $log);
             });
         } catch (UniqueConstraintViolationException) {
             return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
         }
+
+        if ($result['success']) {
+            $this->notifyCheckedIn($result['reservation'], $result['slot'], $actor);
+        }
+
+        return $result;
     }
 
     /**
@@ -142,11 +156,38 @@ class CheckInService
                     'note'           => "Walk-in: ระบบสร้างการจองและเช็คอินอัตโนมัติ เข้าจอดที่ช่อง {$slot->slot_number}",
                 ]);
 
-                return $this->success($reservation, $slot, $this->park($reservation, $slot, $now));
+                $log = $this->park($reservation, $slot, $now);
+
+                audit_by(null, 'reservation.walk_in', $reservation, [
+                    'parking_lot_id'  => $lot->id,
+                    'parking_log_id'  => $log->id,
+                    'parking_slot_id' => $slot->id,
+                    'slot_number'     => $slot->slot_number,
+                    'license_plate'   => $licensePlate,
+                    'plate_province'  => $plateProvince,
+                ]);
+
+                return $this->success($reservation, $slot, $log);
             });
         } catch (UniqueConstraintViolationException) {
             return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
         }
+    }
+
+    /** แจ้ง User เจ้าของการจองว่ารถเข้าจอดแล้ว — Auto (ระบบสแกน) หรือ Manual (เจ้าหน้าที่) */
+    private function notifyCheckedIn(Reservation $reservation, ParkingSlot $slot, ?User $actor): void
+    {
+        notify_user(
+            $reservation->user_id,
+            $actor ? 'เช็คอินสำเร็จ' : 'เช็คอินอัตโนมัติสำเร็จ',
+            sprintf(
+                'รถทะเบียน %s %s เข้าจอดที่ช่อง %s แล้ว (การจอง #%d)',
+                $reservation->license_plate,
+                $actor ? 'เช็คอินโดยเจ้าหน้าที่' : 'เช็คอินผ่านระบบสแกนรถ',
+                $slot->slot_number,
+                $reservation->id
+            )
+        );
     }
 
     private function park(Reservation $reservation, ParkingSlot $slot, Carbon $now): ParkingLog
@@ -159,6 +200,8 @@ class CheckInService
             'plate_province'  => $reservation->plate_province,
             'brand'           => $reservation->brand,
             'color'           => $reservation->color,
+            // อัตราค่าจอด ณ ตอน Check-in ใช้คิดค่าจอดตอน Check-out
+            'hourly_rate'     => ParkingLot::whereKey($slot->parking_lot_id)->value('hourly_rate'),
             'check_in_time'   => $now,
         ]);
 

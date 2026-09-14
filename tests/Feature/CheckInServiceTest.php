@@ -191,6 +191,7 @@ class CheckInServiceTest extends TestCase
 
         $this->assertDatabaseHas('parking_slots', ['id' => $walkIn->parking_slot_id, 'status' => 'occupied']);
         $this->assertDatabaseHas('parking_logs', ['reservation_id' => $walkIn->id, 'parking_lot_id' => $lot->id, 'check_out_time' => null]);
+        $this->assertEquals((float) $lot->hourly_rate, (float) $result['log']->fresh()->hourly_rate); // อัตรา ณ ตอน Check-in
         $this->assertDatabaseHas('reservation_logs', ['reservation_id' => $walkIn->id, 'old_status' => null, 'new_status' => 'checked_in']);
         $this->assertDatabaseMissing('payments', ['reservation_id' => $walkIn->id]);
     }
@@ -229,7 +230,7 @@ class CheckInServiceTest extends TestCase
         $walkIn = $this->walkIn($lot);
         $walkIn['log']->update(['check_in_time' => now()->subHours(2)]);
 
-        $this->assertTrue(app(CheckOutService::class)->checkOut($walkIn['log']->fresh())['success']);
+        $this->assertTrue(app(CheckOutService::class)->checkOut($walkIn['reservation'])['success']);
 
         $payment = Payment::where('parking_log_id', $walkIn['log']->id)->firstOrFail();
         $this->assertEquals(60, (float) $payment->parking_fee);

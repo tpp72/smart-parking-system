@@ -11,11 +11,13 @@ use App\Models\Reservation;
  *
  * ค้นหาการจอง (pending / confirmed) ของ ทะเบียน + จังหวัด แล้วตัดสินตามลานที่กล้องติดตั้ง:
  * - confirmed ในลานนี้ + อยู่ในช่วงเช็คอิน → เช็คอินด้วยการจองเดิม
- *   (ยี่ห้อและสีไม่ตรงทั้งคู่ → ยังเช็คอิน + แจ้ง Owner/Admin ให้ตรวจสอบ)
- * - confirmed ในลานนี้ + มาก่อนเวลาจอง     → ไม่เช็คอิน · แจ้ง Owner/Admin ให้ Manual Check-in
- * - การจองอยู่ลานอื่น / ยัง pending / เลยเวลาเช็คอิน → Walk-in + แจ้ง Owner/Admin
+ *   (ยี่ห้อและสีไม่ตรงทั้งคู่ → ยังเช็คอิน + แจ้งผู้ดูแลลานให้ตรวจสอบ)
+ * - confirmed ในลานนี้ + มาก่อนเวลาจอง     → ไม่เช็คอิน · แจ้งผู้ดูแลลานให้ Manual Check-in
+ * - การจองอยู่ลานอื่น / ยัง pending / เลยเวลาเช็คอิน → Walk-in (บันทึก Audit Log)
  * - ไม่พบการจอง (รวมทะเบียนหรือจังหวัดไม่ตรง) → Walk-in
  * - Walk-in แต่ลานเต็ม → OUTCOME_LOT_FULL (ผู้เรียกต้องไม่บันทึกผล Scan)
+ *
+ * การแจ้งเตือนเจ้าหน้าที่ตาม project-plan.md §15.4 · เหตุการณ์ผิดปกติบันทึกลง Audit Log ในนามระบบ (ai_scan.*)
  */
 class AutoCheckInService
 {
@@ -48,7 +50,7 @@ class AutoCheckInService
 
         if ($booking && $booking->parking_lot_id === $lot->id && $booking->status === 'confirmed') {
             if ($booking->reserve_start->isFuture()) {
-                return $this->earlyArrival($lot, $booking);
+                return $this->earlyArrival($scan, $lot, $booking);
             }
 
             if (Reservation::checkable()->whereKey($booking->id)->exists()) {
@@ -59,19 +61,25 @@ class AutoCheckInService
         return $this->walkIn($scan, $lot, $booking);
     }
 
-    private function earlyArrival(ParkingLot $lot, Reservation $booking): array
+    private function earlyArrival(LicensePlateScan $scan, ParkingLot $lot, Reservation $booking): array
     {
         $reserveAt = $booking->reserve_start->format('d/m/Y H:i');
 
-        $lot->notifyStaff('รถมาก่อนเวลาจอง', sprintf(
+        $lot->notifyManagers('รถมาก่อนเวลาจอง', sprintf(
             'ทะเบียน %s %s (การจอง #%d) มาถึงลาน %s ก่อนเวลาจอง %s — ระบบไม่เช็คอินอัตโนมัติ กรุณาตรวจสอบรถและทำ Manual Check-in',
             $booking->license_plate, $booking->plate_province, $booking->id, $lot->name, $reserveAt
         ));
 
+        audit_by(null, 'ai_scan.early_arrival', $booking, [
+            'scan_id'        => $scan->id,
+            'parking_lot_id' => $lot->id,
+            'reserve_start'  => $booking->reserve_start->toDateTimeString(),
+        ]);
+
         return $this->result(
             self::OUTCOME_EARLY_ARRIVAL,
             false,
-            "มาก่อนเวลาจอง ({$reserveAt}) — ระบบไม่เช็คอินอัตโนมัติ แจ้ง Owner / Admin ของลานให้ทำ Manual Check-in แล้ว",
+            "มาก่อนเวลาจอง ({$reserveAt}) — ระบบไม่เช็คอินอัตโนมัติ แจ้งผู้ดูแลลานให้ทำ Manual Check-in แล้ว",
             $booking,
             staffNotified: true
         );
@@ -79,6 +87,7 @@ class AutoCheckInService
 
     private function checkInBooking(LicensePlateScan $scan, ParkingLot $lot, Reservation $booking): array
     {
+        // CheckInService แจ้ง User เจ้าของการจองเมื่อเช็คอินสำเร็จ
         $result = $this->checkIn->checkInReservation($booking);
 
         if (!$result['success']) {
@@ -88,26 +97,27 @@ class AutoCheckInService
         }
 
         $slotNumber = $result['slot']->slot_number;
-
-        notify_user(
-            $booking->user_id,
-            'เช็คอินอัตโนมัติสำเร็จ',
-            "ทะเบียน {$booking->license_plate} เช็คอินผ่านระบบสแกนรถ เข้าจอดที่ช่อง {$slotNumber} แล้ว (การจอง #{$booking->id})"
-        );
-
         $mismatch = $this->vehicleMismatch($booking, $scan);
 
         if ($mismatch) {
-            $lot->notifyStaff('ยี่ห้อ/สีรถไม่ตรงกับการจอง', sprintf(
+            $lot->notifyManagers('ยี่ห้อ/สีรถไม่ตรงกับการจอง', sprintf(
                 'ทะเบียน %s %s (การจอง #%d) เช็คอินอัตโนมัติที่ลาน %s ช่อง %s แล้ว แต่%s — กรุณาตรวจสอบรถคันนี้',
                 $booking->license_plate, $booking->plate_province, $booking->id, $lot->name, $slotNumber, $mismatch
             ));
+
+            audit_by(null, 'ai_scan.vehicle_mismatch', $booking, [
+                'scan_id'       => $scan->id,
+                'booked_brand'  => $booking->brand,
+                'booked_color'  => $booking->color,
+                'scanned_brand' => $scan->brand,
+                'scanned_color' => $scan->color,
+            ]);
         }
 
         return $this->result(
             self::OUTCOME_CHECKED_IN,
             true,
-            "เช็คอินด้วยการจอง #{$booking->id}" . ($mismatch ? " — {$mismatch} (แจ้ง Owner / Admin ให้ตรวจสอบแล้ว)" : ''),
+            "เช็คอินด้วยการจอง #{$booking->id}" . ($mismatch ? " — {$mismatch} (แจ้งผู้ดูแลลานให้ตรวจสอบแล้ว)" : ''),
             $result['reservation'],
             $slotNumber,
             (bool) $mismatch
@@ -127,23 +137,23 @@ class AutoCheckInService
         }
 
         $walkIn = $result['reservation'];
-        $slotNumber = $result['slot']->slot_number;
         $reason = $unusableBooking ? $this->unusableBookingReason($unusableBooking, $lot) : null;
 
         if ($reason) {
-            $lot->notifyStaff('Auto Check-in เป็น Walk-in (มีการจองค้างอยู่)', sprintf(
-                'ทะเบียน %s %s เข้าลาน %s ช่อง %s เป็น Walk-in #%d เพราะ%s',
-                $walkIn->license_plate, $walkIn->plate_province, $lot->name, $slotNumber, $walkIn->id, $reason
-            ));
+            // ไม่แจ้งเตือนเจ้าหน้าที่ (§15.4) — บันทึกไว้ตรวจสอบย้อนหลังใน Audit Log
+            audit_by(null, 'ai_scan.booking_not_used', $unusableBooking, [
+                'scan_id'                => $scan->id,
+                'walk_in_reservation_id' => $walkIn->id,
+                'reason'                 => $reason,
+            ]);
         }
 
         return $this->result(
             self::OUTCOME_WALK_IN,
             true,
-            'เช็คอินเป็น Walk-in' . ($reason ? " — {$reason} (แจ้ง Owner / Admin แล้ว)" : ''),
+            'เช็คอินเป็น Walk-in' . ($reason ? " — {$reason}" : ''),
             $walkIn,
-            $slotNumber,
-            (bool) $reason
+            $result['slot']->slot_number
         );
     }
 

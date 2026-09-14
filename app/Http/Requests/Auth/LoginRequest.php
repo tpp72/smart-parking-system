@@ -41,7 +41,10 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt(['email' => Str::lower($this->string('email')), 'password' => $this->string('password')], $this->boolean('remember'))) {
+        $credentials = ['email' => Str::lower($this->string('email')), 'password' => $this->string('password')];
+
+        // บัญชีระบบ (เช่น Walkin User) Login ไม่ได้ แม้รหัสผ่านถูกต้อง — ตอบเหมือนข้อมูลไม่ถูกต้อง
+        if (! Auth::attemptWhen($credentials, fn ($user) => ! $user->is_system, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

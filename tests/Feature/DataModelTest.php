@@ -240,6 +240,8 @@ class DataModelTest extends TestCase
     {
         $this->assertRejectedByDatabase(fn () => ParkingLog::factory()->create(['reservation_id' => null]));
         $this->assertRejectedByDatabase(fn () => ParkingLog::factory()->create(['plate_province' => null]));
+        $this->assertRejectedByDatabase(fn () => ParkingLog::factory()->create(['hourly_rate' => null]));
+        $this->assertRejectedByDatabase(fn () => ParkingLog::factory()->create(['hourly_rate' => -1]));
     }
 
     public function test_check_out_time_cannot_precede_check_in_time(): void
@@ -282,13 +284,16 @@ class DataModelTest extends TestCase
     {
         foreach (['user', 'owner', 'admin'] as $role) {
             $this->actingAs(User::factory()->create(['role' => $role]));
-            admin_audit("test.{$role}");
+            audit_log("test.{$role}");
             $this->assertDatabaseHas('admin_actions', ['action' => "test.{$role}", 'actor_role' => $role]);
         }
 
+        audit_by(null, 'test.system');
+        $this->assertDatabaseHas('admin_actions', ['action' => 'test.system', 'actor_role' => 'system', 'actor_id' => null, 'ip_address' => null]);
+
         auth()->logout();
-        admin_audit('test.system');
-        $this->assertDatabaseHas('admin_actions', ['action' => 'test.system', 'actor_role' => 'system', 'actor_id' => null]);
+        audit_log('test.no_login');
+        $this->assertDatabaseHas('admin_actions', ['action' => 'test.no_login', 'actor_role' => 'system', 'actor_id' => null]);
 
         $this->assertRejectedByDatabase(fn () => AdminAction::create(['action' => 'x', 'actor_role' => 'guest']));
     }

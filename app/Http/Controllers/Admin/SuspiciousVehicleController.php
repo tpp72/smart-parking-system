@@ -24,8 +24,6 @@ class SuspiciousVehicleController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        admin_audit('suspicious_vehicle.index', null, ['q' => $q]);
-
         return view('admin.suspicious-vehicles.index', compact('entries', 'q'));
     }
 
@@ -56,7 +54,7 @@ class SuspiciousVehicleController extends Controller
 
         $entry = SuspiciousVehicle::create($data);
 
-        admin_audit('suspicious_vehicle.create', $entry, [
+        audit_log('suspicious_vehicle.create', $entry, [
             'license_plate'  => $entry->license_plate,
             'plate_province' => $entry->plate_province,
             'level'          => $entry->level,
@@ -92,7 +90,7 @@ class SuspiciousVehicleController extends Controller
 
         $suspiciousVehicle->update($data);
 
-        admin_audit('suspicious_vehicle.update', $suspiciousVehicle, [
+        audit_log('suspicious_vehicle.update', $suspiciousVehicle, [
             'license_plate'  => $suspiciousVehicle->license_plate,
             'plate_province' => $suspiciousVehicle->plate_province,
             'level'          => $suspiciousVehicle->level,
@@ -106,7 +104,7 @@ class SuspiciousVehicleController extends Controller
     {
         $plate = $suspiciousVehicle->license_plate;
 
-        admin_audit('suspicious_vehicle.delete', $suspiciousVehicle, [
+        audit_log('suspicious_vehicle.delete', $suspiciousVehicle, [
             'license_plate'  => $plate,
             'plate_province' => $suspiciousVehicle->plate_province,
             'level'          => $suspiciousVehicle->level,
@@ -124,7 +122,7 @@ class SuspiciousVehicleController extends Controller
 
         $state = $suspiciousVehicle->is_active ? 'เปิดใช้งาน' : 'ระงับ';
 
-        admin_audit('suspicious_vehicle.toggle', $suspiciousVehicle, [
+        audit_log('suspicious_vehicle.toggle', $suspiciousVehicle, [
             'license_plate' => $suspiciousVehicle->license_plate,
             'is_active'     => $suspiciousVehicle->is_active,
         ]);

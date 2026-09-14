@@ -104,7 +104,7 @@
                     <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wide border-b sp-divider pb-2">เอกสารประกอบ</h2>
                     @if($application->document_path)
                     <p class="text-sm text-gray-400">เอกสารปัจจุบัน:
-                        <a href="{{ Storage::url($application->document_path) }}" target="_blank" class="text-red-400 hover:text-red-300 underline">ดูไฟล์เดิม</a>
+                        <a href="{{ route('owner-applications.document', $application) }}" target="_blank" class="text-red-400 hover:text-red-300 underline">ดูไฟล์เดิม</a>
                     </p>
                     @endif
                     <p class="text-xs text-gray-400">อัปโหลดไฟล์ใหม่เพื่อแทนที่ (JPG, PNG, PDF — ไม่เกิน 5MB)</p>

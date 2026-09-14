@@ -61,7 +61,7 @@ class UserController extends Controller
             'force_password_reset' => true,
         ]);
 
-        admin_audit('user.create', $user, ['role' => $user->role]);
+        audit_log('user.create', $user, ['role' => $user->role]);
 
         return redirect()->route('admin.users.edit', $user)
             ->with('success', "สร้างผู้ใช้ \"{$user->name}\" (role: {$user->role}) เรียบร้อยแล้ว — บังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก");
@@ -88,18 +88,21 @@ class UserController extends Controller
             return back()->withErrors(['role' => 'ไม่สามารถเปลี่ยน role ของตัวเองออกจาก admin ได้'])->withInput();
         }
 
+        $before = $user->only(['name', 'email', 'role']);
+
         $user->update([
             'name'  => $data['name'],
             'email' => $data['email'],
             'role'  => $data['role'],
         ]);
 
-        $auditExtra = ['changed' => array_keys($data)];
+        // การเปลี่ยน Role อยู่ใน changes.role
+        $auditExtra = ['changes' => audit_changes($before, $user)];
         if ($isDemoting) {
             $auditExtra['demotion_reason'] = $data['demotion_reason'];
         }
 
-        admin_audit('user.update', $user, $auditExtra);
+        audit_log('user.update', $user, $auditExtra);
 
         return redirect()->route('admin.users.edit', $user)->with('success', 'อัปเดตผู้ใช้เรียบร้อยแล้ว');
     }
@@ -115,7 +118,7 @@ class UserController extends Controller
             'force_password_reset' => true,
         ])->save();
 
-        admin_audit('user.force_reset', $user, [
+        audit_log('user.force_reset', $user, [
             'force_password_reset' => true,
         ]);
 
@@ -167,7 +170,8 @@ class UserController extends Controller
                 $deletedLotsCount++;
             }
 
-            admin_audit('user.delete', $user, [
+            audit_log('user.delete', $user, [
+                'email'                   => $user->email,
                 'role'                    => $user->role,
                 'lots_deleted'            => $deletedLotsCount,
                 'reservations_cancelled'  => $cancelledReservationsCount,

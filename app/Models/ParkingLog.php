@@ -14,6 +14,8 @@ class ParkingLog extends Model
     protected $casts = [
         'check_in_time'  => 'datetime',
         'check_out_time' => 'datetime',
+        // อัตราค่าจอด ณ ตอน Check-in
+        'hourly_rate'    => 'decimal:2',
     ];
 
     public function parkingLot()

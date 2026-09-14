@@ -298,7 +298,7 @@ npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าส
 **Role Management Rules:**
 - Admin ไม่สามารถเปลี่ยน role ตัวเองออกจาก admin ได้ (ป้องกัน lock-out)
 - Admin ปลด Owner → User ต้องระบุเหตุผล (บันทึกใน Audit Log)
-- Owner สามารถส่งคำร้องลาออกกลับเป็น User ได้เอง (ต้องระบุเหตุผล) ที่ `POST /owner/demote-self`
+- Owner ยื่นคำร้องลาออก (ต้องระบุเหตุผล) ที่ `POST /owner/resignation` — มีผลเมื่อ Admin อนุมัติที่ `/admin/owner-resignations` (ยกเลิกการจองค้าง, เช็คเอาท์รถที่จอดอยู่, ลบลานของ Owner แล้วกลับเป็น User)
 
 สำหรับรายละเอียดทั้งหมดว่าแต่ละ role ทำอะไรได้บ้าง ดูที่ [docs/project-plan.md](docs/project-plan.md)
 
@@ -791,6 +791,7 @@ notifications
   scan                      → AI Scan (อัปโหลดรูป → ทะเบียน)
   suspicious-vehicles       → บัญชีดำ CRUD + toggle
   owner-applications        → อนุมัติ/ปฏิเสธคำขอ Owner
+  owner-resignations        → อนุมัติ/ปฏิเสธคำร้องลาออกของ Owner
 
 /owner/...                  → Owner Portal (role: owner)
   dashboard                 → ภาพรวม + Analytics
@@ -799,7 +800,7 @@ notifications
   parking-slots             → จัดการช่องจอดของตน
   reservations              → การจองในลานของตน
   revenue                   → รายงานรายได้
-  demote-self               → POST ส่งคำร้องลาออกกลับเป็น User
+  resignation               → POST ยื่นคำร้องลาออก (รอ Admin อนุมัติ)
 
 /user/...                   → User Panel (role: user)
   dashboard                 → ภาพรวม
