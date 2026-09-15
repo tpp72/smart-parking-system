@@ -84,19 +84,6 @@
             @enderror
         </div>
 
-        <div>
-            <label class="block text-sm text-gray-200 mb-1">เจ้าของลาน (Owner)</label>
-            <select name="owner_id" class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white focus:ring-0 focus:border-red-600 sp-select">
-                <option value="">— ระบบ (ไม่มีเจ้าของ) —</option>
-                @foreach($owners ?? [] as $owner)
-                    <option value="{{ $owner->id }}" @selected(old('owner_id', $lot?->owner_id) == $owner->id)>{{ $owner->name }}</option>
-                @endforeach
-            </select>
-            @error('owner_id')
-                <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
-            @enderror
-        </div>
-
 
         <div class="flex items-center gap-3 pt-1">
             <input type="hidden" name="reservations_enabled" value="0" />

@@ -4,12 +4,33 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
-use App\Models\User;
+use App\Models\Reservation;
 use Illuminate\Http\Request;
 
+/**
+ * Admin จัดการลานของ Admin (owner_id = NULL) เท่านั้น — สร้างลานให้ Owner หรือโอนลานไม่ได้ (project-plan.md §5.1.1)
+ */
 class ParkingLotController extends Controller
 {
-    // Admin จัดการได้เฉพาะลานจอดที่ยังไม่มีเจ้าของ — ลานที่มี owner ให้ owner จัดการเองเท่านั้น (guard ในแต่ละ method ด้านล่าง)
+    private function assertAdminLot(ParkingLot $lot): void
+    {
+        abort_if($lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+    }
+
+    private function rules(): array
+    {
+        return [
+            'name'                 => ['required', 'string', 'max:255'],
+            'location'             => ['nullable', 'string'],
+            'address'              => ['nullable', 'string', 'max:500'],
+            'district'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', 'max:255'],
+            'landmark'             => ['nullable', 'string', 'max:500'],
+            'total_slots'          => ['required', 'integer', 'min:0'],
+            'hourly_rate'          => ['required', 'numeric', 'min:0'],
+            'reservations_enabled' => ['boolean'],
+        ];
+    }
 
     public function index(Request $request)
     {
@@ -35,31 +56,18 @@ class ParkingLotController extends Controller
 
     public function create()
     {
-        $owners = User::where('role', 'owner')->orderBy('name')->get(['id', 'name']);
-        return view('admin.parking-lots.create', compact('owners'));
+        return view('admin.parking-lots.create');
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name'                 => ['required', 'string', 'max:255'],
-            'location'             => ['nullable', 'string'],
-            'address'              => ['nullable', 'string', 'max:500'],
-            'district'             => ['nullable', 'string', 'max:255'],
-            'province'             => ['nullable', 'string', 'max:255'],
-            'landmark'             => ['nullable', 'string', 'max:500'],
-            'total_slots'          => ['required', 'integer', 'min:0'],
-            'hourly_rate'          => ['required', 'numeric', 'min:0'],
-            'owner_id'             => ['nullable', 'exists:users,id'],
-            'reservations_enabled' => ['boolean'],
-        ]);
+        $data = $request->validate($this->rules());
 
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
-        $lot = ParkingLot::create($data);
+        $lot = ParkingLot::create($data + ['owner_id' => null]);
 
         audit_log('parking_lot.create', $lot, [
             'name'                 => $lot->name,
-            'owner_id'             => $lot->owner_id,
             'hourly_rate'          => $lot->hourly_rate,
             'reservations_enabled' => $lot->reservations_enabled,
         ]);
@@ -70,29 +78,16 @@ class ParkingLotController extends Controller
 
     public function edit(ParkingLot $parking_lot)
     {
-        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+        $this->assertAdminLot($parking_lot);
 
-        $owners = User::where('role', 'owner')->orderBy('name')->get(['id', 'name']);
-        return view('admin.parking-lots.edit', compact('parking_lot', 'owners'));
+        return view('admin.parking-lots.edit', compact('parking_lot'));
     }
 
     public function update(Request $request, ParkingLot $parking_lot)
     {
-        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+        $this->assertAdminLot($parking_lot);
 
-        $data = $request->validate([
-            'name'                 => ['required', 'string', 'max:255'],
-            'location'             => ['nullable', 'string'],
-            'address'              => ['nullable', 'string', 'max:500'],
-            'district'             => ['nullable', 'string', 'max:255'],
-            'province'             => ['nullable', 'string', 'max:255'],
-            'landmark'             => ['nullable', 'string', 'max:500'],
-            'total_slots'          => ['required', 'integer', 'min:0'],
-            'hourly_rate'          => ['required', 'numeric', 'min:0'],
-            'owner_id'             => ['nullable', 'exists:users,id'],
-            'reservations_enabled' => ['boolean'],
-        ]);
-
+        $data = $request->validate($this->rules());
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
         $before = $parking_lot->only(array_keys($data));
@@ -106,7 +101,12 @@ class ParkingLotController extends Controller
 
     public function destroy(ParkingLot $parking_lot)
     {
-        abort_if($parking_lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
+        $this->assertAdminLot($parking_lot);
+
+        // ลบไม่ได้ถ้ายังมีการจองค้าง (รอยืนยันมัดจำ / ยืนยันแล้ว / กำลังจอด) — กฎเดียวกับฝั่ง Owner
+        if ($parking_lot->reservations()->whereIn('status', Reservation::ACTIVE_STATUSES)->exists()) {
+            return back()->withErrors(['error' => 'ไม่สามารถลบลานจอดที่ยังมีการจองค้างอยู่ (รอยืนยันมัดจำ / ยืนยันแล้ว / กำลังจอด) — ปิดรับการจองแล้วรอให้การจองเสร็จสิ้นก่อน']);
+        }
 
         $parking_lot->delete();
 

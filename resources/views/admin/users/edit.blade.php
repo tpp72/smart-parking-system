@@ -55,8 +55,16 @@
                         @enderror
                     </div>
 
+                    @if ($user->role !== 'owner')
+                        <p class="text-gray-400 text-xs -mt-2">การเป็น Owner ต้องผ่านคำขอสมัคร Owner</p>
+                    @endif
+
                     {{-- เหตุผล (บังคับเฉพาะเมื่อปลด owner → user) --}}
                     <div x-show="origRole === 'owner' && role === 'user'" x-cloak>
+                        <p class="text-sm text-red-200 mb-2">
+                            การปลด Owner จะยกเลิกการจองที่ยังไม่ Check-in, เช็คเอาท์รถที่จอดอยู่, แจ้งผู้จองให้ติดต่อ Admin
+                            และ<span class="font-semibold">ลบลานจอดของผู้ใช้นี้ทั้งหมด ({{ $ownedLotsCount }} แห่ง)</span> — ย้อนกลับไม่ได้
+                        </p>
                         <label class="block text-sm text-red-300 mb-1 font-semibold">
                             เหตุผลในการปลด Owner *
                         </label>
@@ -118,13 +126,17 @@
                 @if ($user->role === 'owner')
                     <p class="text-gray-300 text-sm">
                         ผู้ใช้นี้เป็น <span class="sp-badge sp-badge-owner">owner</span> —
-                        การลบจะ<span class="text-red-300 font-semibold">ลบลานจอดของผู้ใช้นี้ทั้งหมด</span>ไปด้วย
-                        และ<span class="text-red-300 font-semibold">ยกเลิกการจองที่ยัง pending/confirmed</span> ในลานเหล่านั้นอัตโนมัติ
-                        (พร้อมแจ้งเตือนผู้จอง) หากมีรถกำลังจอดอยู่จริง ต้อง Check-Out ก่อนจึงจะลบได้
+                        ระบบจะปิดลานจอดของผู้ใช้นี้ทั้งหมด ({{ $ownedLotsCount }} แห่ง) ก่อน: ยกเลิกการจองที่ยังไม่ Check-in,
+                        เช็คเอาท์รถที่จอดอยู่, แจ้งผู้จองให้ติดต่อ Admin แล้ว<span class="text-red-300 font-semibold">ลบลานจอดและข้อมูลของลาน</span>
                     </p>
-                @else
-                    <p class="text-gray-300 text-sm">การลบผู้ใช้จะลบข้อมูลที่เกี่ยวข้องของผู้ใช้นี้ทั้งหมด และไม่สามารถย้อนกลับได้</p>
                 @endif
+                <p class="text-gray-300 text-sm mt-2">
+                    การจองของผู้ใช้นี้ที่ยังไม่ Check-in จะถูกยกเลิกและรถที่จอดอยู่จะถูกเช็คเอาท์เพื่อคืนช่องจอด
+                    จากนั้นข้อมูลของผู้ใช้จะถูกลบทั้งหมด และไม่สามารถย้อนกลับได้
+                </p>
+                @error('error')
+                    <p class="text-red-300 text-sm mt-2">{{ $message }}</p>
+                @enderror
 
                 <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="mt-4 flex justify-end"
                     onsubmit="return confirm('ยืนยันลบผู้ใช้ \'{{ $user->name }}\' ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')">

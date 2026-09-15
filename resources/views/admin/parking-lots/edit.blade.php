@@ -13,8 +13,7 @@
 
                 @include('admin.parking-lots.partials.form', [
                     'lot' => $parking_lot,
-                    'owners' => $owners,
-                    'submitLabel' => 'อัปเดต',
+                                        'submitLabel' => 'อัปเดต',
                 ])
             </form>
 

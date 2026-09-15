@@ -47,23 +47,39 @@ class OwnerApplicationController extends Controller
 
     public function approve(OwnerApplication $ownerApplication)
     {
-        if (!$ownerApplication->isPending()) {
-            return back()->withErrors(['error' => 'คำขอนี้ไม่ได้อยู่ในสถานะรอพิจารณา']);
-        }
+        $error = DB::transaction(function () use ($ownerApplication) {
+            $application = OwnerApplication::whereKey($ownerApplication->id)->lockForUpdate()->first();
 
-        DB::transaction(function () use ($ownerApplication) {
-            $ownerApplication->update([
+            if (!$application->isPending()) {
+                return 'คำขอนี้ไม่ได้อยู่ในสถานะรอพิจารณา';
+            }
+
+            // เป็น Owner ได้เฉพาะบัญชี User — กัน Admin/บัญชีระบบกลายเป็น Owner
+            $applicant = User::whereKey($application->user_id)->lockForUpdate()->first();
+            if ($applicant->role !== 'user' || $applicant->is_system) {
+                return "อนุมัติไม่ได้ — ผู้สมัครต้องเป็นบัญชี User (ปัจจุบันเป็น {$applicant->role})";
+            }
+
+            $application->update([
                 'status'      => 'approved',
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
                 'rejection_reason' => null,
             ]);
 
-            $ownerApplication->user->forceFill([
+            $applicant->forceFill([
                 'role'         => 'owner',
                 'owner_status' => 'approved',
             ])->save();
+
+            return null;
         });
+
+        if ($error) {
+            return back()->withErrors(['error' => $error]);
+        }
+
+        $ownerApplication->refresh();
 
         audit_log('owner_application.approve', $ownerApplication, []);
 
