@@ -45,6 +45,7 @@
                     <a href="{{ route('admin.parking-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">ประวัติจอด · Logs</a>
                     <a href="{{ route('admin.reservation-logs.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Log การจอง</a>
                     <a href="{{ route('admin.admin-actions.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Admin Log</a>
+                    <a href="{{ route('admin.exports.index') }}" class="text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-3 py-1.5 transition">Export CSV</a>
                     <a href="{{ route('admin.owner-applications.index') }}" class="text-xs {{ $pendingApplications > 0 ? 'text-yellow-400 border-yellow-500/40 hover:border-yellow-400' : 'text-gray-400 border-white/10 hover:border-white/30' }} hover:text-white border rounded-lg px-3 py-1.5 transition">
                         คำขอ Owner{{ $pendingApplications > 0 ? ' ('.$pendingApplications.')' : '' }}
                     </a>

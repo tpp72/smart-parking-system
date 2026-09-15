@@ -21,6 +21,8 @@
                     <h1 class="text-3xl font-extrabold sp-glow-text">ประวัติการจอด (Parking Logs)</h1>
                     <p class="text-gray-300 mt-1">ค้นหาตามทะเบียนรถ / กรองตามวันที่ — รถที่ยังไม่เช็คเอาท์ ทำ Manual Check-out ได้จากที่นี่</p>
                 </div>
+                <a href="{{ route('admin.exports.parking-logs', request()->query()) }}" class="sp-btn sp-btn-outline"
+                    title="Export ตามตัวกรองของหน้านี้ ครอบคลุมทุกลานในระบบ">Export CSV (ทุกลาน)</a>
             </div>
 
             @if (session('success'))
