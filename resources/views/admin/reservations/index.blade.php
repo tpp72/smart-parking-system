@@ -21,7 +21,11 @@
                     <h1 class="text-3xl font-extrabold sp-glow-text">จัดการการจอง (Reservations)</h1>
                     <p class="text-gray-300 mt-1">ค้นหา / กรอง / เช็คอิน-เช็คเอาท์ / ยกเลิก — ยืนยันการจองด้วยการยืนยันรับเงินมัดจำในหน้าชำระเงิน</p>
                 </div>
-                <a href="{{ route('admin.payments.index') }}" class="sp-btn sp-btn-outline">ยืนยันรับเงินมัดจำ →</a>
+                <div class="flex flex-wrap gap-2">
+                    <a href="{{ route('admin.exports.reservations', request()->query()) }}" class="sp-btn sp-btn-outline"
+                        title="Export ตามตัวกรองของหน้านี้ ครอบคลุมทุกลานในระบบ">Export CSV (ทุกลาน)</a>
+                    <a href="{{ route('admin.payments.index') }}" class="sp-btn sp-btn-outline">ยืนยันรับเงินมัดจำ →</a>
+                </div>
             </div>
 
             @if (session('success'))
