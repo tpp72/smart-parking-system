@@ -297,7 +297,9 @@ npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าส
 
 **Role Management Rules:**
 - Admin ไม่สามารถเปลี่ยน role ตัวเองออกจาก admin ได้ (ป้องกัน lock-out)
-- Admin ปลด Owner → User ต้องระบุเหตุผล (บันทึกใน Audit Log)
+- การเป็น Owner ต้องผ่านคำขอสมัคร Owner — Admin ตั้งผู้ใช้เป็น Owner โดยตรงไม่ได้
+- Admin ปลด Owner → User ต้องระบุเหตุผล และระบบปิดลานทั้งหมดของ Owner แบบเดียวกับอนุมัติคำร้องลาออก (บันทึก `user.demote_owner` ใน Audit Log)
+- ลบผู้ใช้: ระบบยกเลิกการจองค้าง / เช็คเอาท์รถ (และปิดลานถ้าเป็น Owner) ก่อนลบ · บัญชีระบบ Walkin User จัดการไม่ได้
 - Owner ยื่นคำร้องลาออก (ต้องระบุเหตุผล) ที่ `POST /owner/resignation` — มีผลเมื่อ Admin อนุมัติที่ `/admin/owner-resignations` (ยกเลิกการจองค้าง, เช็คเอาท์รถที่จอดอยู่, ลบลานของ Owner แล้วกลับเป็น User)
 
 สำหรับรายละเอียดทั้งหมดว่าแต่ละ role ทำอะไรได้บ้าง ดูที่ [docs/project-plan.md](docs/project-plan.md)

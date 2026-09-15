@@ -9,7 +9,10 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-extrabold tracking-tight sp-glow-text">Dashboard</h1>
-                        <p class="text-gray-400 text-sm mt-0.5">Smart Parking System — ภาพรวมระบบ</p>
+                        <p class="text-gray-400 text-sm mt-0.5">
+                            Smart Parking System — ภาพรวมทั้งระบบ {{ $stats['lots_total'] }} ลาน (ลานของ Admin {{ $stats['admin_lots_total'] }} ลาน)
+                        </p>
+                        <p class="text-gray-500 text-xs mt-0.5">การจัดการในเมนูการจอง / Payment / ลานจอด จำกัดเฉพาะลานของ Admin</p>
                     </div>
                     <span class="text-xs text-gray-500 hidden sm:block">{{ now()->format('d M Y, H:i') }}</span>
                 </div>
@@ -106,16 +109,19 @@
                     </div>
                 </div>
 
-                {{-- รายได้วันนี้ --}}
+                {{-- รายได้ (เงินที่รับจริง) --}}
+                @php $rangeLabel = ['7d' => '7 วัน', 'month' => 'เดือนนี้'][$range] ?? 'วันนี้'; @endphp
                 <div class="sp-card rounded-2xl p-5 border border-green-600/25 relative overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-br from-green-900/20 to-transparent pointer-events-none rounded-2xl"></div>
                     <div class="flex items-start justify-between relative z-10">
                         <div>
-                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">รายได้วันนี้</p>
+                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">รายได้{{ $rangeLabel }}</p>
                             <p class="text-3xl font-extrabold mt-2 text-green-300">
                                 ฿{{ number_format((float)($stats['revenue_paid'] ?? 0), 2) }}
                             </p>
-                            <p class="text-xs text-gray-500 mt-1">Revenue (Paid)</p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                มัดจำ ฿{{ number_format($stats['revenue_deposit'], 0) }} · ค่าจอด ฿{{ number_format($stats['revenue_parking'], 0) }}
+                            </p>
                         </div>
                         <div class="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -128,7 +134,7 @@
                     <div class="absolute inset-0 bg-gradient-to-br from-red-900/20 to-transparent pointer-events-none rounded-2xl"></div>
                     <div class="flex items-start justify-between relative z-10">
                         <div>
-                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">ค้างชำระวันนี้</p>
+                            <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">ค่าจอดค้างชำระ{{ $rangeLabel }}</p>
                             <p class="text-4xl font-extrabold mt-2 text-red-300">{{ $stats['unpaid_count'] ?? 0 }}</p>
                             <p class="text-xs text-gray-500 mt-1">Unpaid Bills</p>
                         </div>
@@ -143,7 +149,7 @@
             {{-- ══════════════════════════════════════════════════════
                  Reservation Lifecycle Stats
             ══════════════════════════════════════════════════════ --}}
-            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
                 {{-- Checked In --}}
                 <div class="sp-card rounded-2xl p-5 border border-sky-600/25 relative overflow-hidden">
@@ -179,8 +185,20 @@
                     </div>
                 </div>
 
+                {{-- AI Scan --}}
+                <div class="sp-card rounded-2xl p-5 border border-violet-600/25 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-violet-900/15 to-transparent pointer-events-none rounded-2xl"></div>
+                    <div class="relative z-10">
+                        <p class="text-gray-400 text-xs font-medium uppercase tracking-wider">AI Scan ({{ $rangeLabel }})</p>
+                        <p class="text-3xl font-extrabold mt-1 text-violet-300">{{ $stats['scans_total'] }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            ผ่าน {{ $stats['scans_passed'] }} · ไม่ผ่านเกณฑ์ {{ $stats['scans_failed'] }} · รถต้องสงสัย {{ $stats['scans_suspicious'] }}
+                        </p>
+                    </div>
+                </div>
+
                 {{-- Blacklist --}}
-                <div class="sp-card rounded-2xl p-5 border border-red-700/30 relative overflow-hidden col-span-2 lg:col-span-1">
+                <div class="sp-card rounded-2xl p-5 border border-red-700/30 relative overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-br from-red-950/30 to-transparent pointer-events-none rounded-2xl"></div>
                     <div class="flex items-center justify-between relative z-10">
                         <div>
@@ -319,7 +337,9 @@
                             <div class="flex items-start justify-between mb-3">
                                 <div>
                                     <p class="font-extrabold text-sm">{{ $lot->name }}</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">{{ number_format((float)$lot->hourly_rate, 2) }} ฿/hr</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">
+                                        {{ number_format((float)$lot->hourly_rate, 2) }} ฿/hr · {{ $lot->owner_name ? 'Owner: '.$lot->owner_name : 'ลานของ Admin' }}
+                                    </p>
                                 </div>
                                 @if($lotOccPct >= 90)
                                     <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">เต็ม</span>

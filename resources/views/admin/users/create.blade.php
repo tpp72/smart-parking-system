@@ -50,7 +50,7 @@
                         @error('role')
                             <p class="text-red-300 text-sm mt-1">{{ $message }}</p>
                         @enderror
-                        <p class="text-gray-400 text-xs mt-1">เลือก <span class="font-semibold">admin</span> เพื่อสร้างผู้ดูแลระบบเพิ่ม</p>
+                        <p class="text-gray-400 text-xs mt-1">เลือก <span class="font-semibold">admin</span> เพื่อสร้างผู้ดูแลระบบเพิ่ม — การเป็น Owner ต้องผ่านคำขอสมัคร Owner</p>
                     </div>
 
                     <div>
