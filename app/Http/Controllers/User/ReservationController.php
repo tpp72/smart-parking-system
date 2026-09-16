@@ -29,11 +29,14 @@ class ReservationController extends Controller
     }
 
     /** ฟอร์มสร้างการจอง — User เลือกได้เฉพาะลาน (ลานที่เปิดรับจองและยังมีช่องว่าง) */
-    public function create()
+    public function create(Request $request)
     {
         $lots = ParkingLot::reservable()->withAvailableSlot()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
 
-        return view('user.reservations.create', compact('lots'));
+        // เลือกลานมาจากการ์ด "ลานที่ว่างแนะนำ" (?lot_id=) — ใช้ได้เฉพาะลานที่อยู่ในรายการที่จองได้
+        $selectedLotId = $lots->firstWhere('id', (int) $request->query('lot_id'))?->id;
+
+        return view('user.reservations.create', compact('lots', 'selectedLotId'));
     }
 
     /** บันทึกการจอง + สร้าง Deposit Payment — ช่องจอดถูกจัดสรรโดยระบบเมื่อยืนยันรับเงินมัดจำ */

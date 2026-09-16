@@ -19,7 +19,7 @@
 
             <div class="sp-card rounded-2xl p-6" x-data="{
                 allLots: {{ Js::from($lots) }},
-                lotId: '{{ old('parking_lot_id') }}',
+                lotId: '{{ old('parking_lot_id', $selectedLotId) }}',
                 get deposit() {
                     if (!this.lotId) return null;
                     const lot = this.allLots.find(l => String(l.id) === String(this.lotId));
@@ -101,7 +101,7 @@
                                 x-model="lotId">
                                 <option value="">-- เลือกลาน --</option>
                                 @foreach ($lots as $lot)
-                                    <option value="{{ $lot->id }}" @selected(old('parking_lot_id') == $lot->id)>
+                                    <option value="{{ $lot->id }}" @selected(old('parking_lot_id', $selectedLotId) == $lot->id)>
                                         {{ $lot->name }}
                                         ({{ number_format($lot->hourly_rate, 2) }} ฿/ชม.)
                                     </option>

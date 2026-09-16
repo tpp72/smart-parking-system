@@ -132,7 +132,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     @forelse($lotsAvailable as $lot)
-                        <a href="{{ route('user.reservations.create') }}?lot_id={{ $lot->id }}"
+                        <a href="{{ route('user.reservations.create', ['lot_id' => $lot->id]) }}"
                             class="rounded-xl border sp-divider p-4 hover:opacity-95">
                             <div class="flex items-center justify-between">
                                 <p class="font-extrabold">{{ $lot->name }}</p>
