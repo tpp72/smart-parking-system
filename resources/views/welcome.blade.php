@@ -118,8 +118,8 @@
             </div>
 
             <div class="welcome-card p-6 rounded-xl border border-red-900 hover:border-red-600 transition">
-                <h3 class="text-xl font-bold text-red-500 mb-3">Vehicle Tracking</h3>
-                <p class="text-gray-400">บันทึกข้อมูลรถและประวัติการเข้า-ออก</p>
+                <h3 class="text-xl font-bold text-red-500 mb-3">AI Check-in / Check-out</h3>
+                <p class="text-gray-400">สแกนป้ายทะเบียนด้วย AI เข้า-ออกอัตโนมัติ พร้อมประวัติการจอด</p>
             </div>
 
             <div class="welcome-card p-6 rounded-xl border border-red-900 hover:border-red-600 transition">
