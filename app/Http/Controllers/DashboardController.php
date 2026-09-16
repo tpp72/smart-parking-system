@@ -104,17 +104,14 @@ class DashboardController extends Controller
             ->select(['pl.id as log_id', 'pl.license_plate', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time'])
             ->get();
 
-        // แนะนำ lots ที่ว่าง (user friendly)
-        $lotsAvailable = DB::table('parking_lots as lot')
-            ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
-            ->groupBy('lot.id', 'lot.name')
-            ->orderByDesc(DB::raw("SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END)"))
+        // แนะนำลานที่จองได้ทันที (เงื่อนไขเดียวกับหน้าจอง) — กดการ์ดแล้วไปหน้าจองพร้อมเลือกลานนั้นไว้
+        $lotsAvailable = ParkingLot::reservable()
+            ->withAvailableSlot()
+            ->withCount(['slots as available' => fn ($query) => $query->where('status', 'available')])
+            ->orderByDesc('available')
+            ->orderBy('name')
             ->limit(5)
-            ->selectRaw("
-            lot.id, lot.name,
-            SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END) as available
-        ")
-            ->get();
+            ->get(['id', 'name']);
 
         $stats = [
             'slots_total'     => (int)($slotStats->slots_total ?? 0),
