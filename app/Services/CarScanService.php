@@ -137,6 +137,32 @@ PROMPT;
     }
 
     /**
+     * โหมดจำลอง AI (CARSCAN_FAKE=true) — ไม่เรียก Claude API · เปิดได้เฉพาะ Environment local / testing
+     * ใช้กับ E2E (project-plan.md §25.2) และการเดโมบนเครื่องพัฒนา
+     */
+    public static function fakeEnabled(): bool
+    {
+        return (bool) config('carscan.fake', false) && app()->environment(['local', 'testing']);
+    }
+
+    /**
+     * ผลจำลองจากชื่อไฟล์รูป: ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy.png
+     * เช่น "กข 1234__กรุงเทพมหานคร__Toyota__ขาว__95.png" (ส่วนที่ว่าง = AI อ่านไม่ได้ · ไม่ระบุ Accuracy = 95)
+     */
+    public static function fakeDetect(string $originalName): array
+    {
+        $parts = explode('__', preg_replace('/\.[^.]+$/', '', $originalName));
+
+        return [
+            'license_plate' => $parts[0] ?? '',
+            'province'      => $parts[1] ?? '',
+            'brand'         => ($parts[2] ?? '') !== '' ? $parts[2] : null,
+            'color'         => ($parts[3] ?? '') !== '' ? $parts[3] : null,
+            'confidence'    => isset($parts[4]) && is_numeric($parts[4]) ? (float) $parts[4] : 95.0,
+        ];
+    }
+
+    /**
      * AI Scan pipeline: เก็บรูป → AI อ่านข้อมูล → จัดผลตามเกณฑ์ Accuracy → ตรวจ Blacklist → บันทึก Scan
      * (ผู้เรียกแจ้งเตือนด้วย alertStaff() หลังรู้ผล Auto Check-in — ลานเต็มใช้ discardForFullLot() แทน)
      *
@@ -148,8 +174,10 @@ PROMPT;
         $storedPath   = $file->store('car-scans', 'public');
         $absolutePath = storage_path('app/public/' . $storedPath);
 
-        // 2. Run AI (Claude Vision)
-        $result = $this->detect($absolutePath);
+        // 2. Run AI (Claude Vision) — โหมดจำลองอ่านผลจากชื่อไฟล์แทน (E2E / เดโมบนเครื่องพัฒนา)
+        $result = self::fakeEnabled()
+            ? self::fakeDetect($file->getClientOriginalName())
+            : $this->detect($absolutePath);
 
         $licensePlate = trim((string) ($result['license_plate'] ?? '')) ?: null;
         $province     = trim((string) ($result['province'] ?? '')) ?: null;
