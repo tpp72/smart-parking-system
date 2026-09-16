@@ -269,19 +269,13 @@ php artisan reservations:expire
 ### E2E Testing (Playwright)
 
 ```bash
-# [SETUP] รันครั้งแรก หรือหลังเปลี่ยน password ของ test user
-npm run test:e2e:setup
+# ไม่ต้องเปิด php artisan serve เอง — Playwright เปิด server (port 8010) และ migrate:fresh --seed
+# ฐานข้อมูล smart_parking_test ให้ทุกครั้ง (AI ใช้โหมดจำลอง ไม่เรียก Claude API)
 
-# ต้องรัน php artisan serve ก่อนเสมอ
-
-npm run test:e2e             # [AS NEEDED] รัน test ทุก browser
+npm run test:e2e             # [AS NEEDED] รัน E2E ทั้งหมด (Chromium)
 npm run test:e2e:ui          # [AS NEEDED] รันพร้อม UI (เลือก test ได้)
 npm run test:e2e:headed      # [AS NEEDED] รันแบบเห็น browser จริง
 npm run test:e2e:debug       # [AS NEEDED] debug ทีละ step
-npm run test:e2e:chromium    # [AS NEEDED] รันเฉพาะ Chrome
-npm run test:e2e:firefox     # [AS NEEDED] รันเฉพาะ Firefox
-npm run test:e2e:webkit      # [AS NEEDED] รันเฉพาะ Safari
-npm run test:e2e:mobile      # [AS NEEDED] รันเฉพาะ mobile viewport
 npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าสุด
 ```
 
@@ -819,69 +813,27 @@ notifications
 
 ## E2E Testing (Playwright)
 
-### Test Users (ต้องมีในฐานข้อมูลก่อนรัน)
+E2E ครอบคลุม Flow หลักตาม `docs/project-plan.md` §25.2 — ใช้บัญชีจาก Seeder (`admin@demo.com`, `user@demo.com` / `password`)
 
-| Role | Email | Password |
-|---|---|---|
-| admin | admin@tester.com | Admin1234! |
-| user | user@tester.com | User1234! |
-
-### Test Suite Coverage
-
-| Test | คำอธิบาย |
+| ไฟล์ | Flow |
 |---|---|
-| Auth Setup | Login ทั้ง 2 roles + save session state |
-| Crawl Dashboard | Crawl links จาก admin dashboard (max 60 หน้า) |
-| All Admin Routes | ตรวจ 22 routes — HTTP status, JS errors, broken images |
-| Guest Routes | ตรวจ 4 routes (/, /login, /register, /forgot-password) |
-| Coverage Report | visitRoutes() ครบ 22 admin routes + สร้าง coverage-report.md |
-| Responsive Layout | ตรวจ 5 key pages ที่ 375/768/1280px |
-| Form Inventory | ตรวจ 5 create pages — มี form + submit button |
-| Nav Integrity | ตรวจ nav links จาก dashboard |
-| Loading Speed | ตรวจ 12 routes ต้องโหลด < 5 วินาที |
+| `e2e/reservation-flow.test.js` | User จอง → Admin ยืนยันรับเงินมัดจำ → รอถึงเวลาจอง → สแกนเข้า (Auto Check-in + จัดช่อง) → สแกนออก (Auto Check-out, ยอดสุทธิ 0) → `completed` |
+| `e2e/walk-in-flow.test.js` | สแกนรถที่ไม่มีการจอง → Walk-in + จัดช่อง → สแกนออก → Admin ยืนยันรับชำระค่าจอด → `completed` |
 
-Reports สร้างที่ `e2e/reports/`:
-- `bug-report.md` — issues found
-- `coverage-report.md` — route coverage
-- `e2e/logs/error-log.json` — console/network errors
-
-### ผล E2E ล่าสุด
-
-> รายงานจากการรัน `npm run qa:audit` ครั้งล่าสุดที่มีอยู่ (**generated 2026-06-09** — รันก่อนการย้ายระบบ AI scan มาเป็น Claude Vision รันใหม่ด้วย `npm run qa:audit` เพื่ออัปเดตตัวเลข)
-
-```
-✓ Playwright E2E tests: 105 (Chromium)
-✓ Routes tested: 30
-✓ Bugs found: 0 (critical: 0)
-✓ Auth checks: 8 (failures: 0)
-✓ Responsive checks: 16 (failures: 0)
-```
-
-Reports เต็มอยู่ที่ `e2e/reports/` — `bug-report.md`, `coverage-report.md`, `security-report.md`, `performance-report.md`, `responsive-report.md`, `authorization-report.md`, `css-report.md`
+- ฐานข้อมูลที่ใช้: `smart_parking_test` (เปลี่ยนได้ด้วย `E2E_DB_DATABASE` — ต้องมีคำว่า `test` ในชื่อ ระบบกันการล้างฐานข้อมูลพัฒนา)
+- AI Scan โหมดจำลอง (`CARSCAN_FAKE=true`, ใช้ได้เฉพาะ `APP_ENV=local/testing`): ผล AI มาจากชื่อไฟล์รูป `ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy.png`
+- ผลล่าสุด (2026-09-15): **2 passed** (~2 นาที — Flow การจองต้องรอถึงเวลาจอง 1–2 นาที)
 
 ### PHPUnit Tests
 
-รันด้วย `php artisan test` (ต้องมี DB `smart_parking_test` แยกจาก dev — ดูค่าใน `phpunit.xml`)
+รันด้วย `php artisan test` — ใช้ DB `smart_parking_test` (ตั้งใน `phpunit.xml`) และอ่าน `DB_PASSWORD` จาก `.env` / `.env.testing` (ไม่ commit รหัสผ่าน)
 
 ```
-Tests: 126 total — 119 passing, 7 failing (327 assertions)
+Tests: 272 passed (1275 assertions)
 ```
 
-**Test files (23):**
-```
-tests/Feature/AdminSuspiciousVehicleTest.php      tests/Feature/OcrCheckInTest.php
-tests/Feature/Auth/*.php (5 files)                tests/Feature/ProfileTest.php
-tests/Feature/CheckInTest.php                     tests/Feature/ReservationCheckInIntegrationTest.php
-tests/Feature/CheckOutTest.php                     tests/Feature/ReservationDepositTest.php
-tests/Feature/DashboardChartDataTest.php           tests/Feature/ReservationNotificationsTest.php
-tests/Feature/ExampleTest.php                      tests/Feature/ReservationTest.php
-tests/Feature/ExpireReservationsTest.php           tests/Feature/SlotReservationLifecycleTest.php
-tests/Feature/LotReservationsEnabledTest.php       tests/Feature/SuspiciousVehicleBlacklistTest.php
-                                                    tests/Feature/UserCancelReservationTest.php
-tests/Unit/ExampleTest.php
-```
-
-⚠️ **Known failing (7)** — ทั้งหมดอยู่ใน `ReservationTest.php`, `ReservationDepositTest.php`, `LotReservationsEnabledTest.php`: test payload ยังส่งแค่ `vehicle_id` แบบเก่า แต่ `User\ReservationController::store()` ปัจจุบันบังคับ `license_plate` เป็น required field แล้ว (ตาม flow "จองด้วยทะเบียนโดยตรง") — ต้องอัปเดต test payload ให้ตรงกับ validation ปัจจุบัน
+- ตาราง Requirement ↔ Test: `docs/TEST_COVERAGE.md` · รายการทดสอบด้วยมือ: `docs/UAT_CHECKLIST.md`
+- CI: GitHub Actions (`.github/workflows/tests.yml`) รัน PHPUnit บน `main` และ Pull Request ด้วย PHP 8.4 + PostgreSQL
 
 ---
 
@@ -940,17 +892,11 @@ config/
 └── carscan.php    ← Anthropic API key + model
 
 e2e/
-├── auth.setup.js          ← save auth sessions
-├── ai-test.test.js        ← full test suite
-├── utils/
-│   ├── routes.js          ← all routes list
-│   ├── crawler.js         ← link crawler
-│   ├── errorMonitor.js    ← console/network error listener
-│   ├── screenshot.js      ← screenshot helpers
-│   ├── uiDetector.js      ← overflow/invisible text/broken images
-│   ├── functional.js      ← form/button/nav collectors
-│   └── reporter.js        ← generate bug/coverage reports
-└── reports/               ← generated reports (gitignored)
+├── global-setup.js            ← migrate:fresh --seed ฐานข้อมูลทดสอบก่อนรัน
+├── reservation-flow.test.js   ← §25.2 Reservation Happy Path
+├── walk-in-flow.test.js       ← §25.2 Walk-in Flow
+├── support/helpers.js         ← login / สแกนจำลอง / Mark as Paid / ตรวจสถานะ
+└── reports/                   ← generated reports (gitignored)
 ```
 
 ---
