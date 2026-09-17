@@ -1,53 +1,60 @@
-<section class="space-y-6">
-    <header>
-        <h2 class="text-lg font-extrabold text-red-200">
-            {{ __('Delete Account') }}
-        </h2>
+@php
+    $deletionErrors = $errors->userDeletion;
+    $activeBookings = $deletionBlocker === null
+        ? \App\Models\Reservation::where('user_id', $user->id)->whereIn('status', ['pending', 'confirmed'])->count()
+        : 0;
+@endphp
 
-        <p class="mt-1 text-sm text-gray-300">
-            {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.') }}
-        </p>
-    </header>
+<section aria-labelledby="delete-account-title" class="rounded-card border border-line bg-surface shadow-1">
+    <div class="grid gap-6 p-5 sm:p-6 md:grid-cols-[14rem_1fr] md:gap-10">
+        <header>
+            <h2 id="delete-account-title" class="text-h3 text-fg">ลบบัญชี</h2>
+            <p class="mt-1 text-label text-fg-3">ลบบัญชีและข้อมูลการจองของบัญชีนี้ออกจากระบบถาวร</p>
+        </header>
 
-    {{-- ใช้ปุ่มธีมเราแทน danger button ของ Breeze (คุมสีง่ายสุด) --}}
-    <button type="button" class="sp-btn sp-btn-danger" x-data=""
-        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')">
-        {{ __('Delete Account') }}
-    </button>
+        <div class="flex flex-col items-start gap-4">
+            @if ($deletionErrors->has('account'))
+                <x-ui.alert tone="danger" class="w-full">{{ $deletionErrors->first('account') }}</x-ui.alert>
+            @endif
 
-    <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
-        {{-- ทำให้กล่อง modal เป็นโทนดำแดง --}}
-        <form method="post" action="{{ route('profile.destroy') }}" class="p-6 sp-card rounded-2xl">
-            @csrf
-            @method('delete')
+            @if ($deletionBlocker)
+                <p class="text-fg-2">{{ $deletionBlocker }}</p>
+                @if ($user->role === 'owner')
+                    <x-ui.button variant="secondary" :href="route('owner.dashboard').'#owner-resignation'">ไปที่คำร้องลาออก</x-ui.button>
+                @endif
+            @else
+                <ul class="flex list-disc flex-col gap-1 pl-5 text-fg-2 marker:text-fg-3">
+                    <li>
+                        ระบบยกเลิกการจองที่ยังไม่ Check-in ทั้งหมด
+                        <span class="num font-semibold text-fg">{{ $activeBookings }}</span> รายการ
+                    </li>
+                    <li>มัดจำที่เจ้าหน้าที่ยืนยันรับเงินแล้วจะไม่ได้รับคืน</li>
+                    <li>กู้คืนบัญชีไม่ได้ ต้องสมัครใหม่หากต้องการใช้งานอีกครั้ง</li>
+                </ul>
 
-            <h2 class="text-lg font-extrabold text-red-200">
-                {{ __('Are you sure you want to delete your account?') }}
-            </h2>
+                <x-ui.button variant="danger" x-data x-on:click="$dispatch('open-modal', 'confirm-user-deletion')">
+                    ลบบัญชี
+                </x-ui.button>
 
-            <p class="mt-2 text-sm text-gray-300">
-                {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
-            </p>
+                <x-ui.modal name="confirm-user-deletion" :show="$deletionErrors->has('password')" maxWidth="md"
+                    title="ลบบัญชีถาวร?"
+                    description="กรอกรหัสผ่านเพื่อยืนยัน ระบบจะยกเลิกการจองที่ยังไม่ Check-in แล้วลบบัญชีทันที">
+                    <form method="post" action="{{ route('profile.destroy') }}" id="delete-account-form" class="px-5 py-4" data-no-busy>
+                        @csrf
+                        @method('delete')
 
-            <div class="mt-6">
-                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
+                        <x-ui.field label="รหัสผ่าน" for="delete_account_password" required :error="$deletionErrors->get('password')">
+                            <x-password-input id="delete_account_password" name="password" autocomplete="current-password"
+                                :invalid="$deletionErrors->has('password')" required />
+                        </x-ui.field>
+                    </form>
 
-                <x-text-input id="password" name="password" type="password"
-                    class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                    placeholder="{{ __('Password') }}" />
-
-                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
-            </div>
-
-            <div class="mt-6 flex justify-end gap-2">
-                <button type="button" class="sp-btn sp-btn-outline" x-on:click="$dispatch('close')">
-                    {{ __('Cancel') }}
-                </button>
-
-                <button type="submit" class="sp-btn sp-btn-danger">
-                    {{ __('Delete Account') }}
-                </button>
-            </div>
-        </form>
-    </x-modal>
+                    <x-slot name="footer">
+                        <x-ui.button variant="secondary" x-on:click="$dispatch('close')">ยกเลิก</x-ui.button>
+                        <x-ui.button type="submit" form="delete-account-form" variant="danger">ลบบัญชี</x-ui.button>
+                    </x-slot>
+                </x-ui.modal>
+            @endif
+        </div>
+    </div>
 </section>

@@ -1,0 +1,86 @@
+/*
+ * Smart Parking System — Design Tokens (UI Phase 1: Foundation)
+ *
+ * โลกทางภาพ: บัตรจอดรถ — กระดาษความร้อนสีขาวเย็น (Light) / ตู้เจ้าหน้าที่ยามกลางคืน (Dark)
+ * หมึกดำ · ตรายางสีคราม 1 สี · หมึกสถานะเขียว/อำพัน/แดง · ไม่มี gradient, glow, glass, blur
+ *
+ * ค่าสีเก็บเป็น channel "R G B" เพื่อให้ Tailwind ใช้ opacity ได้: rgb(var(--color-x) / <alpha-value>)
+ * ห้ามสร้างสีนอกไฟล์นี้ — ทุกหน้า/ทุก component ต้องอ้าง token ผ่าน Tailwind (bg-surface, text-fg, ...)
+ *
+ * ธีม: <html data-theme="light|dark"> ถูกตั้งก่อน paint โดย resources/views/partials/theme-init.blade.php
+ */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --color-page: 233 235 231;          /* #E9EBE7 — พื้นหลังหน้า */
+  --color-surface: 250 251 248;       /* #FAFBF8 — บัตร/แผง/ฟอร์ม */
+  --color-surface-2: 240 241 237;     /* #F0F1ED — แถวสลับ, hover, พื้นที่จม */
+  --color-line: 213 216 210;          /* #D5D8D2 — เส้นแบ่งบาง */
+  --color-field: 115 121 113;         /* #737971 — ขอบ input (≥3:1 กับ surface) */
+
+  /* Text */
+  --color-fg: 21 23 26;               /* #15171A */
+  --color-fg-2: 58 63 69;             /* #3A3F45 */
+  --color-fg-3: 92 99 106;            /* #5C636A */
+
+  /* Primary — หมึกตรายางสีคราม */
+  --color-primary: 52 56 184;         /* #3438B8 — พื้นปุ่มหลัก */
+  --color-primary-hover: 43 47 157;   /* #2B2F9D */
+  --color-primary-ink: 52 56 184;     /* #3438B8 — ลิงก์/ข้อความเน้น/focus ring */
+  --color-on-primary: 255 255 255;
+
+  /* Status inks */
+  --color-success: 23 105 63;         /* #17693F */
+  --color-warning: 133 86 0;          /* #855600 */
+  --color-danger: 179 38 30;          /* #B3261E */
+  --color-on-danger: 255 255 255;
+
+  /* ฉากหลังของ modal/drawer (ใช้คู่กับ opacity) */
+  --color-scrim: 21 23 26;
+
+  /* Elevation — Light ใช้เงาบางมาก */
+  --shadow-1: 0 1px 2px rgb(21 23 26 / 0.06);
+  --shadow-overlay: 0 6px 16px -6px rgb(21 23 26 / 0.18), 0 1px 2px rgb(21 23 26 / 0.06);
+
+  /* Shape */
+  --radius-control: 2px;              /* input, badge, stamp */
+  --radius-card: 6px;                 /* button, card */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-page: 15 17 19;             /* #0F1113 */
+  --color-surface: 23 26 29;          /* #171A1D */
+  --color-surface-2: 30 34 38;        /* #1E2226 */
+  --color-line: 42 47 52;             /* #2A2F34 */
+  --color-field: 114 121 128;         /* #727980 */
+
+  --color-fg: 236 237 234;            /* #ECEDEA */
+  --color-fg-2: 196 200 195;          /* #C4C8C3 */
+  --color-fg-3: 149 155 151;          /* #959B97 */
+
+  --color-primary: 79 84 217;         /* #4F54D9 */
+  --color-primary-hover: 94 99 232;   /* #5E63E8 */
+  --color-primary-ink: 154 158 255;   /* #9A9EFF */
+  --color-on-primary: 255 255 255;
+
+  --color-success: 95 207 146;        /* #5FCF92 */
+  --color-warning: 237 180 83;        /* #EDB453 */
+  --color-danger: 255 129 117;        /* #FF8175 */
+  --color-on-danger: 21 23 26;
+
+  --color-scrim: 0 0 0;
+
+  /* Dark ไม่ใช้เงาเป็นลำดับชั้นหลัก — ใช้เส้นขอบ; เงาเหลือเฉพาะ overlay เพื่อแยกชั้น */
+  --shadow-1: none;
+  --shadow-overlay: 0 8px 20px -8px rgb(0 0 0 / 0.6);
+}

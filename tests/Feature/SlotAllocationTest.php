@@ -186,7 +186,7 @@ class SlotAllocationTest extends TestCase
 
         $cancelled = $this->book($lot);
         $cancelledSlot = $this->confirm($cancelled)['slot'];
-        app(ReservationService::class)->cancel($cancelled, $cancelled->user, 'User ยกเลิกการจอง');
+        app(ReservationService::class)->cancel($cancelled, $cancelled->user, 'ผู้ใช้ยกเลิกการจอง');
         $this->assertDatabaseHas('parking_slots', ['id' => $cancelledSlot->id, 'status' => 'available']);
 
         $expiring = $this->book($lot, ['reserve_start' => now()]);

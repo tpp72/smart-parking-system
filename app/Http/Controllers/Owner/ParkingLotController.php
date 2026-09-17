@@ -31,17 +31,23 @@ class ParkingLotController extends Controller
                     ->orWhere('province', 'like', "%{$q}%")
                     ->orWhere('landmark', 'like', "%{$q}%");
             }))
-            ->withCount(['slots', 'reservations'])
+            ->withCount([
+                'slots',
+                'slots as available_count' => fn ($s) => $s->where('status', 'available'),
+                'slots as reserved_count' => fn ($s) => $s->where('status', 'reserved'),
+                'slots as occupied_count' => fn ($s) => $s->where('status', 'occupied'),
+                'reservations as active_reservations_count' => fn ($r) => $r->whereIn('status', Reservation::ACTIVE_STATUSES),
+            ])
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
 
-        return view('owner.parking-lots.index', compact('lots', 'q'));
+        return view('parking.lots.index', compact('lots', 'q') + ['scope' => 'owner']);
     }
 
     public function create()
     {
-        return view('owner.parking-lots.create');
+        return view('parking.lots.form', ['lot' => null, 'scope' => 'owner']);
     }
 
     public function store(Request $request)
@@ -76,7 +82,7 @@ class ParkingLotController extends Controller
     public function edit(int $parking_lot)
     {
         $lot = $this->ownedLot($parking_lot);
-        return view('owner.parking-lots.edit', compact('lot'));
+        return view('parking.lots.form', ['lot' => $lot, 'scope' => 'owner']);
     }
 
     public function update(Request $request, int $parking_lot)

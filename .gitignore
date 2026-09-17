@@ -5,6 +5,7 @@
 .env
 .env.backup
 .env.production
+.env.testing
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -24,3 +25,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Claude Code — ตั้งค่าส่วนตัว + Impeccable (ติดตั้งด้วย npx impeccable install)
+.claude/settings.local.json
+.claude/skills/impeccable/
+.claude/agents/impeccable-*.md
+.impeccable/

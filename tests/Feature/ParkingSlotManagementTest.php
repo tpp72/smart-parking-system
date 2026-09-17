@@ -57,7 +57,7 @@ class ParkingSlotManagementTest extends TestCase
 
         $this->actingAs($this->admin())
             ->delete(route('admin.parking-slots.destroy', $slot))
-            ->assertRedirect(route('admin.parking-slots.index'));
+            ->assertRedirect(route('admin.parking-slots.index', ['lot_id' => $slot->parking_lot_id]));
 
         $this->assertDatabaseMissing('parking_slots', ['id' => $slot->id]);
     }
@@ -77,7 +77,7 @@ class ParkingSlotManagementTest extends TestCase
 
         $this->actingAs($owner)
             ->delete(route('owner.parking-slots.destroy', $available))
-            ->assertRedirect(route('owner.parking-slots.index'));
+            ->assertRedirect(route('owner.parking-slots.index', ['lot_id' => $lot->id]));
 
         $this->assertDatabaseHas('parking_slots', ['id' => $occupied->id]);
         $this->assertDatabaseMissing('parking_slots', ['id' => $available->id]);
@@ -93,7 +93,7 @@ class ParkingSlotManagementTest extends TestCase
             'parking_lot_id' => $lot->id,
             'slot_number'    => 'X001',
             'status'         => 'occupied',
-        ])->assertRedirect(route('admin.parking-slots.index'));
+        ])->assertRedirect(route('admin.parking-slots.index', ['lot_id' => $lot->id]));
 
         $this->assertDatabaseHas('parking_slots', ['parking_lot_id' => $lot->id, 'slot_number' => 'X001', 'status' => 'available']);
     }
@@ -109,7 +109,7 @@ class ParkingSlotManagementTest extends TestCase
             'parking_lot_id' => $lot->id,
             'slot_number'    => 'Y001-A',
             'status'         => 'available',
-        ])->assertRedirect(route('admin.parking-slots.index'));
+        ])->assertRedirect(route('admin.parking-slots.index', ['lot_id' => $lot->id]));
 
         $this->assertDatabaseHas('parking_slots', ['id' => $slot->id, 'slot_number' => 'Y001-A', 'status' => 'reserved']);
     }
@@ -145,7 +145,7 @@ class ParkingSlotManagementTest extends TestCase
             'end'            => 3,
             'pad'            => 2,
             'status'         => 'occupied',
-        ])->assertRedirect(route('owner.parking-slots.index'));
+        ])->assertRedirect(route('owner.parking-slots.index', ['lot_id' => $lot->id]));
 
         $this->assertSame(3, ParkingSlot::where('parking_lot_id', $lot->id)->where('status', 'available')->count());
         $this->assertDatabaseHas('parking_slots', ['parking_lot_id' => $lot->id, 'slot_number' => 'Z01']);

@@ -2,393 +2,243 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LicensePlateScan;
 use App\Models\OwnerApplication;
+use App\Models\OwnerResignation;
+use App\Models\ParkingLog;
 use App\Models\ParkingLot;
+use App\Models\Payment;
+use App\Models\Reservation;
 use App\Models\SuspiciousVehicle;
+use App\Queries\RevenueQuery;
+use App\Services\CheckOutService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    public function user()
+    public function user(CheckOutService $checkOut)
     {
-        $userId = Auth::id();
         $user = Auth::user();
 
         if ($user?->force_password_reset) {
             return redirect()->route('profile.edit')
-                ->with('warning', 'กรุณาเปลี่ยนรหัสผ่านก่อนเข้าใช้งาน Dashboard');
+                ->with('warning', 'กรุณาเปลี่ยนรหัสผ่านก่อนเข้าใช้งานหน้าหลัก');
         }
 
-        $userId = $user->id;
-        $now = now();
+        // บัตรทุกใบที่ยังไม่จบ: กำลังจอดก่อน แล้วเรียงตามเวลาเริ่มจอง (ใกล้หมดเวลาเช็คอินก่อน)
+        $tickets = Reservation::with(['parkingLot:id,name,hourly_rate', 'parkingSlot:id,slot_number', 'depositPayment', 'parkingLog'])
+            ->where('user_id', $user->id)
+            ->active()
+            ->get()
+            ->sortBy(fn (Reservation $r) => [$r->status === 'checked_in' ? 0 : 1, $r->reserve_start->getTimestamp()])
+            ->values();
 
-        // ===== Global slots stats (optional for user) =====
-        $slotStats = DB::table('parking_slots')
-            ->selectRaw("
-            COUNT(*) as slots_total,
-            SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as slots_available,
-            SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) as slots_reserved,
-            SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as slots_occupied
-        ")->first();
-
-        // ===== 1) Active parking (สำคัญสุด) =====
-        $activeLog = DB::table('parking_logs as pl')
-            ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
-            ->leftJoin('payments as p', 'p.parking_log_id', '=', 'pl.id')
-            ->whereNull('pl.check_out_time')
-            ->where('r.user_id', $userId)
-            ->orderByDesc('pl.check_in_time')
-            ->select([
-                'pl.id as log_id',
-                'pl.license_plate',
-                'lot.name as lot_name',
-                's.slot_number',
-                'pl.check_in_time',
-                'p.id as payment_id',
-                'p.payment_status',
-                'p.total_amount',
-            ])
-            ->first();
-
-        // ===== 2) Active reservation (ถ้าไม่ได้กำลังจอด) =====
-        $activeReservation = DB::table('reservations as r')
-            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'r.parking_slot_id')
-            ->where('r.user_id', $userId)
-            ->whereIn('r.status', ['pending', 'confirmed'])
-            ->where('r.reserve_start', '>', $now->copy()->subHour())
-            ->orderBy('r.reserve_start')
-            ->select([
-                'r.id as reservation_id',
-                'r.license_plate',
-                'lot.name as lot_name',
-                's.slot_number',
-                'r.reserve_start',
-                'r.deposit_amount',
-                'r.status',
-            ])
-            ->first();
-
-        // ===== Lists (รองลงมา) =====
-        $activeNowList = DB::table('parking_logs as pl')
-            ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
-            ->whereNull('pl.check_out_time')
-            ->where('r.user_id', $userId)
-            ->orderByDesc('pl.check_in_time')
-            ->limit(5)
-            ->select(['pl.id as log_id', 'pl.license_plate', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
-            ->get();
-
-        $recentReservations = DB::table('reservations as r')
-            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
-            ->where('r.user_id', $userId)
-            ->orderByDesc('r.created_at')
-            ->limit(5)
-            ->select(['r.id', 'r.license_plate', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
-            ->get();
+        // รถที่จอดอยู่: ประมาณค่าจอด ณ ตอนนี้ด้วยสูตรเดียวกับตอน Check-out (ยอดจริงคิดตอนออก)
+        $estimates = $tickets
+            ->filter(fn (Reservation $r) => $r->status === 'checked_in' && $r->parkingLog && ! $r->parkingLog->check_out_time)
+            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->calculate($r, $r->parkingLog, now())]);
 
         $recentHistory = DB::table('parking_logs as pl')
             ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->where('r.user_id', $userId)
-            ->orderByDesc('pl.check_in_time')
-            ->limit(8)
-            ->select(['pl.id as log_id', 'pl.license_plate', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time'])
+            ->leftJoin('payments as p', 'p.parking_log_id', '=', 'pl.id')
+            ->where('r.user_id', $user->id)
+            ->whereNotNull('pl.check_out_time')
+            ->orderByDesc('pl.check_out_time')
+            ->limit(3)
+            ->select(['pl.id as log_id', 'pl.license_plate', 'pl.plate_province', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time', 'p.total_amount', 'p.payment_status'])
             ->get();
 
-        // แนะนำ lots ที่ว่าง (user friendly)
-        $lotsAvailable = DB::table('parking_lots as lot')
-            ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
-            ->groupBy('lot.id', 'lot.name')
-            ->orderByDesc(DB::raw("SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END)"))
+        // แนะนำลานที่จองได้ทันที (เงื่อนไขเดียวกับหน้าจอง) — กดแล้วไปหน้าจองพร้อมเลือกลานนั้นไว้
+        $lotsAvailable = ParkingLot::reservable()
+            ->withAvailableSlot()
+            ->withCount(['slots as available' => fn ($query) => $query->where('status', 'available')])
+            ->orderByDesc('available')
+            ->orderBy('name')
             ->limit(5)
-            ->selectRaw("
-            lot.id, lot.name,
-            SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END) as available
-        ")
-            ->get();
+            ->get(['id', 'name', 'hourly_rate']);
 
-        $stats = [
-            'slots_total'     => (int)($slotStats->slots_total ?? 0),
-            'slots_available' => (int)($slotStats->slots_available ?? 0),
-            'slots_reserved'  => (int)($slotStats->slots_reserved ?? 0),
-            'slots_occupied'  => (int)($slotStats->slots_occupied ?? 0),
-            'active_now'      => $activeLog ? 1 : 0,
-        ];
-
-        return view('dashboard-user', compact(
-            'stats',
-            'activeLog',
-            'activeReservation',
-            'activeNowList',
-            'recentReservations',
-            'recentHistory',
-            'lotsAvailable'
-        ));
+        return view('dashboard-user', compact('tickets', 'estimates', 'recentHistory', 'lotsAvailable'));
     }
 
-
+    /**
+     * Admin Dashboard = ภาพรวมทั้งระบบ ทุกลาน (project-plan.md §17.1, §5.1.1)
+     * ตัวกรอง ?lot_id= (ว่าง = ทุกลาน) และ ?range= today | 7d | month ใช้กับ KPI กราฟ และรายการ — ทุกตัวเลขบอกขอบเขตของตัวเอง
+     * งานที่รอผู้ดูแลระบบและจำนวนบัญชีดำไม่ขึ้นกับตัวกรอง · การจัดการยังจำกัดเฉพาะลานของ Admin ในหน้าจัดการ
+     */
     public function admin()
     {
-        $range = request('range', 'today');   // today | 7d | month
-        $lotId = request('lot_id');           // nullable
-        $q = trim((string) request('q', '')); // plate search
+        $range = in_array(request('range'), ['today', '7d', 'month'], true) ? request('range') : 'today';
 
-        // Admin เห็น/จัดการได้เฉพาะลานที่ไม่มีเจ้าของ — ลานที่มี owner เป็นของ Owner คนนั้นเท่านั้น
-        $unownedLotIds = ParkingLot::unowned()->pluck('id');
-
-        // กัน lot_id ที่ส่งมาเป็นลานที่มีเจ้าของ (URL manipulation)
-        if ($lotId && !$unownedLotIds->contains((int) $lotId)) {
-            $lotId = null;
-        }
+        $lots = ParkingLot::with('owner:id,name')->orderBy('name')->get(['id', 'name', 'owner_id', 'hourly_rate']);
+        $lot = $lots->firstWhere('id', (int) request('lot_id')); // null = ทุกลาน
+        $scopeLotIds = $lot ? collect([$lot->id]) : $lots->pluck('id');
 
         [$from, $to] = match ($range) {
-            '7d'   => [now()->subDays(7)->startOfDay(), now()->endOfDay()],
+            '7d'    => [now()->subDays(6)->startOfDay(), now()->endOfDay()], // 7 วันล่าสุด รวมวันนี้
             'month' => [now()->startOfMonth(), now()->endOfDay()],
             default => [now()->startOfDay(), now()->endOfDay()],
         };
 
-        // ===== Slot stats (รวมเป็น 1 query) =====
+        // ── ตอนนี้ (ไม่ขึ้นกับช่วงเวลา) ────────────────────────────────────
         $slotStats = DB::table('parking_slots')
-            ->whereIn('parking_lot_id', $unownedLotIds)
+            ->whereIn('parking_lot_id', $scopeLotIds)
             ->selectRaw("
-            COUNT(*) as slots_total,
-            SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as slots_available,
-            SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) as slots_reserved,
-            SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as slots_occupied
-        ")->first();
+                COUNT(*) as total,
+                SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available,
+                SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) as reserved,
+                SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as occupied
+            ")->first();
 
-        $lotsTotal = $unownedLotIds->count();
+        // รอยืนยันรับเงิน ณ ตอนนี้ แยกมัดจำ / ค่าจอด (ไม่ผูกกับช่วงเวลา — นิยามเดียวกับหน้ารายได้ของเจ้าของลาน)
+        $unpaid = function (string $type, $lotIds): array {
+            $query = fn () => Payment::where('type', $type)
+                ->where('payment_status', Payment::STATUS_UNPAID)
+                ->whereHas('reservation', fn ($q) => $q->whereIn('parking_lot_id', $lotIds));
 
-        $activeCount = DB::table('parking_logs')
-            ->whereIn('parking_lot_id', $unownedLotIds)
-            ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
-            ->whereNull('check_out_time')
-            ->count();
+            return ['count' => $query()->count(), 'amount' => (float) $query()->sum('total_amount')];
+        };
+
+        // ── ในช่วงเวลาที่เลือก ────────────────────────────────────────────
+        $paid = fn () => RevenueQuery::paid($scopeLotIds)->whereBetween('p.paid_at', [$from, $to]);
+
+        $scanStats = DB::table('license_plate_scans')
+            ->whereIn('parking_lot_id', $scopeLotIds)
+            ->whereBetween('scan_time', [$from, $to])
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN result = 'passed' THEN 1 ELSE 0 END) as passed,
+                SUM(CASE WHEN result IN ('low_accuracy', 'unreadable') THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN is_suspicious THEN 1 ELSE 0 END) as suspicious
+            ")->first();
+
+        $logsBetween = fn (string $column) => DB::table('parking_logs')
+            ->whereIn('parking_lot_id', $scopeLotIds)
+            ->whereBetween($column, [$from, $to]);
 
         $stats = [
-            'lots_total'       => (int)$lotsTotal,
-            'slots_total'      => (int)($slotStats->slots_total ?? 0),
-            'slots_available'  => (int)($slotStats->slots_available ?? 0),
-            'slots_reserved'   => (int)($slotStats->slots_reserved ?? 0),
-            'slots_occupied'   => (int)($slotStats->slots_occupied ?? 0),
-            'active_now'       => (int)$activeCount,
-            'revenue_paid'     => (float) DB::table('payments as p')
-                ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-                ->whereIn('pl.parking_lot_id', $unownedLotIds)
-                ->where('p.payment_status', 'paid')
-                ->whereBetween('p.created_at', [$from, $to])
-                ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
-                ->sum('p.total_amount'),
-            'unpaid_count'     => (int) DB::table('payments as p')
-                ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-                ->whereIn('pl.parking_lot_id', $unownedLotIds)
-                ->where('p.payment_status', 'unpaid')
-                ->whereBetween('p.created_at', [$from, $to])
-                ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
+            'lots_total'       => $lots->count(),
+            'admin_lots_total' => $lots->whereNull('owner_id')->count(),
+            'slots_total'      => (int) ($slotStats->total ?? 0),
+            'slots_available'  => (int) ($slotStats->available ?? 0),
+            'slots_reserved'   => (int) ($slotStats->reserved ?? 0),
+            'slots_occupied'   => (int) ($slotStats->occupied ?? 0),
+            'active_now'       => DB::table('parking_logs')->whereIn('parking_lot_id', $scopeLotIds)->whereNull('check_out_time')->count(),
+            'unpaid_deposits'  => $unpaid(Payment::TYPE_DEPOSIT, $scopeLotIds),
+            'unpaid_checkouts' => $unpaid(Payment::TYPE_CHECKOUT, $scopeLotIds),
+            'revenue_paid'     => (float) $paid()->sum('p.total_amount'),
+            'revenue_deposit'  => (float) $paid()->where('p.type', Payment::TYPE_DEPOSIT)->sum('p.total_amount'),
+            'revenue_parking'  => (float) $paid()->where('p.type', Payment::TYPE_CHECKOUT)->sum('p.total_amount'),
+            'check_ins'        => $logsBetween('check_in_time')->count(),
+            'check_outs'       => $logsBetween('check_out_time')->count(),
+            'walk_ins'         => DB::table('parking_logs as pl')
+                ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
+                ->whereIn('pl.parking_lot_id', $scopeLotIds)
+                ->where('r.is_walk_in', true)
+                ->whereBetween('pl.check_in_time', [$from, $to])
                 ->count(),
-            'reservations_checked_in' => (int) DB::table('reservations')
-                ->whereIn('parking_lot_id', $unownedLotIds)
-                ->where('status', 'checked_in')
-                ->whereBetween('checked_in_at', [$from, $to])
-                ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
-                ->count(),
-            'reservations_completed'  => (int) DB::table('reservations')
-                ->whereIn('parking_lot_id', $unownedLotIds)
-                ->where('status', 'completed')
-                ->whereBetween('completed_at', [$from, $to])
-                ->when($lotId, fn($qq) => $qq->where('parking_lot_id', $lotId))
-                ->count(),
-            'blacklist_active' => (int) SuspiciousVehicle::active()->count(),
+            'scans_total'      => (int) ($scanStats->total ?? 0),
+            'scans_passed'     => (int) ($scanStats->passed ?? 0),
+            'scans_failed'     => (int) ($scanStats->failed ?? 0),
+            'scans_suspicious' => (int) ($scanStats->suspicious ?? 0),
+            // บัญชีดำเป็นรายการกลางของทั้งระบบ ไม่ผูกกับลาน
+            'blacklist_active' => SuspiciousVehicle::active()->count(),
         ];
 
-        // Active now
-        $activeNow = DB::table('parking_logs as pl')
-            ->leftJoin('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->leftJoin('users as u', 'u.id', '=', 'r.user_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
-            ->whereNull('lot.owner_id')
-            ->whereNull('pl.check_out_time')
-            ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
-            ->when($q !== '', fn($qq) => $qq->where('pl.license_plate', 'ilike', "%{$q}%"))
-            ->orderByDesc('pl.check_in_time')
-            ->limit(10)
-            ->select(['pl.id as log_id', 'pl.license_plate', 'u.name as user_name', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
-            ->get();
+        // ── งานที่รอผู้ดูแลระบบ (ไม่ขึ้นกับตัวกรอง) ─────────────────────────
+        $adminLotIds = $lots->whereNull('owner_id')->pluck('id');
+        $adminDeposits = $unpaid(Payment::TYPE_DEPOSIT, $adminLotIds);
+        $adminCheckouts = $unpaid(Payment::TYPE_CHECKOUT, $adminLotIds);
 
-        // Lots overview
-        $lotsOverview = DB::table('parking_lots as lot')
-            ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
-            ->whereNull('lot.owner_id')
-            ->groupBy('lot.id', 'lot.name', 'lot.total_slots', 'lot.hourly_rate')
-            ->orderBy('lot.id')
-            ->selectRaw("
-            lot.id, lot.name, lot.total_slots, lot.hourly_rate,
-            SUM(CASE WHEN s.status = 'available' THEN 1 ELSE 0 END) as available,
-            SUM(CASE WHEN s.status = 'occupied' THEN 1 ELSE 0 END) as occupied,
-            SUM(CASE WHEN s.status = 'reserved' THEN 1 ELSE 0 END) as reserved
-        ")
-            ->limit(8)
-            ->get();
-
-        // Latest scans — Blacklist ตรวจด้วย ทะเบียน + จังหวัด
-        $latestScans = DB::table('license_plate_scans as lps')
-            ->leftJoin('suspicious_vehicles as sv', function ($join) {
-                $join->on('sv.license_plate', '=', 'lps.license_plate')
-                     ->on('sv.plate_province', '=', 'lps.plate_province')
-                     ->where('sv.is_active', true);
-            })
-            ->orderByDesc('lps.scan_time')
-            ->limit(6)
-            ->select([
-                'lps.license_plate',
-                'lps.scan_time',
-                'lps.source',
-                DB::raw("CASE WHEN sv.id IS NULL THEN false ELSE true END as is_suspicious"),
-            ])
-            ->get();
-
-        // Unpaid payments
-        $unpaidPayments = DB::table('payments as p')
-            ->join('parking_logs as pl', 'pl.id', '=', 'p.parking_log_id')
-            ->whereIn('pl.parking_lot_id', $unownedLotIds)
-            ->where('p.payment_status', 'unpaid')
-            ->whereBetween('p.created_at', [$from, $to])
-            ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
-            ->when($q !== '', fn($qq) => $qq->where('pl.license_plate', 'ilike', "%{$q}%"))
-            ->orderByDesc('p.created_at')
-            ->limit(8)
-            ->select(['p.id as payment_id', 'pl.license_plate', 'p.total_hours', 'p.total_amount'])
-            ->get();
-
-        // Reservations
-        $reservations = DB::table('reservations as r')
-            ->join('users as u', 'u.id', '=', 'r.user_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
-            ->whereNull('lot.owner_id')
-            ->whereBetween('r.created_at', [$from, $to])
-            ->when($lotId, fn($qq) => $qq->where('r.parking_lot_id', $lotId))
-            ->when($q !== '', fn($qq) => $qq->where('r.license_plate', 'ilike', "%{$q}%"))
-            ->orderByDesc('r.created_at')
-            ->limit(8)
-            ->select(['r.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
-            ->get();
-
-        // Recent history
-        $recentHistory = DB::table('parking_logs as pl')
-            ->leftJoin('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->leftJoin('users as u', 'u.id', '=', 'r.user_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->whereNull('lot.owner_id')
-            ->whereBetween('pl.check_in_time', [$from, $to])
-            ->when($lotId, fn($qq) => $qq->where('pl.parking_lot_id', $lotId))
-            ->when($q !== '', fn($qq) => $qq->where('pl.license_plate', 'ilike', "%{$q}%"))
-            ->orderByDesc('pl.check_in_time')
-            ->limit(10)
-            ->select(['pl.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time'])
-            ->get();
-
-        // Slots preview (optional)
-        $slotsPreview = DB::table('parking_slots as s')
-            ->join('parking_lots as lot', 'lot.id', '=', 's.parking_lot_id')
-            ->whereNull('lot.owner_id')
-            ->when($lotId, fn($qq) => $qq->where('s.parking_lot_id', $lotId))
-            ->orderByDesc('s.updated_at')
-            ->limit(8)
-            ->select(['s.slot_number', 's.status', 'lot.name as lot_name'])
-            ->get();
-
-        $pendingApplications = OwnerApplication::where('status', 'pending')->count();
-        $pendingResignations = \App\Models\OwnerResignation::pending()->count();
-
-        // ── Chart data ─────────────────────────────────────────────────────
-        $statusKeys   = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
-        $statusColors = [
-            'pending'    => 'rgba(250,204,21,0.85)',
-            'confirmed'  => 'rgba(96,165,250,0.85)',
-            'checked_in' => 'rgba(52,211,153,0.85)',
-            'completed'  => 'rgba(34,197,94,0.85)',
-            'cancelled'  => 'rgba(239,68,68,0.85)',
-            'expired'    => 'rgba(107,114,128,0.85)',
+        $tasks = [
+            'applications' => OwnerApplication::where('status', 'pending')->count(),
+            'resignations' => OwnerResignation::pending()->count(),
+            'payments'     => [
+                'count'  => $adminDeposits['count'] + $adminCheckouts['count'],
+                'amount' => $adminDeposits['amount'] + $adminCheckouts['amount'],
+            ],
         ];
-        $rawStatusCounts = DB::table('reservations')
-            ->whereIn('parking_lot_id', $unownedLotIds)
-            ->selectRaw('status, COUNT(*) as count')
-            ->whereIn('status', $statusKeys)
+
+        // ── การจองใหม่ในช่วงเวลา (รวม Walk-in) แยกตามสถานะปัจจุบัน ─────────────
+        $statusCounts = DB::table('reservations')
+            ->whereIn('parking_lot_id', $scopeLotIds)
+            ->whereBetween('created_at', [$from, $to])
+            ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
-            ->pluck('count', 'status');
+            ->pluck('total', 'status');
 
-        $chartReservationStatus = [
-            'labels'   => ['Pending', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'Expired'],
-            'datasets' => [[
-                'data'            => array_map(fn ($s) => (int) ($rawStatusCounts[$s] ?? 0), $statusKeys),
-                'backgroundColor' => array_values($statusColors),
-                'borderColor'     => '#111827',
-                'borderWidth'     => 2,
-                'hoverOffset'     => 6,
-            ]],
-        ];
+        $reservationStatus = collect(Reservation::STATUSES)
+            ->mapWithKeys(fn (string $status) => [$status => (int) ($statusCounts[$status] ?? 0)]);
 
-        $chartSlotOccupancy = [
-            'labels'   => ['ว่าง', 'จอง', 'ใช้งาน'],
-            'datasets' => [[
-                'label'           => 'ช่องจอด',
-                'data'            => [
-                    $stats['slots_available'],
-                    $stats['slots_reserved'],
-                    $stats['slots_occupied'],
-                ],
-                'backgroundColor' => [
-                    'rgba(34,197,94,0.75)',
-                    'rgba(250,204,21,0.75)',
-                    'rgba(239,68,68,0.75)',
-                ],
-                'borderRadius'    => 6,
-                'borderWidth'     => 0,
-            ]],
-        ];
-
-        $topLotsRaw = DB::table('reservations as r')
+        // ── ลานที่มีการจองใหม่มากที่สุดในช่วงเวลา (เทียบทุกลานเสมอ) ──────────────
+        $topLots = DB::table('reservations as r')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
-            ->whereNull('lot.owner_id')
-            ->selectRaw('lot.name, COUNT(*) as reservation_count')
+            ->whereBetween('r.created_at', [$from, $to])
+            ->selectRaw('lot.id, lot.name, COUNT(*) as total')
             ->groupBy('lot.id', 'lot.name')
-            ->orderByDesc('reservation_count')
+            ->orderByDesc('total')
+            ->orderBy('lot.name')
             ->limit(5)
             ->get();
 
-        $chartTopLots = [
-            'labels'   => $topLotsRaw->pluck('name')->toArray(),
-            'datasets' => [[
-                'label'           => 'การจอง',
-                'data'            => $topLotsRaw->pluck('reservation_count')->map(fn ($v) => (int) $v)->toArray(),
-                'backgroundColor' => 'rgba(96,165,250,0.75)',
-                'borderRadius'    => 6,
-                'borderWidth'     => 0,
-            ]],
-        ];
+        // ── ภาพรวมทุกลาน: สถานะช่อง ณ ตอนนี้ + รถที่จอดอยู่ + รับเงินในช่วงเวลา (แสดงทุกลาน ไม่จำกัดจำนวน) ──
+        $slotsByLot = DB::table('parking_slots')
+            ->selectRaw("
+                parking_lot_id,
+                SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available,
+                SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) as reserved,
+                SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as occupied
+            ")
+            ->groupBy('parking_lot_id')
+            ->get()
+            ->keyBy('parking_lot_id');
+
+        $parkedByLot = DB::table('parking_logs')
+            ->whereNull('check_out_time')
+            ->selectRaw('parking_lot_id, COUNT(*) as total')
+            ->groupBy('parking_lot_id')
+            ->pluck('total', 'parking_lot_id');
+
+        $revenueByLot = RevenueQuery::paid($lots->pluck('id'))
+            ->whereBetween('p.paid_at', [$from, $to])
+            ->selectRaw('r.parking_lot_id, SUM(p.total_amount) as revenue')
+            ->groupBy('r.parking_lot_id')
+            ->pluck('revenue', 'parking_lot_id');
+
+        $lotsOverview = $lots->map(fn (ParkingLot $l) => (object) [
+            'id'          => $l->id,
+            'name'        => $l->name,
+            'owner_name'  => $l->owner?->name,
+            'hourly_rate' => (float) $l->hourly_rate,
+            'available'   => (int) ($slotsByLot[$l->id]->available ?? 0),
+            'reserved'    => (int) ($slotsByLot[$l->id]->reserved ?? 0),
+            'occupied'    => (int) ($slotsByLot[$l->id]->occupied ?? 0),
+            'parked'      => (int) ($parkedByLot[$l->id] ?? 0),
+            'revenue'     => (float) ($revenueByLot[$l->id] ?? 0),
+        ]);
+
+        // ── รถที่จอดอยู่ตอนนี้ + สแกนล่าสุด ───────────────────────────────────
+        $parked = ParkingLog::with([
+            'parkingLot:id,name',
+            'parkingSlot:id,slot_number',
+            'reservation:id,user_id,is_walk_in',
+            'reservation.user:id,name',
+        ])
+            ->whereIn('parking_lot_id', $scopeLotIds)
+            ->whereNull('check_out_time')
+            ->orderByDesc('check_in_time')
+            ->limit(8)
+            ->get();
+
+        $latestScans = LicensePlateScan::with('parkingLot:id,name')
+            ->whereIn('parking_lot_id', $scopeLotIds)
+            ->orderByDesc('scan_time')
+            ->limit(6)
+            ->get(['id', 'parking_lot_id', 'license_plate', 'plate_province', 'confidence', 'result', 'is_suspicious', 'scan_time']);
 
         return view('admin.dashboard', compact(
-            'stats',
-            'range',
-            'activeNow',
-            'lotsOverview',
-            'latestScans',
-            'unpaidPayments',
-            'reservations',
-            'recentHistory',
-            'slotsPreview',
-            'pendingApplications',
-            'pendingResignations',
-            'chartReservationStatus',
-            'chartSlotOccupancy',
-            'chartTopLots'
+            'range', 'lots', 'lot', 'stats', 'tasks', 'reservationStatus', 'topLots', 'lotsOverview', 'parked', 'latestScans'
         ));
     }
 }

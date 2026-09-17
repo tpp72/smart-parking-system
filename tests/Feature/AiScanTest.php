@@ -112,8 +112,8 @@ class AiScanTest extends TestCase
         $this->assertSame($lot->id, $scan->parking_lot_id);
         $this->assertNotNull($scan->image_path);
 
-        $this->assertFalse($this->notified($admin, 'AI Accuracy ไม่ผ่านเกณฑ์'));
-        $this->assertFalse($this->notified($owner, 'AI Accuracy ไม่ผ่านเกณฑ์'));
+        $this->assertFalse($this->notified($admin, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
+        $this->assertFalse($this->notified($owner, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
     }
 
     // ─── [3] Accuracy = 85 → ไม่ผ่าน · ไม่ Auto Check-in · แจ้ง Owner + Admin ─
@@ -143,9 +143,9 @@ class AiScanTest extends TestCase
         $this->assertDatabaseCount('parking_logs', 0);
         $this->assertSame('confirmed', $reservation->fresh()->status);
 
-        $this->assertTrue($this->notified($owner, 'AI Accuracy ไม่ผ่านเกณฑ์'));
-        $this->assertTrue($this->notified($admin, 'AI Accuracy ไม่ผ่านเกณฑ์'));
-        $this->assertFalse($this->notified($uploader, 'AI Accuracy ไม่ผ่านเกณฑ์'));
+        $this->assertTrue($this->notified($owner, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
+        $this->assertTrue($this->notified($admin, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
+        $this->assertFalse($this->notified($uploader, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
     }
 
     // ─── [4] ไม่มีค่า Accuracy → ถือว่าไม่ผ่าน ─────────────────────────────
@@ -196,8 +196,8 @@ class AiScanTest extends TestCase
 
         $this->scanAs($this->makeUser(), $lot);
 
-        $this->assertTrue($this->notified($adminA, 'AI Accuracy ไม่ผ่านเกณฑ์'));
-        $this->assertTrue($this->notified($adminB, 'AI Accuracy ไม่ผ่านเกณฑ์'));
+        $this->assertTrue($this->notified($adminA, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
+        $this->assertTrue($this->notified($adminB, 'ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
     }
 
     // ─── [7] พบ Blacklist → Check-in ได้ + แจ้ง Admin + Owner ───────────────
@@ -213,8 +213,8 @@ class AiScanTest extends TestCase
         $this->scanAs($this->makeUser(), $lot);
 
         $this->assertTrue(LicensePlateScan::firstOrFail()->is_suspicious);
-        $this->assertTrue($this->notified($admin, '⚠ พบรถต้องสงสัย (Blacklist)'));
-        $this->assertTrue($this->notified($owner, '⚠ พบรถต้องสงสัย (Blacklist)'));
+        $this->assertTrue($this->notified($admin, '⚠ พบรถในบัญชีดำ'));
+        $this->assertTrue($this->notified($owner, '⚠ พบรถในบัญชีดำ'));
 
         // ไม่ Block — รถยังเข้าจอดได้
         $this->assertDatabaseHas('parking_logs', ['license_plate' => self::PLATE, 'parking_lot_id' => $lot->id]);
@@ -232,7 +232,7 @@ class AiScanTest extends TestCase
         $this->scanAs($this->makeUser(), $lot);
 
         $this->assertFalse(LicensePlateScan::firstOrFail()->is_suspicious);
-        $this->assertFalse($this->notified($admin, '⚠ พบรถต้องสงสัย (Blacklist)'));
+        $this->assertFalse($this->notified($admin, '⚠ พบรถในบัญชีดำ'));
     }
 
     // ─── [9] อัปโหลดจำลองกล้องได้ทุกลาน ไม่ขึ้นกับผู้อัปโหลด ─────────────────

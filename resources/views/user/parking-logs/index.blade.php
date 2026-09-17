@@ -1,91 +1,104 @@
+{{--
+    ประวัติการจอด — 1 ครั้งที่จอด = ใบเสร็จ 1 ใบ: เวลาเข้า-ออก · ค่าจอดตามชั่วโมง · หักมัดจำ · ส่วนลดการจอง · ยอดชำระ
+    (project-plan.md §5.3 Parking History)
+--}}
+@use('App\Support\Format')
+
 <x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h1 class="text-2xl font-extrabold sp-glow-text">ประวัติการจอด</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">Parking History</p>
-                </div>
-                <a href="{{ route('user.dashboard') }}" class="sp-btn sp-btn-outline text-sm">← Dashboard</a>
-            </div>
-
-            <div class="sp-card rounded-2xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-xs text-gray-500 uppercase tracking-wider border-b border-white/10">
-                                <th class="px-5 py-4 text-left font-medium">ทะเบียน</th>
-                                <th class="px-5 py-4 text-left font-medium">ลาน / ช่อง</th>
-                                <th class="px-5 py-4 text-left font-medium">เข้า</th>
-                                <th class="px-5 py-4 text-left font-medium">ออก</th>
-                                <th class="px-5 py-4 text-left font-medium">ค่าจอด</th>
-                                <th class="px-5 py-4 text-left font-medium">สถานะ</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            @forelse($logs as $log)
-                                <tr class="hover:bg-white/[0.03] transition">
-                                    <td class="px-5 py-4 font-extrabold">{{ $log->license_plate }}</td>
-                                    <td class="px-5 py-4 text-gray-300">
-                                        {{ $log->lot_name }}
-                                        @if($log->slot_number)
-                                            <span class="text-gray-500">· {{ $log->slot_number }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-5 py-4 text-gray-400 text-xs">{{ $log->check_in_time }}</td>
-                                    <td class="px-5 py-4 text-xs">
-                                        @if($log->check_out_time)
-                                            <span class="text-green-400">{{ $log->check_out_time }}</span>
-                                        @else
-                                            <span class="text-yellow-400 animate-pulse">กำลังจอด…</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-5 py-4 text-gray-300">
-                                        @if($log->total_amount !== null)
-                                            ฿{{ number_format((float)$log->total_amount, 2) }}
-                                            <span class="text-xs text-gray-500">({{ (int) $log->total_hours }}h)</span>
-                                            <span class="block text-xs text-gray-500">ค่าจอด ฿{{ number_format((float)$log->parking_fee, 2) }}</span>
-                                            @if((float)$log->deposit_deduction > 0)
-                                                <span class="block text-xs text-sky-300">หักมัดจำ -฿{{ number_format((float)$log->deposit_deduction, 2) }}</span>
-                                            @endif
-                                            @if((float)$log->reservation_discount > 0)
-                                                <span class="block text-xs text-green-400">ส่วนลด -฿{{ number_format((float)$log->reservation_discount, 2) }}</span>
-                                            @endif
-                                        @else
-                                            <span class="text-gray-600">—</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-5 py-4 whitespace-nowrap">
-                                        @if($log->payment_status === 'paid')
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 whitespace-nowrap">ชำระแล้ว</span>
-                                        @elseif($log->payment_status === 'unpaid')
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 whitespace-nowrap">ค้างชำระ</span>
-                                        @elseif(!$log->check_out_time)
-                                            <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 whitespace-nowrap">active</span>
-                                        @else
-                                            <span class="text-xs text-gray-500">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-5 py-10 text-center text-gray-500">
-                                        ยังไม่มีประวัติการจอด
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                @if($logs->hasPages())
-                    <div class="px-5 py-4 border-t border-white/10">
-                        {{ $logs->links() }}
-                    </div>
-                @endif
-            </div>
-
+    <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6">
+            <h1 class="text-h1 text-fg">ประวัติการจอด</h1>
+            <p class="mt-1 text-fg-2">เวลาเข้า-ออก ค่าจอด และยอดที่ชำระของทุกครั้งที่จอด</p>
         </div>
+
+        @if ($logs->isEmpty())
+            <div class="rounded-card border border-line bg-surface shadow-1">
+                <x-ui.empty-state title="ยังไม่มีประวัติการจอด" description="เมื่อรถ Check-in และ Check-out แล้ว ใบเสร็จค่าจอดจะแสดงที่นี่" />
+            </div>
+        @else
+            <ol class="flex flex-col gap-4">
+                @foreach ($logs as $log)
+                    @php
+                        $in = Format::parse($log->check_in_time);
+                        $out = Format::parse($log->check_out_time);
+                        $parked = $out === null;
+                    @endphp
+                    <li class="overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                        <article aria-labelledby="log-{{ $log->log_id }}" class="grid sm:grid-cols-[1fr_17rem]">
+                            <div class="p-4 sm:p-5">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <x-ui.plate :plate="$log->license_plate" :province="$log->plate_province" size="sm" />
+                                    <div class="min-w-0">
+                                        <h2 id="log-{{ $log->log_id }}" class="font-semibold text-fg">{{ $log->lot_name }}</h2>
+                                        <p class="text-label text-fg-2">
+                                            @if ($log->slot_number)
+                                                ช่อง <span class="num">{{ $log->slot_number }}</span>
+                                            @endif
+                                            @if ($log->is_walk_in)
+                                                · เข้าแบบ Walk-in
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-label sm:grid-cols-3">
+                                    <div>
+                                        <dt class="text-caption text-fg-3">เข้าลาน</dt>
+                                        <dd class="mt-0.5 font-semibold text-fg">{{ Format::short($in) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-caption text-fg-3">ออกจากลาน</dt>
+                                        <dd class="mt-0.5 font-semibold text-fg">{{ $parked ? 'ยังจอดอยู่' : Format::short($out) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-caption text-fg-3">{{ $parked ? 'จอดมาแล้ว' : 'เวลาจอด' }}</dt>
+                                        <dd class="mt-0.5 font-semibold text-fg">{{ Format::duration((int) $in->diffInMinutes($out ?? now())) }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+
+                            {{-- ใบเสร็จ --}}
+                            <div class="border-t border-dashed border-field bg-surface-2/60 p-4 text-label sm:border-l sm:border-t-0 sm:p-5">
+                                @if ($log->total_amount !== null)
+                                    <dl class="flex flex-col gap-1.5">
+                                        <div class="flex justify-between gap-3">
+                                            <dt class="text-fg-2">ค่าจอด <span class="num">{{ (int) $log->total_hours }}</span> ชม.@if ($log->hourly_rate) × <span class="num">{{ Format::baht($log->hourly_rate) }}</span>@endif</dt>
+                                            <dd class="num text-fg">{{ Format::baht($log->parking_fee) }}</dd>
+                                        </div>
+                                        @if ((float) $log->deposit_deduction > 0)
+                                            <div class="flex justify-between gap-3">
+                                                <dt class="text-fg-2">หักมัดจำ</dt>
+                                                <dd class="num text-fg">−{{ Format::baht($log->deposit_deduction) }}</dd>
+                                            </div>
+                                        @endif
+                                        @if ((float) $log->reservation_discount > 0)
+                                            <div class="flex justify-between gap-3">
+                                                <dt class="text-fg-2">ส่วนลดการจอง</dt>
+                                                <dd class="num text-fg">−{{ Format::baht($log->reservation_discount) }}</dd>
+                                            </div>
+                                        @endif
+                                        <div class="mt-1 flex justify-between gap-3 border-t border-line pt-2 font-semibold">
+                                            <dt class="text-fg">ยอดชำระ</dt>
+                                            <dd class="num text-h3 text-fg">{{ Format::baht($log->total_amount) }}</dd>
+                                        </div>
+                                    </dl>
+                                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                                        <x-ui.status type="payment" :value="$log->payment_status" audience="user" />
+                                        @if ($log->payment_status === 'unpaid')
+                                            <span class="text-caption text-fg-3">รอเจ้าหน้าที่ยืนยันรับเงิน</span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <x-ui.status type="reservation" value="checked_in" audience="user" />
+                                    <p class="mt-2 text-fg-2">ค่าจอดคิดตอน Check-out ตามจำนวนชั่วโมงที่จอดจริง (ปัดขึ้น ขั้นต่ำ 1 ชั่วโมง)</p>
+                                @endif
+                            </div>
+                        </article>
+                    </li>
+                @endforeach
+            </ol>
+
+            <x-ui.pagination :paginator="$logs" class="mt-6" />
+        @endif
     </div>
 </x-app-layout>

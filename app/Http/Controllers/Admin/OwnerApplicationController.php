@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\OwnerApplication;
 use App\Models\User;
+use App\Support\Navigation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class OwnerApplicationController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $status = $request->query('status', '');
+        $status = (string) $request->query('status', '');
 
         $applications = OwnerApplication::with(['user:id,name,email', 'reviewer:id,name'])
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
@@ -47,23 +48,39 @@ class OwnerApplicationController extends Controller
 
     public function approve(OwnerApplication $ownerApplication)
     {
-        if (!$ownerApplication->isPending()) {
-            return back()->withErrors(['error' => 'คำขอนี้ไม่ได้อยู่ในสถานะรอพิจารณา']);
-        }
+        $error = DB::transaction(function () use ($ownerApplication) {
+            $application = OwnerApplication::whereKey($ownerApplication->id)->lockForUpdate()->first();
 
-        DB::transaction(function () use ($ownerApplication) {
-            $ownerApplication->update([
+            if (!$application->isPending()) {
+                return 'คำขอนี้ไม่ได้อยู่ในสถานะรอพิจารณา';
+            }
+
+            // เป็น Owner ได้เฉพาะบัญชี User — กัน Admin/บัญชีระบบกลายเป็น Owner
+            $applicant = User::whereKey($application->user_id)->lockForUpdate()->first();
+            if ($applicant->role !== 'user' || $applicant->is_system) {
+                return "อนุมัติไม่ได้ — ผู้สมัครต้องเป็นบัญชีผู้ใช้ (ปัจจุบันเป็น" . (Navigation::ROLE_LABELS[$applicant->role] ?? $applicant->role) . ")";
+            }
+
+            $application->update([
                 'status'      => 'approved',
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
                 'rejection_reason' => null,
             ]);
 
-            $ownerApplication->user->forceFill([
+            $applicant->forceFill([
                 'role'         => 'owner',
                 'owner_status' => 'approved',
             ])->save();
+
+            return null;
         });
+
+        if ($error) {
+            return back()->withErrors(['error' => $error]);
+        }
+
+        $ownerApplication->refresh();
 
         audit_log('owner_application.approve', $ownerApplication, []);
 

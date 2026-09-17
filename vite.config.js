@@ -17,26 +17,11 @@ export default defineConfig({
             host: '127.0.0.1',
         },
         watch: {
-            // Keep Vite's hot-reload watcher away from every directory and file
-            // type that Playwright generates during test runs.  Without these
-            // ignores, Vite crashes or endlessly restarts when Playwright
-            // writes binary screenshots (.png), videos (.webm), trace archives
-            // (.zip), partial Chromium downloads (.crdownload), and HTML
-            // reports into the project tree while the dev server is running.
+            // กัน Vite hot-reload วนรอบไม่จบเมื่อ Playwright เขียนไฟล์ผลทดสอบ
+            // (screenshot, trace, วิดีโอ) ลงในโปรเจกต์ระหว่าง dev server เปิดอยู่
             ignored: [
-                // Playwright test artifact directories (all under e2e/)
                 '**/e2e/screenshots/**',
                 '**/e2e/reports/**',
-                '**/e2e/logs/**',
-                '**/e2e/.auth/**',
-                // Playwright default output dirs (top-level, if ever used)
-                '**/playwright-report/**',
-                '**/test-results/**',
-                // Root-level reports written by the afterAll hook
-                'bug-report.md',
-                'coverage-report.md',
-                'error-log.json',
-                // Individual binary/generated file types Playwright emits
                 '**/*.webm',        // video recordings
                 '**/*.zip',         // trace archives
                 '**/*.crdownload',  // Chromium in-progress downloads

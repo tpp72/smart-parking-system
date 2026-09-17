@@ -61,7 +61,7 @@ class ScanGateService
         $result = $this->checkOut->checkOut($log->reservation);
 
         if (!$result['success']) {
-            $lot->notifyManagers('Auto Check-out ไม่สำเร็จ', sprintf(
+            $lot->notifyManagers('Check-out อัตโนมัติไม่สำเร็จ', sprintf(
                 'ทะเบียน %s ที่ลาน %s — %s กรุณาตรวจสอบและทำ Manual Check-out',
                 $car, $lot->name, $result['error']
             ));

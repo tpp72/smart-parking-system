@@ -1,128 +1,78 @@
-{{-- ตาราง Payment (Deposit + Checkout) ใช้ร่วมกันระหว่าง Admin และ Owner — ต้องส่ง $payments และ $markPaidRoute --}}
-<div class="sp-card rounded-2xl overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="w-full sp-table">
-            <thead>
-                <tr>
-                    <th class="px-5 py-4 text-left">#</th>
-                    <th class="px-5 py-4 text-left">ประเภท</th>
-                    <th class="px-5 py-4 text-left">ทะเบียน</th>
-                    <th class="px-5 py-4 text-left">ผู้ใช้</th>
-                    <th class="px-5 py-4 text-left">ลาน</th>
-                    <th class="px-5 py-4 text-right">ชั่วโมง</th>
-                    <th class="px-5 py-4 text-right">ค่าจอด</th>
-                    <th class="px-5 py-4 text-right">หักมัดจำ / ส่วนลด</th>
-                    <th class="px-5 py-4 text-right">ยอดรวม</th>
-                    <th class="px-5 py-4 text-center">สถานะ</th>
-                    <th class="px-5 py-4 text-left">วันที่</th>
-                    <th class="px-5 py-4 text-right">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($payments as $payment)
-                    @php
-                        $isDeposit = $payment->type === \App\Models\Payment::TYPE_DEPOSIT;
-                        $plate = $payment->parkingLog?->license_plate ?? $payment->reservation?->license_plate;
-                        $brand = $payment->parkingLog?->brand ?? $payment->reservation?->brand;
-                        $lotName = $payment->parkingLog?->parkingLot?->name ?? $payment->reservation?->parkingLot?->name;
-                    @endphp
-                    <tr>
-                        <td class="px-5 py-3 text-gray-500 text-xs">#{{ $payment->id }}</td>
-                        <td class="px-5 py-3">
-                            @if($isDeposit)
-                                <span class="sp-badge sp-badge-warn">มัดจำ</span>
-                                <span class="block text-xs text-gray-500 mt-1">การจอง #{{ $payment->reservation_id }}</span>
-                            @else
-                                <span class="sp-badge sp-badge-ok">ค่าจอด</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-3 font-extrabold tracking-wider text-red-300">
-                            {{ $plate ?? '—' }}
-                            @if($brand)
-                                <span class="block text-xs font-normal text-gray-500">{{ $brand }}</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-3 text-gray-300">
-                            {{ $payment->reservation?->user?->name ?? '—' }}
-                        </td>
-                        <td class="px-5 py-3 text-gray-300">{{ $lotName ?? '—' }}</td>
-                        <td class="px-5 py-3 text-right text-gray-300">
-                            @if($isDeposit)
-                                <span class="text-gray-600">—</span>
-                            @else
-                                {{ $payment->total_hours }} ชม.
-                            @endif
-                            <span class="block text-xs text-gray-500">
-                                {{ number_format((float)$payment->hourly_rate, 2) }} ฿/ชม.
-                            </span>
-                        </td>
-                        <td class="px-5 py-3 text-right text-gray-300">
-                            @if($isDeposit)
-                                <span class="text-gray-600">—</span>
-                            @else
-                                ฿{{ number_format((float)$payment->parking_fee, 2) }}
-                            @endif
-                        </td>
-                        <td class="px-5 py-3 text-right text-xs">
-                            @if((float)$payment->deposit_deduction > 0)
-                                <span class="block text-sky-300">มัดจำ -฿{{ number_format((float)$payment->deposit_deduction, 2) }}</span>
-                            @endif
-                            @if((float)$payment->reservation_discount > 0)
-                                <span class="block text-green-400">ส่วนลด -฿{{ number_format((float)$payment->reservation_discount, 2) }}</span>
-                            @endif
-                            @if((float)$payment->deposit_deduction <= 0 && (float)$payment->reservation_discount <= 0)
-                                <span class="text-gray-600">—</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-3 text-right font-extrabold
-                            {{ $payment->payment_status === 'paid' ? 'text-green-300' : ($payment->payment_status === 'void' ? 'text-gray-500' : 'text-yellow-300') }}">
-                            ฿{{ number_format((float)$payment->total_amount, 2) }}
-                        </td>
-                        <td class="px-5 py-3 text-center">
-                            @if($payment->payment_status === 'paid')
-                                <span class="sp-badge sp-badge-ok">✓ ชำระแล้ว</span>
-                            @elseif($payment->payment_status === 'void')
-                                <span class="sp-badge sp-badge-bad">void</span>
-                            @else
-                                <span class="sp-badge sp-badge-warn">ค้างชำระ</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-3 text-gray-500 text-xs">
-                            {{ $payment->created_at->format('d/m/Y H:i') }}
-                        </td>
-                        <td class="px-5 py-3 text-right">
-                            @if($payment->payment_status === 'unpaid')
-                                <form method="POST"
-                                      action="{{ route($markPaidRoute, $payment) }}"
-                                      onsubmit="return confirm('{{ $isDeposit
-                                          ? 'ยืนยันรับเงินมัดจำ ฿' . number_format((float) $payment->total_amount, 2) . ' ของทะเบียน ' . $plate . '? ระบบจะยืนยันการจองและจัดช่องจอดให้'
-                                          : 'ยืนยันรับชำระเงิน ฿' . number_format((float) $payment->total_amount, 2) . ' จากทะเบียน ' . $plate . '?' }}')">
-                                    @csrf
-                                    <button type="submit" title="ยืนยันว่าได้รับเงินจริงแล้ว" class="sp-btn sp-btn-success text-sm px-4 py-1.5">
-                                        ✓ รับชำระแล้ว
-                                    </button>
-                                </form>
-                            @else
-                                <span class="text-xs text-gray-600">—</span>
-                            @endif
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="12">
-                            <x-sp-empty
-                                message="{{ $status === 'unpaid' ? 'ไม่มีรายการค้างชำระ' : 'ไม่มีข้อมูล' }}"
-                                sub="{{ $status === 'unpaid' ? 'ลูกค้าทุกคนชำระเงินครบแล้ว' : '' }}" />
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+{{--
+    รายการชำระเงิน (มัดจำ + ค่าจอด) ใช้ร่วมกันระหว่าง Admin และ Owner — ต้องส่ง $payments, $status และ $markPaidRoute
+    แต่ละแถวเป็นใบเสร็จย่อ: ประเภท · รถ · ลาน · รายการคำนวณ · ยอด · สถานะ · ปุ่มรับชำระ (ยืนยันผ่านกล่องยืนยันของระบบ)
+--}}
+@use('App\Support\Format')
+@use('App\Models\Payment')
 
-    @if($payments->hasPages())
-        <div class="px-5 py-4 border-t border-white/10">
-            {{ $payments->links('vendor.pagination.sp') }}
-        </div>
-    @endif
-</div>
+@if ($payments->isEmpty())
+    <div class="rounded-card border border-line bg-surface shadow-1">
+        <x-ui.empty-state
+            :title="$status === 'unpaid' ? 'ไม่มีรายการรอยืนยันรับเงิน' : 'ไม่มีรายการในกลุ่มนี้'"
+            :description="$status === 'unpaid' ? 'มัดจำและค่าจอดทุกรายการได้รับการยืนยันแล้ว' : null" />
+    </div>
+@else
+    <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+        @foreach ($payments as $payment)
+            @php
+                $isDeposit = $payment->type === Payment::TYPE_DEPOSIT;
+                $plate = $payment->parkingLog?->license_plate ?? $payment->reservation?->license_plate;
+                $province = $payment->reservation?->plate_province;
+                $lotName = $payment->parkingLog?->parkingLot?->name ?? $payment->reservation?->parkingLot?->name;
+                $customer = $payment->reservation?->user?->name;
+                $amount = Format::baht($payment->total_amount);
+            @endphp
+            <li data-payment-type="{{ $payment->type }}" class="grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.1fr)_auto] lg:items-center lg:gap-5">
+                <x-ui.plate :plate="$plate ?? '—'" :province="$province" size="sm" class="justify-self-start" />
+
+                <div class="min-w-0">
+                    <p class="font-semibold text-fg">
+                        {{ $isDeposit ? 'มัดจำ' : 'ค่าจอด' }}
+                        <span class="tabular font-normal text-fg-3">#{{ $payment->id }} · การจอง #{{ $payment->reservation_id }}</span>
+                    </p>
+                    <p class="truncate text-label text-fg-2">{{ $lotName ?? '—' }} · {{ $customer ?? '—' }}</p>
+                    <p class="text-caption text-fg-3">สร้าง {{ Format::short($payment->created_at) }}@if ($payment->paid_at) · รับเงิน {{ Format::short($payment->paid_at) }}@endif</p>
+                </div>
+
+                {{-- รายการคำนวณ --}}
+                <dl class="flex flex-col gap-0.5 text-label">
+                    @if ($isDeposit)
+                        <div class="flex justify-between gap-3 lg:justify-start">
+                            <dt class="text-fg-2">ค่าจอด 1 ชม. ของลาน</dt>
+                            <dd class="tabular text-fg">{{ Format::baht($payment->hourly_rate) }}</dd>
+                        </div>
+                    @else
+                        <div class="flex justify-between gap-3 lg:justify-start">
+                            <dt class="text-fg-2"><span class="tabular">{{ (int) $payment->total_hours }}</span> ชม. × <span class="tabular">{{ Format::baht($payment->hourly_rate) }}</span></dt>
+                            <dd class="tabular text-fg">{{ Format::baht($payment->parking_fee) }}</dd>
+                        </div>
+                        @if ((float) $payment->deposit_deduction > 0)
+                            <div class="flex justify-between gap-3 lg:justify-start"><dt class="text-fg-2">หักมัดจำ</dt><dd class="tabular text-fg">−{{ Format::baht($payment->deposit_deduction) }}</dd></div>
+                        @endif
+                        @if ((float) $payment->reservation_discount > 0)
+                            <div class="flex justify-between gap-3 lg:justify-start"><dt class="text-fg-2">ส่วนลดการจอง</dt><dd class="tabular text-fg">−{{ Format::baht($payment->reservation_discount) }}</dd></div>
+                        @endif
+                    @endif
+                </dl>
+
+                <div class="flex flex-wrap items-center gap-3 lg:flex-col lg:items-end lg:gap-1.5">
+                    <p class="num text-h3 text-fg">{{ $amount }}</p>
+                    <x-ui.status type="payment" :value="$payment->payment_status" audience="staff" />
+                    @if ($payment->payment_status === Payment::STATUS_UNPAID)
+                        <form method="POST" action="{{ route($markPaidRoute, $payment) }}"
+                            data-confirm="{{ $isDeposit
+                                ? "ยืนยันว่าได้รับเงินมัดจำ {$amount} ของทะเบียน {$plate} แล้ว — การจองจะยืนยันและระบบจัดช่องจอดให้ (ถ้าลานเต็ม การจองจะถูกยกเลิก)"
+                                : "ยืนยันว่าได้รับค่าจอด {$amount} จากทะเบียน {$plate} แล้ว" }}"
+                            data-confirm-title="{{ $isDeposit ? 'ยืนยันรับเงินมัดจำ?' : 'ยืนยันรับเงินค่าจอด?' }}"
+                            data-confirm-label="รับชำระแล้ว" data-confirm-cancel="ยังไม่ได้รับเงิน">
+                            @csrf
+                            <x-ui.button type="submit" size="sm">รับชำระแล้ว</x-ui.button>
+                        </form>
+                    @endif
+                </div>
+            </li>
+        @endforeach
+    </ol>
+
+    <x-ui.pagination :paginator="$payments" class="mt-6" />
+@endif

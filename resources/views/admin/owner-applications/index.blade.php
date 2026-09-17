@@ -1,113 +1,97 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+{{--
+    คำขอเป็นเจ้าของลาน — แท็บสถานะพร้อมจำนวน · ค้นหา · รายการเรียงรอพิจารณาก่อน · ไปหน้ารายละเอียดเพื่อพิจารณา
+    ต้องการ: $applications, $q, $status ('' | pending | approved | rejected), $counts
+--}}
+@use('App\Support\Format')
 
-            {{-- Header --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight sp-glow-text">คำขอเจ้าของลานจอด</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">รายการคำขอทั้งหมดจากผู้ใช้ที่ต้องการเป็นเจ้าของลานจอด</p>
-                </div>
-            </div>
+@php
+    $tabs = [
+        '' => ['ทั้งหมด', array_sum($counts)],
+        'pending' => ['รอพิจารณา', $counts['pending']],
+        'approved' => ['อนุมัติแล้ว', $counts['approved']],
+        'rejected' => ['ไม่อนุมัติ', $counts['rejected']],
+    ];
+@endphp
 
-            {{-- Flash --}}
-            @if(session('success'))
-            <div class="sp-card rounded-xl p-4 border border-green-500/40 text-green-300 text-sm">{{ session('success') }}</div>
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6">
+            <h1 class="text-h1 text-fg">คำขอเป็นเจ้าของลาน</h1>
+            <p class="mt-1 text-fg-2">ผู้ใช้ที่ต้องการเปิดลานจอดในระบบ · อนุมัติแล้วบัญชีเป็นเจ้าของลานและเพิ่มลานเองได้</p>
+        </div>
+
+        @if ($errors->any())
+            <x-ui.alert tone="danger" class="mb-4">{{ $errors->first() }}</x-ui.alert>
+        @endif
+
+        <nav aria-label="กรองตามสถานะ" class="mb-4 flex gap-1 overflow-x-auto border-b border-line">
+            @foreach ($tabs as $key => [$label, $count])
+                <a href="{{ route('admin.owner-applications.index', array_filter(['status' => $key, 'q' => $q])) }}" @if ($status === $key) aria-current="page" @endif
+                    @class([
+                        'inline-flex min-h-touch shrink-0 items-center gap-1.5 px-3 text-label transition-colors duration-fast',
+                        'font-semibold text-fg shadow-[inset_0_-2px_0_rgb(var(--color-primary-ink))]' => $status === $key,
+                        'text-fg-2 hover:text-fg' => $status !== $key,
+                    ])>
+                    {{ $label }}
+                    <span @class(['tabular rounded-control px-1.5 text-caption', 'bg-warning/15 font-semibold text-fg' => $key === 'pending' && $count > 0, 'bg-surface-2 text-fg-2' => ! ($key === 'pending' && $count > 0)])>{{ $count }}</span>
+                </a>
+            @endforeach
+        </nav>
+
+        <form method="GET" role="search" class="flex flex-wrap items-end gap-3 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+            @if ($status !== '')
+                <input type="hidden" name="status" value="{{ $status }}">
             @endif
+            <x-ui.field label="ค้นหา" for="q" class="min-w-0 flex-1 sm:max-w-md">
+                <x-ui.input id="q" name="q" type="search" :value="$q" placeholder="ชื่อธุรกิจ ผู้ติดต่อ เบอร์โทร ชื่อ หรืออีเมลผู้สมัคร" />
+            </x-ui.field>
+            <x-ui.button type="submit" variant="secondary">ค้นหา</x-ui.button>
+            @if ($q !== '')
+                <x-ui.button variant="ghost" :href="route('admin.owner-applications.index', array_filter(['status' => $status]))">ล้างคำค้น</x-ui.button>
+            @endif
+        </form>
 
-            {{-- Status counters --}}
-            <div class="grid grid-cols-3 gap-4">
-                <a href="{{ route('admin.owner-applications.index', ['status' => 'pending']) }}"
-                   class="sp-card rounded-2xl p-4 text-center {{ $status === 'pending' ? 'ring-2 ring-yellow-500/60' : '' }}">
-                    <p class="text-2xl font-extrabold text-yellow-400">{{ $counts['pending'] }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">รอพิจารณา</p>
-                </a>
-                <a href="{{ route('admin.owner-applications.index', ['status' => 'approved']) }}"
-                   class="sp-card rounded-2xl p-4 text-center {{ $status === 'approved' ? 'ring-2 ring-green-500/60' : '' }}">
-                    <p class="text-2xl font-extrabold text-green-400">{{ $counts['approved'] }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">อนุมัติแล้ว</p>
-                </a>
-                <a href="{{ route('admin.owner-applications.index', ['status' => 'rejected']) }}"
-                   class="sp-card rounded-2xl p-4 text-center {{ $status === 'rejected' ? 'ring-2 ring-red-500/60' : '' }}">
-                    <p class="text-2xl font-extrabold text-red-400">{{ $counts['rejected'] }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">ไม่อนุมัติ</p>
-                </a>
-            </div>
+        <div class="mt-4">
+            @if ($applications->isEmpty())
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    <x-ui.empty-state :title="$q !== '' ? 'ไม่พบคำขอที่ตรงกับคำค้น' : ($status === 'pending' ? 'ไม่มีคำขอที่รอพิจารณา' : 'ยังไม่มีคำขอ')"
+                        description="ผู้ใช้ยื่นคำขอได้จากเมนูบัญชี เมื่อมีคำขอใหม่จะแสดงที่นี่" />
+                </div>
+            @else
+                <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                    @foreach ($applications as $app)
+                        <li class="grid gap-3 px-4 py-4 sm:px-5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] md:items-center md:gap-6">
+                            <div class="min-w-0">
+                                <p class="truncate font-semibold text-fg">{{ $app->business_name ?: $app->parking_lot_name }}</p>
+                                <p class="truncate text-label text-fg-2">
+                                    ลาน "{{ $app->parking_lot_name }}" · ประมาณ <span class="tabular">{{ number_format($app->estimated_slots) }}</span> ช่อง
+                                </p>
+                                <p class="truncate text-caption text-fg-3">{{ $app->applicant_type === 'company' ? 'บริษัท / นิติบุคคล' : 'บุคคลธรรมดา' }} · โทร <span class="tabular">{{ $app->phone }}</span></p>
+                            </div>
 
-            {{-- Search & Filter --}}
-            <form method="GET" class="flex flex-col sm:flex-row gap-3">
-                <input type="text" name="q" value="{{ $q }}" placeholder="ค้นหาชื่อธุรกิจ, ผู้ติดต่อ, อีเมล..."
-                    class="sp-input flex-1">
-                <select name="status" class="sp-input w-full sm:w-40">
-                    <option value="">ทุกสถานะ</option>
-                    <option value="pending" @selected($status === 'pending')>รอพิจารณา</option>
-                    <option value="approved" @selected($status === 'approved')>อนุมัติแล้ว</option>
-                    <option value="rejected" @selected($status === 'rejected')>ไม่อนุมัติ</option>
-                </select>
-                <button type="submit" class="sp-btn sp-btn-primary whitespace-nowrap">ค้นหา</button>
-                @if($q || $status)
-                <a href="{{ route('admin.owner-applications.index') }}" class="sp-btn sp-btn-outline whitespace-nowrap">ล้าง</a>
-                @endif
-            </form>
-
-            {{-- Table --}}
-            <div class="sp-card rounded-2xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b sp-divider text-xs text-gray-400 uppercase tracking-wide">
-                                <th class="py-3 pl-6 text-left">ผู้ยื่นคำขอ</th>
-                                <th class="py-3 text-left">ธุรกิจ / ลานจอด</th>
-                                <th class="py-3 text-left">เบอร์โทร</th>
-                                <th class="py-3 text-left">ช่องจอด</th>
-                                <th class="py-3 text-left">วันที่ส่ง</th>
-                                <th class="py-3 text-left">สถานะ</th>
-                                <th class="py-3 pr-6 text-left"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y sp-divider">
-                            @forelse($applications as $app)
-                            <tr class="hover:bg-white/5 transition">
-                                <td class="py-3 pl-6">
-                                    <p class="font-semibold text-gray-200">{{ $app->user?->name }}</p>
-                                    <p class="text-xs text-gray-400">{{ $app->user?->email }}</p>
-                                </td>
-                                <td class="py-3">
-                                    <p class="font-medium">{{ $app->business_name }}</p>
-                                    <p class="text-xs text-gray-400">{{ $app->parking_lot_name }}</p>
-                                </td>
-                                <td class="py-3 text-gray-300">{{ $app->phone }}</td>
-                                <td class="py-3 text-gray-300">{{ number_format($app->estimated_slots) }}</td>
-                                <td class="py-3 text-gray-400 text-xs">{{ $app->created_at->format('d/m/Y') }}</td>
-                                <td class="py-3">
-                                    @if($app->status === 'pending')
-                                        <span class="sp-badge sp-badge-warn">รอพิจารณา</span>
-                                    @elseif($app->status === 'approved')
-                                        <span class="sp-badge sp-badge-ok">อนุมัติ</span>
-                                    @else
-                                        <span class="sp-badge sp-badge-danger">ไม่อนุมัติ</span>
+                            <div class="min-w-0 text-label">
+                                <p class="truncate text-fg">{{ $app->user?->name ?? 'บัญชีถูกลบ' }}</p>
+                                <p class="truncate text-fg-2">{{ $app->user?->email }}</p>
+                                <p class="text-caption text-fg-3">
+                                    ส่งเมื่อ {{ Format::short($app->created_at) }}
+                                    @if (! $app->isPending() && $app->reviewer)
+                                        · พิจารณาโดย {{ $app->reviewer->name }}
                                     @endif
-                                </td>
-                                <td class="py-3 pr-6">
-                                    <a href="{{ route('admin.owner-applications.show', $app) }}"
-                                        class="sp-btn sp-btn-outline text-xs py-1">ดูรายละเอียด</a>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="7" class="py-12 text-center text-gray-500">ไม่มีคำขอที่ตรงตามเงื่อนไข</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                </p>
+                            </div>
 
-            {{-- Pagination --}}
-            @if($applications->hasPages())
-            <div>{{ $applications->withQueryString()->links() }}</div>
+                            <div class="flex flex-wrap items-center gap-2 md:justify-end">
+                                <x-ui.status type="review" :value="$app->status" />
+                                <x-ui.button :variant="$app->isPending() ? 'primary' : 'secondary'" size="sm" :href="route('admin.owner-applications.show', $app)">
+                                    {{ $app->isPending() ? 'พิจารณา' : 'ดูรายละเอียด' }}
+                                </x-ui.button>
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <x-ui.pagination :paginator="$applications" class="mt-6" />
             @endif
-
         </div>
     </div>
 </x-app-layout>

@@ -116,7 +116,7 @@ return [
     ],
 
     'markdown' => [
-        'theme' => 'sp-dark',
+        'theme' => 'parking-ticket',
         'paths' => [
             resource_path('views/vendor/mail'),
         ],

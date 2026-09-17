@@ -386,11 +386,11 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $completedAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
                 $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
-                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
-                $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Auto check-in: รถเข้าจอด', $checkedInAt);
-                $this->logTransition($reservation, 'checked_in', 'completed', null, 'Auto completed: รถออกจากลานแล้ว', $completedAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ — ระบบจัดสรรและล็อกช่องจอด', $paidAt);
+                $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Check-in อัตโนมัติ: รถเข้าจอด', $checkedInAt);
+                $this->logTransition($reservation, 'checked_in', 'completed', null, 'Check-out อัตโนมัติ: รถออกจากลานแล้ว', $completedAt);
 
                 $log = $this->parkingLog($reservation, $slotId, $checkedInAt, $completedAt);
                 $this->checkoutPayment($log, $reservation, $rate, $cashierId);
@@ -418,10 +418,10 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $checkedInAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
                 $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
-                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
-                $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Auto check-in: รถเข้าจอด', $checkedInAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ — ระบบจัดสรรและล็อกช่องจอด', $paidAt);
+                $this->logTransition($reservation, 'confirmed', 'checked_in', null, 'Check-in อัตโนมัติ: รถเข้าจอด', $checkedInAt);
 
                 $this->parkingLog($reservation, $slotId, $checkedInAt, null);
                 break;
@@ -447,9 +447,9 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $paidAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
                 $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
-                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
+                $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ — ระบบจัดสรรและล็อกช่องจอด', $paidAt);
                 break;
 
             case 'pending':
@@ -465,7 +465,7 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $bookedAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
                 $this->depositPayment($reservation, 'unpaid', null, $bookedAt, null);
                 break;
 
@@ -485,18 +485,18 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $cancelledAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
 
                 if ($wasPaid) {
                     // ยกเลิกหลังชำระ Deposit → ไม่คืนเงิน (Payment คงสถานะ paid)
                     $paidAt = $bookedAt->copy()->addMinutes(intdiv($window, 4));
                     $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
-                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
-                    $this->logTransition($reservation, 'confirmed', 'cancelled', $user->id, 'User ยกเลิกการจอง', $cancelledAt);
+                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ — ระบบจัดสรรและล็อกช่องจอด', $paidAt);
+                    $this->logTransition($reservation, 'confirmed', 'cancelled', $user->id, 'ผู้ใช้ยกเลิกการจอง', $cancelledAt);
                 } else {
                     // ยกเลิกก่อนชำระ Deposit → void
                     $this->depositPayment($reservation, 'void', null, $bookedAt, null, $cancelledAt);
-                    $this->logTransition($reservation, 'pending', 'cancelled', $user->id, 'User ยกเลิกการจอง', $cancelledAt);
+                    $this->logTransition($reservation, 'pending', 'cancelled', $user->id, 'ผู้ใช้ยกเลิกการจอง', $cancelledAt);
                 }
                 break;
 
@@ -514,16 +514,16 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $expiredAt,
                 ]);
 
-                $this->logTransition($reservation, null, 'pending', $user->id, 'User สร้างการจอง', $bookedAt);
+                $this->logTransition($reservation, null, 'pending', $user->id, 'ผู้ใช้สร้างการจอง', $bookedAt);
 
                 if ($wasPaid) {
                     $paidAt = $bookedAt->copy()->addMinutes(random_int(10, 50));
                     $this->depositPayment($reservation, 'paid', $cashierId, $bookedAt, $paidAt);
-                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ (Mark as Paid)', $paidAt);
-                    $this->logTransition($reservation, 'confirmed', 'expired', null, 'Auto-expired: เกินเวลาเช็คอิน 60 นาที', $expiredAt);
+                    $this->logTransition($reservation, 'pending', 'confirmed', $cashierId, 'ยืนยันรับเงินมัดจำ — ระบบจัดสรรและล็อกช่องจอด', $paidAt);
+                    $this->logTransition($reservation, 'confirmed', 'expired', null, 'หมดอายุอัตโนมัติ: ไม่ Check-in ภายใน 60 นาทีหลังเวลาจอง', $expiredAt);
                 } else {
                     $this->depositPayment($reservation, 'void', null, $bookedAt, null, $expiredAt);
-                    $this->logTransition($reservation, 'pending', 'expired', null, 'Auto-expired: เกินเวลาเช็คอิน 60 นาที', $expiredAt);
+                    $this->logTransition($reservation, 'pending', 'expired', null, 'หมดอายุอัตโนมัติ: ไม่ Check-in ภายใน 60 นาทีหลังเวลาจอง', $expiredAt);
                 }
                 break;
         }
@@ -557,7 +557,7 @@ class DatabaseSeeder extends Seeder
             ]));
 
             $this->logTransition($reservation, null, 'checked_in', null, 'Walk-in: ระบบสร้างการจองและเช็คอินอัตโนมัติ', $checkIn);
-            $this->logTransition($reservation, 'checked_in', 'completed', null, 'Auto completed: รถออกจากลานแล้ว', $checkOut);
+            $this->logTransition($reservation, 'checked_in', 'completed', null, 'Check-out อัตโนมัติ: รถออกจากลานแล้ว', $checkOut);
 
             $log = $this->parkingLog($reservation, $slotId, $checkIn, $checkOut);
             $this->checkoutPayment($log, $reservation, (float) $lot->hourly_rate, $this->cashierId($lot, $admin));

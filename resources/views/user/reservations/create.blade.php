@@ -1,159 +1,114 @@
+{{--
+    จองที่จอด — เลือกลาน + เวลาเริ่ม (ล่วงหน้าไม่เกิน 1 วัน) + ข้อมูลรถ · ช่องจอดระบบเลือกให้หลังยืนยันรับมัดจำ
+    สรุปยอดด้านข้าง: มัดจำ = ค่าจอด 1 ชม. · ส่วนลดการจอง = ค่าจอด 1 ชม. (หักตอน Check-out) — project-plan.md §3.1
+--}}
+@use('App\Support\Format')
+
+@php
+    $exampleStart = now()->addHour()->startOfHour();
+@endphp
+
 <x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-            <div class="mb-6">
-                <h1 class="text-3xl font-extrabold sp-glow-text">จองที่จอดรถ</h1>
-                <p class="text-gray-300 mt-1">กรอกป้ายทะเบียน เลือกลาน และเวลาที่ต้องการ</p>
-            </div>
-
-            @if ($errors->any())
-                <div class="sp-card rounded-2xl p-4 mb-6 border border-red-600/40">
-                    <ul class="text-red-300 text-sm space-y-1">
-                        @foreach ($errors->all() as $e)
-                            <li>• {{ $e }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <div class="sp-card rounded-2xl p-6" x-data="{
-                allLots: {{ Js::from($lots) }},
-                lotId: '{{ old('parking_lot_id') }}',
-                get deposit() {
-                    if (!this.lotId) return null;
-                    const lot = this.allLots.find(l => String(l.id) === String(this.lotId));
-                    return lot ? parseFloat(lot.hourly_rate).toFixed(2) : null;
-                }
-            }">
-
-                <form method="POST" action="{{ route('user.reservations.store') }}" class="space-y-5">
-                    @csrf
-
-                    {{-- ป้ายทะเบียนรถ --}}
-                    <div>
-                        <x-input-label value="ป้ายทะเบียนรถ" />
-                        <div class="grid grid-cols-2 gap-3 mt-1">
-                            <div>
-                                <x-text-input id="plate_number" name="plate_number" type="text"
-                                    class="block w-full uppercase tracking-widest @error('plate_number') border-red-500 @enderror"
-                                    value="{{ old('plate_number') }}"
-                                    placeholder="เช่น กข 1234"
-                                    maxlength="15"
-                                    autocomplete="off" />
-                                <x-input-error :messages="$errors->get('plate_number')" class="mt-2" />
-                            </div>
-                            <div>
-                                <select id="plate_province" name="plate_province"
-                                    class="sp-select w-full @error('plate_province') border-red-500 @enderror">
-                                    <option value="">-- จังหวัด --</option>
-                                    @foreach (config('thai_provinces') as $province)
-                                        <option value="{{ $province }}" @selected(old('plate_province') === $province)>
-                                            {{ $province }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('plate_province')" class="mt-2" />
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">กรอกป้ายทะเบียนรถที่จะนำมาจอด (แก้ไขได้ภายหลัง ก่อนเช็คอิน)</p>
-                    </div>
-
-                    {{-- ยี่ห้อ/สีรถ --}}
-                    <div>
-                        <x-input-label value="ยี่ห้อ / สีรถ" />
-                        <div class="grid grid-cols-2 gap-3 mt-1">
-                            <div>
-                                <x-text-input id="brand" name="brand" type="text"
-                                    class="block w-full @error('brand') border-red-500 @enderror"
-                                    value="{{ old('brand') }}"
-                                    placeholder="เช่น Toyota"
-                                    maxlength="60"
-                                    autocomplete="off"
-                                    required />
-                                <x-input-error :messages="$errors->get('brand')" class="mt-2" />
-                            </div>
-                            <div>
-                                <select id="color" name="color"
-                                    class="sp-select w-full @error('color') border-red-500 @enderror"
-                                    required>
-                                    <option value="">-- สีรถ --</option>
-                                    @foreach (config('car_colors') as $c)
-                                        <option value="{{ $c }}" @selected(old('color') === $c)>{{ $c }}</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('color')" class="mt-2" />
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">กรอกยี่ห้อและสีรถที่จะนำมาจอด (แก้ไขได้ภายหลัง ก่อนเช็คอิน)</p>
-                    </div>
-
-                    {{-- ลานจอด --}}
-                    <div>
-                        <x-input-label for="parking_lot_id" value="ลานจอด (Parking Lot)" />
-                        @if ($lots->isEmpty())
-                            <div class="mt-2 rounded-xl border border-yellow-700/40 bg-yellow-900/10 p-3">
-                                <p class="text-yellow-300 text-sm">ขณะนี้ยังไม่มีลานจอดที่เปิดรับจองและมีช่องว่าง</p>
-                            </div>
-                        @else
-                            <select id="parking_lot_id" name="parking_lot_id"
-                                class="sp-select mt-1 w-full @error('parking_lot_id') border-red-500 @enderror"
-                                x-model="lotId">
-                                <option value="">-- เลือกลาน --</option>
-                                @foreach ($lots as $lot)
-                                    <option value="{{ $lot->id }}" @selected(old('parking_lot_id') == $lot->id)>
-                                        {{ $lot->name }}
-                                        ({{ number_format($lot->hourly_rate, 2) }} ฿/ชม.)
-                                    </option>
-                                @endforeach
-                            </select>
-                        @endif
-                        <x-input-error :messages="$errors->get('parking_lot_id')" class="mt-2" />
-                        <div x-show="deposit !== null" x-cloak
-                             class="mt-2 rounded-xl border border-yellow-700/40 bg-yellow-900/10 p-3 text-sm text-yellow-300">
-                            ค่ามัดจำ: <strong>฿<span x-text="deposit"></span></strong> (ค่าจอด 1 ชั่วโมง)
-                            — ชำระแล้วรอเจ้าหน้าที่ยืนยันรับเงิน การจองจึงจะได้รับการยืนยัน · หักจากค่าจอดเมื่อ Check-Out · ยกเลิกแล้วไม่คืนเงินมัดจำ
-                        </div>
-                    </div>
-
-                    {{-- ช่องจอด: ระบบจัดสรรให้อัตโนมัติ (User เลือกได้เฉพาะลาน) --}}
-                    <div class="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-gray-300">
-                        ระบบจะจัดสรรช่องจอดให้อัตโนมัติเมื่อยืนยันรับเงินมัดจำแล้ว
-                    </div>
-
-                    {{-- เวลาเริ่ม --}}
-                    @php
-                        $minDatetime  = now()->format('Y-m-d\TH:i');
-                        $exampleStart = now()->addHour()->startOfHour()->format('Y-m-d\TH:i');
-                    @endphp
-                    <div>
-                        <x-input-label for="reserve_start" value="เวลาเริ่ม (Reserve Start)" />
-                        <x-text-input id="reserve_start" name="reserve_start" type="text"
-                            data-flatpickr="datetime"
-                            class="mt-1 block w-full @error('reserve_start') border-red-500 @enderror"
-                            value="{{ old('reserve_start', $exampleStart) }}" min="{{ $minDatetime }}" />
-                        <p class="text-xs text-gray-500 mt-1">
-                            ตัวอย่าง: {{ now()->addHour()->startOfHour()->format('d/m/Y H:i') }} น. — คลิกช่องด้านบนเพื่อเลือกจากปฏิทิน
-                        </p>
-                        <x-input-error :messages="$errors->get('reserve_start')" class="mt-2" />
-                    </div>
-
-                    <div class="rounded-xl border border-blue-700/40 bg-blue-900/10 p-3 text-sm text-blue-300">
-                        การจองจะถูกยกเลิกอัตโนมัติหากไม่มีการเช็คอินภายใน 1 ชั่วโมงหลังเวลาที่จอง
-                    </div>
-
-                    <div class="flex gap-3 pt-2">
-                        <button type="submit"
-                            class="sp-btn sp-btn-primary sp-glow-btn flex-1 justify-center py-3"
-                            @if($lots->isEmpty()) disabled @endif>
-                            ยืนยันการจอง
-                        </button>
-                        <a href="{{ route('user.reservations.index') }}"
-                            class="sp-btn sp-btn-outline flex-1 text-center py-3">ยกเลิก</a>
-                    </div>
-                </form>
-            </div>
-
+    <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
+        x-data="{
+            allLots: {{ Js::from($lots) }},
+            lotId: '{{ old('parking_lot_id', $selectedLotId) }}',
+            get lot() { return this.allLots.find(l => String(l.id) === String(this.lotId)) ?? null; },
+            baht(v) { return '฿' + Number(v).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        }">
+        <div class="mb-8">
+            <h1 class="text-h1 text-fg">จองที่จอด</h1>
+            <p class="mt-1 text-fg-2">จองล่วงหน้าได้ไม่เกิน 1 วัน ช่องจอดระบบเลือกให้หลังเจ้าหน้าที่ยืนยันรับมัดจำ</p>
         </div>
+
+        @if ($errors->any())
+            <x-ui.alert tone="danger" title="ยังจองไม่ได้ กรุณาแก้ไข {{ count($errors->all()) }} รายการ" class="mb-6">
+                ดูข้อความใต้ช่องที่มีกรอบสีแดง
+            </x-ui.alert>
+        @endif
+
+        @if ($lots->isEmpty())
+            <div class="rounded-card border border-line bg-surface shadow-1">
+                <x-ui.empty-state title="ยังไม่มีลานที่จองได้" description="ขณะนี้ไม่มีลานที่เปิดรับจองและมีช่องว่าง ลองใหม่ภายหลัง">
+                    <x-ui.button variant="secondary" :href="route('user.dashboard')">กลับหน้าหลัก</x-ui.button>
+                </x-ui.empty-state>
+            </div>
+        @else
+            <form method="POST" action="{{ route('user.reservations.store') }}"
+                class="grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
+                @csrf
+
+                <div class="flex flex-col gap-6">
+                    <section aria-labelledby="booking-when" class="rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
+                        <h2 id="booking-when" class="text-h3 text-fg">ลานและเวลา</h2>
+
+                        <div class="mt-5 flex flex-col gap-5">
+                            <x-ui.field label="ลานจอด" for="parking_lot_id" required hint="แสดงเฉพาะลานที่เปิดรับจองและยังมีช่องว่าง">
+                                <x-ui.select id="parking_lot_id" name="parking_lot_id" x-model="lotId" required placeholder="เลือกลานจอด">
+                                    @foreach ($lots as $lot)
+                                        <option value="{{ $lot->id }}" @selected(old('parking_lot_id', $selectedLotId) == $lot->id)>{{ $lot->name }} — {{ Format::baht($lot->hourly_rate) }}/ชม.</option>
+                                    @endforeach
+                                </x-ui.select>
+                            </x-ui.field>
+
+                            <x-ui.field label="เวลาเริ่มจอด" for="reserve_start" required
+                                hint="ต้องเป็นเวลาหลังจากนี้ และไม่เกิน {{ Format::short(now()->addDay()) }} · นำรถเข้าลานได้ภายใน 60 นาทีหลังเวลาเริ่ม">
+                                <x-ui.input id="reserve_start" name="reserve_start" data-flatpickr="datetime" required
+                                    :value="old('reserve_start', $exampleStart->format('Y-m-d\TH:i'))"
+                                    data-min="{{ now()->format('Y-m-d\TH:i') }}"
+                                    data-max="{{ now()->addDay()->subMinute()->format('Y-m-d\TH:i') }}" />
+                            </x-ui.field>
+                        </div>
+                    </section>
+
+                    <section aria-labelledby="booking-car" class="rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
+                        <h2 id="booking-car" class="text-h3 text-fg">ข้อมูลรถ</h2>
+                        <p class="mt-1 text-label text-fg-3">แก้ไขได้ภายหลังจนกว่ารถจะ Check-in</p>
+                        <div class="mt-5">
+                            @include('user.reservations.partials.vehicle-fields', ['plateNumber' => null, 'plateProvince' => null, 'brand' => null, 'color' => null])
+                        </div>
+                    </section>
+                </div>
+
+                {{-- สรุปยอด (ใบเสร็จ) --}}
+                <aside aria-labelledby="booking-summary" class="rounded-card border border-line bg-surface shadow-1 lg:sticky lg:top-20">
+                    <h2 id="booking-summary" class="border-b border-line px-5 py-4 text-h3 text-fg">สรุปการจอง</h2>
+
+                    <div class="px-5 py-4">
+                        <p x-show="!lot" class="text-label text-fg-2">เลือกลานจอดเพื่อดูยอดมัดจำ</p>
+
+                        <dl x-show="lot" x-cloak class="flex flex-col gap-3 text-label">
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-fg-2">ค่าจอดต่อชั่วโมง</dt>
+                                <dd class="num text-fg" x-text="lot && baht(lot.hourly_rate)"></dd>
+                            </div>
+                            <div class="border-t border-dashed border-field pt-3">
+                                <div class="flex justify-between gap-3 font-semibold">
+                                    <dt class="text-fg">มัดจำ</dt>
+                                    <dd class="num text-h3 text-fg" x-text="lot && baht(lot.hourly_rate)"></dd>
+                                </div>
+                                <p class="mt-1 text-caption text-fg-3">เท่ากับค่าจอด 1 ชั่วโมง · การจองยืนยันเมื่อเจ้าหน้าที่ยืนยันรับเงิน</p>
+                            </div>
+                            <div>
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-fg-2">ส่วนลดการจอง</dt>
+                                    <dd class="num text-fg" x-text="lot && ('−' + baht(lot.hourly_rate))"></dd>
+                                </div>
+                                <p class="mt-1 text-caption text-fg-3">หักจากค่าจอดตอน Check-out ต่อจากมัดจำ ยอดสุทธิไม่ติดลบ</p>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <div class="border-t border-line px-5 py-4">
+                        <ul class="flex flex-col gap-1.5 text-caption text-fg-2">
+                            <li>ยกเลิกหลังยืนยันรับมัดจำแล้ว มัดจำไม่คืน</li>
+                            <li>ไม่ Check-in ภายใน 60 นาทีหลังเวลาเริ่ม การจองหมดอายุ</li>
+                        </ul>
+                        <x-ui.button type="submit" class="mt-4 w-full">ยืนยันการจอง</x-ui.button>
+                        <x-ui.button variant="ghost" :href="route('user.dashboard')" class="mt-2 w-full">ยกเลิก</x-ui.button>
+                    </div>
+                </aside>
+            </form>
+        @endif
     </div>
 </x-app-layout>

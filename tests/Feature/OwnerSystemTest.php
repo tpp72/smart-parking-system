@@ -77,7 +77,7 @@ class OwnerSystemTest extends TestCase
         $this->assertSame(OwnerResignation::STATUS_PENDING, $resignation->status);
         $this->assertSame('owner', $owner->fresh()->role);
         $this->assertDatabaseHas('parking_lots', ['id' => $lot->id]);
-        $this->assertTrue(Notification::where('user_id', $admin->id)->where('title', 'คำร้องลาออกของ Owner')->exists());
+        $this->assertTrue(Notification::where('user_id', $admin->id)->where('title', 'คำร้องลาออกของเจ้าของลาน')->exists());
         $this->assertTrue(AdminAction::where('action', 'owner_resignation.submit')->where('actor_id', $owner->id)->where('actor_role', 'owner')->exists());
 
         $this->actingAs($owner)->get(route('owner.dashboard'))->assertOk()->assertSee('คำร้องลาออกรอการพิจารณา');
@@ -164,8 +164,8 @@ class OwnerSystemTest extends TestCase
 
         // ผู้จองได้รับแจ้งให้ติดต่อ Admin (ไม่มีสรุปยอดชำระของลานที่ถูกลบ)
         $messages = Notification::where('user_id', $booker->id)->pluck('message', 'title');
-        $this->assertStringContainsString('กรุณาติดต่อ Admin', $messages['การจองถูกยกเลิก']);
-        $this->assertStringContainsString('กรุณาติดต่อ Admin', $messages['รถของคุณถูกเช็คเอาท์โดยระบบ']);
+        $this->assertStringContainsString('กรุณาติดต่อผู้ดูแลระบบ', $messages['การจองถูกยกเลิก']);
+        $this->assertStringContainsString('กรุณาติดต่อผู้ดูแลระบบ', $messages['รถของคุณถูกเช็คเอาท์โดยระบบ']);
         $this->assertFalse(Notification::where('user_id', $booker->id)->where('title', 'เช็คเอาท์เรียบร้อย')->exists());
         $this->assertTrue(Notification::where('user_id', $owner->id)->where('title', 'คำร้องลาออกได้รับการอนุมัติ')->exists());
 
@@ -302,11 +302,14 @@ class OwnerSystemTest extends TestCase
             ->assertViewHas('depositRevenue', 40.0)
             ->assertViewHas('parkingRevenue', 80.0)
             ->assertViewHas('transactionCount', 2)
-            ->assertViewHas('unpaidTotal', 30.0);
+            // รอยืนยันรับเงิน ณ ตอนนี้: มัดจำและค่าจอดแยกกัน (ตรงกับตัวเลขบนเมนูชำระเงิน)
+            ->assertViewHas('unpaidDeposits', fn ($row) => (int) $row->count === 1 && (float) $row->amount === 40.0)
+            ->assertViewHas('unpaidCheckouts', fn ($row) => (int) $row->count === 1 && (float) $row->amount === 30.0)
+            ->assertViewHas('revenueTrend', fn ($trend) => end($trend)['value'] === 120.0);
 
         $this->actingAs($owner)->get(route('owner.dashboard'))
             ->assertOk()
-            ->assertViewHas('stats', fn ($stats) => $stats['revenue_today'] === 120.0 && $stats['revenue_month'] === 120.0)
-            ->assertViewHas('chartRevenueTrend', fn ($chart) => end($chart['datasets'][0]['data']) === 120.0);
+            ->assertViewHas('totals', fn ($totals) => $totals['revenue_today'] === 120.0)
+            ->assertViewHas('tasks', fn ($tasks) => $tasks['deposits']['count'] === 1 && $tasks['checkouts']['count'] === 1);
     }
 }

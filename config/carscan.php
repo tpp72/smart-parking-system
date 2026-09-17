@@ -34,4 +34,13 @@ return [
     | ปิดได้เฉพาะเครื่อง dev ที่ยังไม่ได้ตั้งค่า CA bundle: CARSCAN_VERIFY_SSL=false
     */
     'verify_ssl' => env('CARSCAN_VERIFY_SSL', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fake Mode (E2E / Demo)
+    |--------------------------------------------------------------------------
+    | ไม่เรียก Claude API — อ่านผลจากชื่อไฟล์รูป "ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy.png"
+    | ทำงานเฉพาะ APP_ENV=local หรือ testing เท่านั้น (ดู CarScanService::fakeEnabled)
+    */
+    'fake' => env('CARSCAN_FAKE', false),
 ];
