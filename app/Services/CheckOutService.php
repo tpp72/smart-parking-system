@@ -74,7 +74,7 @@ class CheckOutService
                     'old_status'     => 'checked_in',
                     'new_status'     => 'completed',
                     'changed_by'     => $actor?->id,
-                    'note'           => ($actor ? 'Manual check-out' : 'Auto check-out') . ': ' . self::summary($payment),
+                    'note'           => ($actor ? 'Check-out โดยเจ้าหน้าที่' : 'Check-out อัตโนมัติ') . ': ' . self::summary($payment),
                 ]);
 
                 audit_by($actor, 'reservation.check_out', $locked, [

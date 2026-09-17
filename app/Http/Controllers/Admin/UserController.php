@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\UserAccountService;
+use App\Support\Navigation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,7 @@ class UserController extends Controller
                 });
             })
             ->when($role, fn($query) => $query->where('role', $role))
+            ->withCount('ownedParkingLots')
             ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
@@ -65,7 +67,7 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
             'role'     => ['required', Rule::in($this->rolesFor(null))],
         ], [
-            'role.in' => 'สร้างได้เฉพาะ User หรือ Admin — การเป็น Owner ต้องผ่านคำขอสมัคร Owner',
+            'role.in' => 'สร้างได้เฉพาะผู้ใช้หรือผู้ดูแลระบบ — การเป็นเจ้าของลานต้องผ่านคำขอเป็นเจ้าของลาน',
         ]);
 
         $user = User::create([
@@ -81,7 +83,7 @@ class UserController extends Controller
         audit_log('user.create', $user, ['role' => $user->role]);
 
         return redirect()->route('admin.users.edit', $user)
-            ->with('success', "สร้างผู้ใช้ \"{$user->name}\" (role: {$user->role}) เรียบร้อยแล้ว — บังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก");
+            ->with('success', "สร้างบัญชี \"{$user->name}\" (" . (Navigation::ROLE_LABELS[$user->role] ?? $user->role) . ") เรียบร้อยแล้ว — บังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก");
     }
 
     public function edit(User $user)
@@ -91,7 +93,13 @@ class UserController extends Controller
         $roles = $this->rolesFor($user);
         $ownedLotsCount = $user->role === 'owner' ? $user->ownedParkingLots()->count() : 0;
 
-        return view('admin.users.edit', compact('user', 'roles', 'ownedLotsCount'));
+        // ผลกระทบถ้าลบบัญชี: การจองของผู้ใช้ที่ยังไม่ Check-in จะถูกยกเลิก · รถที่จอดอยู่จะถูก Check-out
+        $impact = [
+            'bookings' => $user->reservations()->whereIn('status', ['pending', 'confirmed'])->count(),
+            'parked'   => $user->reservations()->where('status', 'checked_in')->count(),
+        ];
+
+        return view('admin.users.edit', compact('user', 'roles', 'ownedLotsCount', 'impact'));
     }
 
     public function update(Request $request, User $user)
@@ -107,13 +115,13 @@ class UserController extends Controller
             'demotion_reason' => $isDemoting ? ['required', 'string', 'max:1000'] : ['nullable'],
         ], [
             'role.in'                  => $user->role === 'owner'
-                ? 'Owner เปลี่ยนได้เฉพาะปลดกลับเป็น User'
-                : 'การเป็น Owner ต้องผ่านคำขอสมัคร Owner',
-            'demotion_reason.required' => 'กรุณาระบุเหตุผลในการปลด Owner',
+                ? 'เจ้าของลานเปลี่ยนได้เฉพาะปลดกลับเป็นผู้ใช้'
+                : 'การเป็นเจ้าของลานต้องผ่านคำขอเป็นเจ้าของลาน',
+            'demotion_reason.required' => 'กรุณาระบุเหตุผลในการปลดเจ้าของลาน',
         ]);
 
         if ($request->user()->id === $user->id && $data['role'] !== 'admin') {
-            return back()->withErrors(['role' => 'ไม่สามารถเปลี่ยน role ของตัวเองออกจาก admin ได้'])->withInput();
+            return back()->withErrors(['role' => 'เปลี่ยนบทบาทของบัญชีตัวเองออกจากผู้ดูแลระบบไม่ได้'])->withInput();
         }
 
         $before = $user->only(['name', 'email', 'role']);
@@ -141,7 +149,7 @@ class UserController extends Controller
         }
 
         return redirect()->route('admin.users.edit', $user)->with('success', sprintf(
-            'ปลด Owner กลับเป็น User แล้ว — ยกเลิกการจอง %d รายการ · เช็คเอาท์รถ %d คัน · ลบลานจอด %d แห่ง',
+            'ปลดเจ้าของลานกลับเป็นผู้ใช้แล้ว — ยกเลิกการจอง %d รายการ · เช็คเอาท์รถ %d คัน · ลบลานจอด %d แห่ง',
             $result['summary']['reservations_cancelled'],
             $result['summary']['cars_checked_out'],
             $result['summary']['lots_deleted']

@@ -1,21 +1,11 @@
-<x-guest-layout>
-    <p class="mb-5 text-sm text-gray-400 leading-relaxed">
-        พื้นที่นี้ต้องยืนยันรหัสผ่านก่อนดำเนินการต่อ
-    </p>
-
-    <form method="POST" action="{{ route('password.confirm') }}">
+<x-guest-layout title="ยืนยันรหัสผ่าน" description="ส่วนนี้ต้องยืนยันรหัสผ่านอีกครั้งก่อนดำเนินการต่อ">
+    <form method="POST" action="{{ route('password.confirm') }}" class="flex flex-col gap-5">
         @csrf
 
-        <div>
-            <x-input-label for="password" :value="__('รหัสผ่าน')" />
-            <x-password-input id="password" name="password" autocomplete="current-password" required />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+        <x-ui.field label="รหัสผ่าน" for="password" required>
+            <x-password-input id="password" name="password" autocomplete="current-password" required autofocus />
+        </x-ui.field>
 
-        <div class="mt-6">
-            <x-primary-button class="w-full justify-center">
-                ยืนยัน
-            </x-primary-button>
-        </div>
+        <x-ui.button type="submit" class="w-full">ยืนยัน</x-ui.button>
     </form>
 </x-guest-layout>

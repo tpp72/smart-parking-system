@@ -36,6 +36,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// หน้าทดสอบ Design System (UI Phase 1 Foundation) — เปิดเฉพาะ APP_ENV=local ไม่ใช่ฟีเจอร์ของระบบ
+if (app()->environment('local')) {
+    Route::view('/_ui', 'dev.ui-foundation')->name('dev.ui-foundation');
+}
+
 // Smart redirect by role
 Route::get('/dashboard', function () {
     $role = request()->user()?->role;

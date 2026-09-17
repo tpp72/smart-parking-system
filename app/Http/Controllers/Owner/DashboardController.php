@@ -5,209 +5,100 @@ namespace App\Http\Controllers\Owner;
 use App\Http\Controllers\Controller;
 use App\Models\OwnerApplication;
 use App\Models\OwnerResignation;
+use App\Models\ParkingLot;
+use App\Models\Payment;
+use App\Models\Reservation;
 use App\Queries\RevenueQuery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * ภาพรวมของเจ้าของลาน — งานที่ต้องทำก่อน (มัดจำรอยืนยัน / ค่าจอดค้าง / การจองที่ถึงเวลาเข้าลาน)
+ * → สถานะรายลาน ณ ตอนนี้ → รถที่จอดอยู่ + การจองที่กำลังจะมาถึง (กราฟรายได้อยู่หน้ารายได้)
+ */
 class DashboardController extends Controller
 {
     public function index()
     {
-        $user    = Auth::user();
+        $user = Auth::user();
         $ownerId = $user->id;
 
-        // Show pending/rejected state for non-approved owners
+        // บัญชี Owner ที่ยังไม่ได้รับอนุมัติ (ข้อมูลเก่า) — แสดงสถานะคำขอแทนภาพรวม
         if ($user->owner_status !== 'approved') {
-            $application = OwnerApplication::where('user_id', $ownerId)->latest()->first();
             return view('owner.dashboard', [
                 'ownerStatus' => $user->owner_status,
-                'application' => $application,
+                'application' => OwnerApplication::where('user_id', $ownerId)->latest()->first(),
                 'resignation' => null,
-                'stats'              => null,
-                'lotsOverview'       => collect(),
-                'recentReservations' => collect(),
-                'activeNow'          => collect(),
             ]);
         }
 
-        $lotIds = DB::table('parking_lots')
-            ->where('owner_id', $ownerId)
-            ->pluck('id');
+        $lotIds = ParkingLot::ownedBy($ownerId)->pluck('id');
 
-        $lotsTotal = $lotIds->count();
+        // ── งานที่ต้องทำ ─────────────────────────────────────────────────
+        $unpaid = fn (string $type) => Payment::where('type', $type)
+            ->where('payment_status', Payment::STATUS_UNPAID)
+            ->whereHas('reservation', fn ($q) => $q->whereIn('parking_lot_id', $lotIds));
 
-        $slotStats = DB::table('parking_slots')
-            ->whereIn('parking_lot_id', $lotIds)
-            ->selectRaw("
-                COUNT(*) as slots_total,
-                SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as slots_available,
-                SUM(CASE WHEN status='reserved' THEN 1 ELSE 0 END) as slots_reserved,
-                SUM(CASE WHEN status='occupied' THEN 1 ELSE 0 END) as slots_occupied
-            ")
-            ->first();
-
-        $activeNowCount = DB::table('parking_logs')
-            ->whereIn('parking_lot_id', $lotIds)
-            ->whereNull('check_out_time')
-            ->count();
-
-        // รายได้ = เงินที่รับจริง (มัดจำ + ค่าจอด) นับตามเวลาที่ยืนยันรับเงิน
-        $today = now();
-        $revenueToday = (float) RevenueQuery::paid($lotIds)
-            ->whereDate('p.paid_at', $today->toDateString())
-            ->sum('p.total_amount');
-
-        $revenueMonth = (float) RevenueQuery::paid($lotIds)
-            ->whereYear('p.paid_at', $today->year)
-            ->whereMonth('p.paid_at', $today->month)
-            ->sum('p.total_amount');
-
-        $reservationsToday = DB::table('reservations')
-            ->whereIn('parking_lot_id', $lotIds)
-            ->whereDate('reserve_start', $today->toDateString())
-            ->count();
-
-        $pendingReservations = DB::table('reservations')
-            ->whereIn('parking_lot_id', $lotIds)
-            ->where('status', 'pending')
-            ->count();
-
-        $stats = [
-            'lots_total'          => $lotsTotal,
-            'slots_total'         => (int)($slotStats->slots_total ?? 0),
-            'slots_available'     => (int)($slotStats->slots_available ?? 0),
-            'slots_reserved'      => (int)($slotStats->slots_reserved ?? 0),
-            'slots_occupied'      => (int)($slotStats->slots_occupied ?? 0),
-            'active_now'          => $activeNowCount,
-            'revenue_today'       => $revenueToday,
-            'revenue_month'       => $revenueMonth,
-            'reservations_today'  => $reservationsToday,
-            'pending_reservations' => $pendingReservations,
+        $tasks = [
+            'deposits' => ['count' => $unpaid(Payment::TYPE_DEPOSIT)->count(), 'amount' => (float) $unpaid(Payment::TYPE_DEPOSIT)->sum('total_amount')],
+            'checkouts' => ['count' => $unpaid(Payment::TYPE_CHECKOUT)->count(), 'amount' => (float) $unpaid(Payment::TYPE_CHECKOUT)->sum('total_amount')],
+            // ยืนยันแล้วและถึงเวลาเข้าลาน (ยังไม่เลย 60 นาที) — ถ้ากล้องอ่านไม่ได้ ต้อง Manual Check-in
+            'arriving' => Reservation::checkable()->whereIn('parking_lot_id', $lotIds)->count(),
         ];
 
-        $lotsOverview = DB::table('parking_lots as lot')
+        // ── สถานะรายลาน ณ ตอนนี้ + รายได้วันนี้ ────────────────────────────
+        $revenueTodayByLot = RevenueQuery::paid($lotIds)
+            ->whereDate('p.paid_at', now()->toDateString())
+            ->groupBy('r.parking_lot_id')
+            ->selectRaw('r.parking_lot_id, SUM(p.total_amount) as revenue')
+            ->pluck('revenue', 'parking_lot_id');
+
+        $lots = DB::table('parking_lots as lot')
             ->leftJoin('parking_slots as s', 's.parking_lot_id', '=', 'lot.id')
             ->where('lot.owner_id', $ownerId)
-            ->groupBy('lot.id', 'lot.name', 'lot.total_slots', 'lot.hourly_rate', 'lot.reservations_enabled')
+            ->groupBy('lot.id', 'lot.name', 'lot.hourly_rate', 'lot.reservations_enabled')
             ->orderBy('lot.name')
             ->selectRaw("
-                lot.id, lot.name, lot.total_slots, lot.hourly_rate, lot.reservations_enabled,
+                lot.id, lot.name, lot.hourly_rate, lot.reservations_enabled,
+                COUNT(s.id) as total,
                 SUM(CASE WHEN s.status='available' THEN 1 ELSE 0 END) as available,
-                SUM(CASE WHEN s.status='occupied' THEN 1 ELSE 0 END) as occupied,
-                SUM(CASE WHEN s.status='reserved' THEN 1 ELSE 0 END) as reserved
+                SUM(CASE WHEN s.status='reserved' THEN 1 ELSE 0 END) as reserved,
+                SUM(CASE WHEN s.status='occupied' THEN 1 ELSE 0 END) as occupied
             ")
-            ->get();
+            ->get()
+            ->each(fn ($lot) => $lot->revenue_today = (float) ($revenueTodayByLot[$lot->id] ?? 0));
 
-        $recentReservations = DB::table('reservations as r')
-            ->join('users as u', 'u.id', '=', 'r.user_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
-            ->whereIn('r.parking_lot_id', $lotIds)
-            ->orderByDesc('r.created_at')
-            ->limit(8)
-            ->select(['r.id', 'r.license_plate', 'u.name as user_name', 'lot.name as lot_name', 'r.reserve_start', 'r.status'])
-            ->get();
-
-        $activeNow = DB::table('parking_logs as pl')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
-            ->whereIn('pl.parking_lot_id', $lotIds)
-            ->whereNull('pl.check_out_time')
-            ->orderByDesc('pl.check_in_time')
-            ->limit(8)
-            ->select(['pl.id as log_id', 'pl.license_plate', 'lot.name as lot_name', 's.slot_number', 'pl.check_in_time'])
-            ->get();
-
-        // ── Chart data ─────────────────────────────────────────────────────
-        $statusKeys   = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
-        $statusColors = [
-            'rgba(250,204,21,0.85)',
-            'rgba(96,165,250,0.85)',
-            'rgba(52,211,153,0.85)',
-            'rgba(34,197,94,0.85)',
-            'rgba(239,68,68,0.85)',
-            'rgba(107,114,128,0.85)',
+        $totals = [
+            'lots' => $lots->count(),
+            'slots' => (int) $lots->sum('total'),
+            'available' => (int) $lots->sum('available'),
+            'reserved' => (int) $lots->sum('reserved'),
+            'occupied' => (int) $lots->sum('occupied'),
+            'revenue_today' => (float) $lots->sum('revenue_today'),
         ];
-        $rawStatusCounts = DB::table('reservations')
+
+        // ── รถที่จอดอยู่ + การจองที่กำลังจะมาถึง (24 ชม.) ──────────────────
+        $parked = Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'parkingLog:id,reservation_id,check_in_time'])
             ->whereIn('parking_lot_id', $lotIds)
-            ->selectRaw('status, COUNT(*) as count')
-            ->whereIn('status', $statusKeys)
-            ->groupBy('status')
-            ->pluck('count', 'status');
+            ->where('status', 'checked_in')
+            ->get()
+            ->sortByDesc(fn (Reservation $r) => $r->parkingLog?->check_in_time)
+            ->take(8)
+            ->values();
 
-        $chartReservationStatus = [
-            'labels'   => ['Pending', 'Confirmed', 'Checked In', 'Completed', 'Cancelled', 'Expired'],
-            'datasets' => [[
-                'data'            => array_map(fn ($s) => (int) ($rawStatusCounts[$s] ?? 0), $statusKeys),
-                'backgroundColor' => $statusColors,
-                'borderColor'     => '#111827',
-                'borderWidth'     => 2,
-                'hoverOffset'     => 6,
-            ]],
-        ];
-
-        $rawRevenue = $lotIds->isNotEmpty()
-            ? RevenueQuery::paid($lotIds)
-                ->where('p.paid_at', '>=', now()->subMonths(11)->startOfMonth())
-                ->groupByRaw("TO_CHAR(p.paid_at, 'YYYY-MM')")
-                ->selectRaw("TO_CHAR(p.paid_at, 'YYYY-MM') as month_key, SUM(p.total_amount) as revenue")
-                ->pluck('revenue', 'month_key')
-                ->toArray()
-            : [];
-
-        $revLabels = [];
-        $revData   = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $month       = now()->subMonths($i);
-            $revLabels[] = $month->format('M Y');
-            $revData[]   = (float) ($rawRevenue[$month->format('Y-m')] ?? 0);
-        }
-
-        $chartRevenueTrend = [
-            'labels'   => $revLabels,
-            'datasets' => [[
-                'label'                => 'รายได้ (฿)',
-                'data'                 => $revData,
-                'borderColor'          => 'rgba(248,113,113,1)',
-                'backgroundColor'      => 'rgba(239,68,68,0.1)',
-                'tension'              => 0.35,
-                'fill'                 => true,
-                'pointBackgroundColor' => 'rgba(248,113,113,1)',
-                'pointRadius'          => 3,
-                'pointHoverRadius'     => 5,
-            ]],
-        ];
-
-        $chartSlotOccupancy = [
-            'labels'   => ['ว่าง', 'จอง', 'ใช้งาน'],
-            'datasets' => [[
-                'label'           => 'ช่องจอด',
-                'data'            => [
-                    $stats['slots_available'],
-                    $stats['slots_reserved'],
-                    $stats['slots_occupied'],
-                ],
-                'backgroundColor' => [
-                    'rgba(34,197,94,0.75)',
-                    'rgba(250,204,21,0.75)',
-                    'rgba(239,68,68,0.75)',
-                ],
-                'borderRadius'    => 6,
-                'borderWidth'     => 0,
-            ]],
-        ];
+        $upcoming = Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name', 'depositPayment'])
+            ->whereIn('parking_lot_id', $lotIds)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where('reserve_start', '>=', now()->subMinutes(Reservation::gracePeriodMinutes()))
+            ->where('reserve_start', '<=', now()->addDay())
+            ->orderBy('reserve_start')
+            ->limit(8)
+            ->get();
 
         // คำร้องลาออกล่าสุด (รอพิจารณา / ไม่อนุมัติ)
         $resignation = OwnerResignation::where('user_id', $ownerId)->latest('id')->first();
 
-        return view('owner.dashboard', compact(
-            'stats',
-            'lotsOverview',
-            'recentReservations',
-            'activeNow',
-            'chartReservationStatus',
-            'chartRevenueTrend',
-            'chartSlotOccupancy',
-            'resignation',
-        ) + ['ownerStatus' => 'approved', 'application' => null]);
+        return view('owner.dashboard', compact('tasks', 'lots', 'totals', 'parked', 'upcoming', 'resignation')
+            + ['ownerStatus' => 'approved', 'application' => null]);
     }
 }

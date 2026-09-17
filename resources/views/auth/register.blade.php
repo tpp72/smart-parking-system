@@ -1,48 +1,29 @@
-<x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
+<x-guest-layout title="สมัครสมาชิก" description="สมัครแล้วยืนยันอีเมลก่อน จึงจะจองที่จอดได้">
+    <form method="POST" action="{{ route('register') }}" class="flex flex-col gap-5">
         @csrf
 
-        <div>
-            <x-input-label for="name" :value="__('ชื่อ-นามสกุล')" />
-            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name"
-                :value="old('name')" required autofocus autocomplete="name"
-                placeholder="กรอกชื่อของคุณ" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-        </div>
+        <x-ui.field label="ชื่อ-นามสกุล" for="name" required>
+            <x-ui.input id="name" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
+        </x-ui.field>
 
-        <div class="mt-4">
-            <x-input-label for="email" :value="__('อีเมล')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email"
-                :value="old('email')" required autocomplete="username"
-                placeholder="your@email.com" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+        <x-ui.field label="อีเมล" for="email" required hint="ใช้รับลิงก์ยืนยันบัญชีและลิงก์ตั้งรหัสผ่านใหม่">
+            <x-ui.input id="email" type="email" name="email" :value="old('email')" required
+                autocomplete="username" inputmode="email" placeholder="name@example.com" />
+        </x-ui.field>
 
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('รหัสผ่าน')" />
+        <x-ui.field label="รหัสผ่าน" for="password" required hint="อย่างน้อย 8 ตัวอักษร">
             <x-password-input id="password" name="password" autocomplete="new-password" required />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+        </x-ui.field>
 
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('ยืนยันรหัสผ่าน')" />
-            <x-password-input id="password_confirmation" name="password_confirmation"
-                autocomplete="new-password" required />
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
+        <x-ui.field label="ยืนยันรหัสผ่าน" for="password_confirmation" required>
+            <x-password-input id="password_confirmation" name="password_confirmation" autocomplete="new-password" required />
+        </x-ui.field>
 
-        <div class="mt-6">
-            <x-primary-button class="w-full justify-center">
-                สมัครสมาชิก
-            </x-primary-button>
-        </div>
-
-        <p class="mt-5 text-center text-sm text-gray-400">
-            มีบัญชีอยู่แล้ว?
-            <a href="{{ route('login') }}"
-               class="text-red-400 hover:text-red-300 font-semibold underline underline-offset-2 transition">
-                เข้าสู่ระบบ
-            </a>
-        </p>
+        <x-ui.button type="submit" class="w-full">สมัครสมาชิก</x-ui.button>
     </form>
+
+    <p class="mt-6 border-t border-line pt-5 text-center text-fg-2">
+        มีบัญชีอยู่แล้ว?
+        <a href="{{ route('login') }}" class="font-semibold text-primary-ink underline-offset-4 hover:underline">เข้าสู่ระบบ</a>
+    </p>
 </x-guest-layout>

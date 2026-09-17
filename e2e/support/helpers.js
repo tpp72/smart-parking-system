@@ -74,20 +74,28 @@ export async function scanCar(page, { plate, brand = 'Toyota', color = 'ขา�
 /** ตรวจว่าการจองของทะเบียนนี้ในลาน Admin อยู่ในสถานะที่ระบุ (ใช้ตัวกรองหน้าจัดการการจอง) */
 export async function expectReservationStatus(adminPage, plate, status) {
   await adminPage.goto(`/admin/reservations?q=${encodeURIComponent(plate)}&status=${status}`);
-  await expect(adminPage.locator('table')).toContainText(plate);
+  await expect(adminPage.locator('#main-content ol')).toContainText(plate);
 }
 
-/** กด "รับชำระแล้ว" ของรายการค้างชำระที่ตรงกับทะเบียนและประเภท (มัดจำ / ค่าจอด) */
+const PAYMENT_TYPES = { 'มัดจำ': 'deposit', 'ค่าจอด': 'checkout' };
+
+/** แถวรายการชำระเงินของทะเบียนและประเภท (มัดจำ / ค่าจอด) */
+function paymentRow(adminPage, plate, type) {
+  return adminPage.locator(`li[data-payment-type="${PAYMENT_TYPES[type]}"]`, { hasText: plate });
+}
+
+/** กด "รับชำระแล้ว" ของรายการค้างชำระที่ตรงกับทะเบียนและประเภท แล้วยืนยันในกล่องยืนยันของระบบ */
 export async function markPaid(adminPage, plate, type) {
   await adminPage.goto('/admin/payments?status=unpaid');
-  const row = adminPage.locator('tbody tr', { hasText: plate }).filter({ hasText: type });
+  const row = paymentRow(adminPage, plate, type);
   await expect(row).toHaveCount(1);
   await row.getByRole('button', { name: /รับชำระแล้ว/ }).click();
+  await adminPage.getByRole('alertdialog').getByRole('button', { name: 'รับชำระแล้ว' }).click();
   await adminPage.waitForLoadState('domcontentloaded');
 }
 
 /** แถว Payment ที่ชำระแล้วของทะเบียนและประเภทนี้ */
 export async function paidPaymentRow(adminPage, plate, type) {
   await adminPage.goto('/admin/payments?status=paid');
-  return adminPage.locator('tbody tr', { hasText: plate }).filter({ hasText: type });
+  return paymentRow(adminPage, plate, type);
 }

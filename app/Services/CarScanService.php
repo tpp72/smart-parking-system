@@ -232,16 +232,16 @@ PROMPT;
         $alerts = [];
 
         if ($scan->result === LicensePlateScan::RESULT_UNREADABLE) {
-            $alerts[] = ['AI อ่านทะเบียนไม่ได้', "สแกน #{$scan->id} ที่ลาน {$lotName} เวลา {$when} — AI อ่านทะเบียนไม่ได้ (Accuracy {$accuracy}) กรุณาตรวจสอบรถคันนี้"];
+            $alerts[] = ['AI อ่านทะเบียนไม่ได้', "สแกน #{$scan->id} ที่ลาน {$lotName} เวลา {$when} — AI อ่านทะเบียนไม่ได้ (ความแม่นยำ {$accuracy}) กรุณาตรวจสอบรถคันนี้"];
         } elseif ($scan->result === LicensePlateScan::RESULT_LOW_ACCURACY) {
-            $alerts[] = ['AI Accuracy ไม่ผ่านเกณฑ์', sprintf(
-                'สแกน #%d ที่ลาน %s เวลา %s — %s · Accuracy %s ไม่เกินเกณฑ์ %s%% จึงไม่เช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้',
+            $alerts[] = ['ความแม่นยำของ AI ไม่ผ่านเกณฑ์', sprintf(
+                'สแกน #%d ที่ลาน %s เวลา %s — %s · ความแม่นยำ %s ไม่เกินเกณฑ์ %s%% จึงไม่เช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้',
                 $scan->id, $lotName, $when, $carDetail, $accuracy, rtrim(rtrim(number_format((float) config('carscan.accuracy_threshold', 85), 2), '0'), '.')
             )];
         }
 
         if ($scan->is_suspicious) {
-            $alerts[] = ['⚠ พบรถต้องสงสัย (Blacklist)', "{$carDetail} ตรวจพบที่ลาน {$lotName} เวลา {$when} (สแกน #{$scan->id})"];
+            $alerts[] = ['⚠ พบรถในบัญชีดำ', "{$carDetail} ตรวจพบที่ลาน {$lotName} เวลา {$when} (สแกน #{$scan->id})"];
         }
 
         // เหตุการณ์ AI ผิดปกติ → Audit Log (ระบบเป็นผู้ตรวจพบ ไม่ใช่ผู้อัปโหลด)
@@ -286,7 +286,7 @@ PROMPT;
                 ->where('plate_province', $scan->plate_province)
                 ->first();
 
-            $lot->notifyStaff('⚠ พบรถต้องสงสัย (Blacklist)', sprintf(
+            $lot->notifyStaff('⚠ พบรถในบัญชีดำ', sprintf(
                 '%s ตรวจพบที่ลาน %s เวลา %s — ลานเต็ม รถไม่ได้เข้าจอด',
                 $this->carDetail($scan), $lot->name, $scan->scan_time->format('d/m/Y H:i')
             ));

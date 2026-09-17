@@ -116,8 +116,14 @@ class AdminSystemTest extends TestCase
         $this->assertSame(60.0, $stats['revenue_parking']);
         $this->assertSame([3, 1, 2, 1], [$stats['scans_total'], $stats['scans_passed'], $stats['scans_failed'], $stats['scans_suspicious']]);
 
-        $statusData = $response->viewData('chartReservationStatus')['datasets'][0]['data'];
-        $this->assertSame([1, 1, 1], [$statusData[1], $statusData[2], $statusData[3]]); // confirmed, checked_in, completed
+        $statusData = $response->viewData('reservationStatus');
+        $this->assertSame([1, 1, 1], [$statusData['confirmed'], $statusData['checked_in'], $statusData['completed']]);
+        $this->assertCount(2, $response->viewData('lotsOverview'));
+
+        // เลือกลานเดียว: ตัวเลขเหลือเฉพาะลานนั้น แต่บัญชีดำยังเป็นของทั้งระบบ
+        $scoped = $this->actingAs($admin)->get(route('admin.dashboard', ['lot_id' => $adminLot->id, 'range' => '7d']))->assertOk();
+        $this->assertSame([2, 0, 60.0], [$scoped->viewData('stats')['slots_total'], $scoped->viewData('stats')['active_now'], $scoped->viewData('stats')['revenue_paid']]);
+        $scoped->assertSee('กำลังดู')->assertSee('ดูรวมทุกลาน')->assertSee('ทั้งระบบ ไม่ขึ้นกับลานที่เลือก');
 
         // หน้าจัดการยังเห็นเฉพาะลานของ Admin
         $listed = $this->actingAs($admin)->get(route('admin.reservations.index'))->viewData('reservations')->pluck('id');
@@ -176,8 +182,8 @@ class AdminSystemTest extends TestCase
         $this->assertDatabaseMissing('parking_lots', ['id' => $lot->id]);
 
         $messages = Notification::where('user_id', $booker->id)->pluck('message', 'title');
-        $this->assertStringContainsString('กรุณาติดต่อ Admin', $messages['การจองถูกยกเลิก']);
-        $this->assertStringContainsString('กรุณาติดต่อ Admin', $messages['รถของคุณถูกเช็คเอาท์โดยระบบ']);
+        $this->assertStringContainsString('กรุณาติดต่อผู้ดูแลระบบ', $messages['การจองถูกยกเลิก']);
+        $this->assertStringContainsString('กรุณาติดต่อผู้ดูแลระบบ', $messages['รถของคุณถูกเช็คเอาท์โดยระบบ']);
         $this->assertTrue(Notification::where('user_id', $owner->id)->where('title', 'บัญชีของคุณถูกปลดจากการเป็นเจ้าของลานจอด')->exists());
 
         $audit = AdminAction::where('action', 'user.demote_owner')->firstOrFail();
@@ -222,7 +228,7 @@ class AdminSystemTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['id' => $owner->id]);
         $this->assertDatabaseMissing('parking_lots', ['id' => $lot->id]);
-        $this->assertStringContainsString('กรุณาติดต่อ Admin',
+        $this->assertStringContainsString('กรุณาติดต่อผู้ดูแลระบบ',
             Notification::where('user_id', $booker->id)->where('title', 'การจองถูกยกเลิก')->value('message'));
 
         // ลบตัวเองไม่ได้

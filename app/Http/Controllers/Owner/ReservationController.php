@@ -35,7 +35,8 @@ class ReservationController extends Controller
             'user:id,name,email',
             'parkingLot:id,name,hourly_rate',
             'parkingSlot:id,parking_lot_id,slot_number',
-            'parkingLog:id,reservation_id,check_in_time,hourly_rate',
+            'parkingLog:id,reservation_id,check_in_time,check_out_time,hourly_rate',
+            'depositPayment',
         ])
             ->whereIn('parking_lot_id', $ownedLotIds)
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
@@ -57,9 +58,14 @@ class ReservationController extends Controller
             ->pluck('id')
             ->all();
 
-        return view('owner.reservations.index', compact(
-            'reservations', 'ownedLots', 'q', 'status', 'lotId', 'from', 'to', 'statuses', 'checkableIds'
-        ));
+        // รถที่จอดอยู่: ยอดประมาณถ้า Check-out ตอนนี้ (สูตรเดียวกับ Check-out จริง — หักมัดจำและส่วนลดแล้ว)
+        $estimates = $reservations->getCollection()
+            ->filter(fn (Reservation $r) => $r->status === 'checked_in' && $r->parkingLog && ! $r->parkingLog->check_out_time)
+            ->mapWithKeys(fn (Reservation $r) => [$r->id => $this->checkOutService->calculate($r, $r->parkingLog, now())]);
+
+        return view('staff.reservations', compact(
+            'reservations', 'q', 'status', 'lotId', 'from', 'to', 'statuses', 'checkableIds', 'estimates'
+        ) + ['lots' => $ownedLots, 'scope' => 'owner']);
     }
 
     /** Check-In รถของการจองนี้โดยตรง (แทนหน้า Manual Check-In แยก) */
@@ -78,7 +84,7 @@ class ReservationController extends Controller
         $slot = $result['slot'];
 
         return back()->with('success',
-            "Check-In สำเร็จ! ทะเบียน {$reservation->license_plate} → ช่อง {$slot->slot_number}"
+            "Check-in สำเร็จ — ทะเบียน {$reservation->license_plate} เข้าช่อง {$slot->slot_number}"
         );
     }
 
@@ -95,6 +101,6 @@ class ReservationController extends Controller
             return back()->withErrors(['error' => $result['error']]);
         }
 
-        return back()->with('success', "Check-Out สำเร็จ! ทะเบียน {$reservation->license_plate} | " . CheckOutService::summary($result['payment']));
+        return back()->with('success', "Check-out สำเร็จ — ทะเบียน {$reservation->license_plate} · " . CheckOutService::summary($result['payment']));
     }
 }

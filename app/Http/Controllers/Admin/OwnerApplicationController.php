@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\OwnerApplication;
 use App\Models\User;
+use App\Support\Navigation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class OwnerApplicationController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $status = $request->query('status', '');
+        $status = (string) $request->query('status', '');
 
         $applications = OwnerApplication::with(['user:id,name,email', 'reviewer:id,name'])
             ->when($q !== '', fn($query) => $query->where(function ($qq) use ($q) {
@@ -57,7 +58,7 @@ class OwnerApplicationController extends Controller
             // เป็น Owner ได้เฉพาะบัญชี User — กัน Admin/บัญชีระบบกลายเป็น Owner
             $applicant = User::whereKey($application->user_id)->lockForUpdate()->first();
             if ($applicant->role !== 'user' || $applicant->is_system) {
-                return "อนุมัติไม่ได้ — ผู้สมัครต้องเป็นบัญชี User (ปัจจุบันเป็น {$applicant->role})";
+                return "อนุมัติไม่ได้ — ผู้สมัครต้องเป็นบัญชีผู้ใช้ (ปัจจุบันเป็น" . (Navigation::ROLE_LABELS[$applicant->role] ?? $applicant->role) . ")";
             }
 
             $application->update([

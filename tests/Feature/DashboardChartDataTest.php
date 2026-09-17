@@ -46,23 +46,19 @@ class DashboardChartDataTest extends TestCase
         ]);
     }
 
-    // ─── [1] admin chart structure ────────────────────────────────────────
+    // ─── [1] admin reservation status breakdown covers all six statuses ──
 
-    public function test_admin_dashboard_reservation_status_chart_has_six_statuses(): void
+    public function test_admin_dashboard_reservation_status_has_six_statuses(): void
     {
         $admin    = $this->admin();
         $response = $this->actingAs($admin)->get(route('admin.dashboard'));
 
         $response->assertStatus(200);
-        $chart = $response->viewData('chartReservationStatus');
-
-        $this->assertArrayHasKey('labels', $chart);
-        $this->assertArrayHasKey('datasets', $chart);
-        $this->assertCount(6, $chart['labels']);
-        $this->assertCount(6, $chart['datasets'][0]['data']);
+        $this->assertSame(Reservation::STATUSES, $response->viewData('reservationStatus')->keys()->all());
+        $response->assertDontSee('chart.js', false);
     }
 
-    // ─── [2] admin reservation status counts match DB ─────────────────────
+    // ─── [2] admin reservation status counts match DB (การจองใหม่ในช่วงเวลา) ─
 
     public function test_admin_reservation_status_counts_match_database(): void
     {
@@ -74,18 +70,17 @@ class DashboardChartDataTest extends TestCase
         $this->makeReservationForLot($lot, 'confirmed');
         $this->makeReservationForLot($lot, 'completed');
 
-        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
-        $data     = $response->viewData('chartReservationStatus')['datasets'][0]['data'];
+        $data = $this->actingAs($admin)->get(route('admin.dashboard'))->viewData('reservationStatus');
 
-        // indices: 0=pending, 1=confirmed, 2=checked_in, 3=completed, 4=cancelled, 5=expired
-        $this->assertSame(2, $data[0]); // pending
-        $this->assertSame(1, $data[1]); // confirmed
-        $this->assertSame(1, $data[3]); // completed
+        $this->assertSame(2, $data['pending']);
+        $this->assertSame(1, $data['confirmed']);
+        $this->assertSame(1, $data['completed']);
+        $this->assertSame(0, $data['cancelled']);
     }
 
-    // ─── [3] admin slot occupancy reflects current state ──────────────────
+    // ─── [3] admin slot counts reflect current state ──────────────────────
 
-    public function test_admin_slot_occupancy_chart_matches_slot_states(): void
+    public function test_admin_slot_counts_match_slot_states(): void
     {
         $admin = $this->admin();
         $lot   = ParkingLot::factory()->create();
@@ -94,18 +89,14 @@ class DashboardChartDataTest extends TestCase
         ParkingSlot::factory()->count(2)->create(['parking_lot_id' => $lot->id, 'status' => 'occupied']);
         ParkingSlot::factory()->count(1)->create(['parking_lot_id' => $lot->id, 'status' => 'reserved']);
 
-        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
-        $data     = $response->viewData('chartSlotOccupancy')['datasets'][0]['data'];
+        $stats = $this->actingAs($admin)->get(route('admin.dashboard'))->viewData('stats');
 
-        // indices: 0=available, 1=reserved, 2=occupied
-        $this->assertSame(3, $data[0]); // available
-        $this->assertSame(1, $data[1]); // reserved
-        $this->assertSame(2, $data[2]); // occupied
+        $this->assertSame([6, 3, 1, 2], [$stats['slots_total'], $stats['slots_available'], $stats['slots_reserved'], $stats['slots_occupied']]);
     }
 
-    // ─── [4] admin top lots limited to five ───────────────────────────────
+    // ─── [4] admin top lots limited to five, busiest first ────────────────
 
-    public function test_admin_top_lots_chart_limited_to_five(): void
+    public function test_admin_top_lots_limited_to_five(): void
     {
         $admin = $this->admin();
 
@@ -116,30 +107,26 @@ class DashboardChartDataTest extends TestCase
             }
         }
 
-        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
-        $chart    = $response->viewData('chartTopLots');
+        $topLots = $this->actingAs($admin)->get(route('admin.dashboard'))->viewData('topLots');
 
-        $this->assertLessThanOrEqual(5, count($chart['labels']));
-        $this->assertLessThanOrEqual(5, count($chart['datasets'][0]['data']));
+        $this->assertCount(5, $topLots);
+        $this->assertSame([6, 5, 4, 3, 2], $topLots->pluck('total')->map(fn ($v) => (int) $v)->all());
     }
 
-    // ─── [5] owner revenue trend has twelve months ────────────────────────
+    // ─── [5] owner revenue trend (หน้ารายได้) has twelve months ───────────
 
     public function test_owner_revenue_trend_has_twelve_months(): void
     {
         $owner    = $this->owner();
-        $response = $this->actingAs($owner)->get(route('owner.dashboard'));
+        $response = $this->actingAs($owner)->get(route('owner.revenue.index'));
 
         $response->assertStatus(200);
-        $chart = $response->viewData('chartRevenueTrend');
-
-        $this->assertCount(12, $chart['labels']);
-        $this->assertCount(12, $chart['datasets'][0]['data']);
+        $this->assertCount(12, $response->viewData('revenueTrend'));
     }
 
-    // ─── [6] owner only sees own lots in reservation status chart ─────────
+    // ─── [6] owner upcoming bookings scoped to own lots ───────────────────
 
-    public function test_owner_reservation_status_scoped_to_own_lots(): void
+    public function test_owner_upcoming_reservations_scoped_to_own_lots(): void
     {
         $ownerA = $this->owner();
         $ownerB = $this->owner();
@@ -154,10 +141,8 @@ class DashboardChartDataTest extends TestCase
         $this->makeReservationForLot($lotB, 'pending');
 
         $response = $this->actingAs($ownerA)->get(route('owner.dashboard'));
-        $data     = $response->viewData('chartReservationStatus')['datasets'][0]['data'];
 
-        // ownerA should see 3 pending, not 5
-        $this->assertSame(3, $data[0]); // index 0 = pending
+        $this->assertCount(3, $response->viewData('upcoming'));
     }
 
     // ─── [7] owner slot occupancy scoped to own lots ──────────────────────
@@ -174,9 +159,8 @@ class DashboardChartDataTest extends TestCase
         ParkingSlot::factory()->count(10)->create(['parking_lot_id' => $lotB->id, 'status' => 'available']);
 
         $response = $this->actingAs($ownerA)->get(route('owner.dashboard'));
-        $data     = $response->viewData('chartSlotOccupancy')['datasets'][0]['data'];
 
         // ownerA sees only 4 available, not 14
-        $this->assertSame(4, $data[0]); // available
+        $this->assertSame(4, $response->viewData('totals')['available']);
     }
 }

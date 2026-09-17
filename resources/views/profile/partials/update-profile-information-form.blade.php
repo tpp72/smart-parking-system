@@ -1,66 +1,50 @@
-<section>
-    <header>
-        <h2 class="text-lg font-extrabold text-white">
-            {{ __('Profile Information') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-300">
-            {{ __("Update your account's profile information and email address.") }}
-        </p>
-    </header>
-
-    <form id="send-verification" method="post" action="{{ route('verification.send') }}">
-        @csrf
-    </form>
-
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
-        @csrf
-        @method('patch')
+<section aria-labelledby="profile-information-title" class="rounded-card border border-line bg-surface shadow-1">
+    <div class="grid gap-6 p-5 sm:p-6 md:grid-cols-[14rem_1fr] md:gap-10">
+        <header>
+            <h2 id="profile-information-title" class="text-h3 text-fg">ข้อมูลบัญชี</h2>
+            <p class="mt-1 text-label text-fg-3">ชื่อที่แสดงในระบบ และอีเมลที่ใช้เข้าสู่ระบบ</p>
+        </header>
 
         <div>
-            <x-input-label for="name" :value="__('Name')" class="text-gray-200" />
-            <x-text-input id="name" name="name" type="text"
-                class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
-        </div>
+            <form id="send-verification" method="post" action="{{ route('verification.send') }}">
+                @csrf
+            </form>
 
-        <div>
-            <x-input-label for="email" :value="__('Email')" class="text-gray-200" />
-            <x-text-input id="email" name="email" type="email"
-                class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                :value="old('email', $user->email)" required autocomplete="username" />
-            <x-input-error class="mt-2" :messages="$errors->get('email')" />
+            <form method="post" action="{{ route('profile.update') }}" class="flex flex-col gap-5">
+                @csrf
+                @method('patch')
 
-            @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && !$user->hasVerifiedEmail())
-                <div class="mt-3 rounded-xl border border-yellow-600/40 bg-yellow-900/15 p-3">
-                    <p class="text-sm text-yellow-200 font-semibold">
-                        {{ __('Your email address is unverified.') }}
-                    </p>
+                @if (session('status') === 'profile-updated')
+                    <x-ui.alert tone="success">บันทึกข้อมูลบัญชีแล้ว</x-ui.alert>
+                @endif
 
-                    <button form="send-verification"
-                        class="mt-2 inline-flex items-center text-sm font-bold text-yellow-200 underline hover:text-white">
-                        {{ __('Click here to re-send the verification email.') }}
-                    </button>
+                <x-ui.field label="ชื่อ-นามสกุล" for="name" required>
+                    <x-ui.input id="name" name="name" type="text" :value="old('name', $user->name)" required autocomplete="name" />
+                </x-ui.field>
 
-                    @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-semibold text-sm text-green-200">
-                            {{ __('A new verification link has been sent to your email address.') }}
-                        </p>
-                    @endif
+                <x-ui.field label="อีเมล" for="email" required hint="ถ้าเปลี่ยนอีเมล ต้องยืนยันอีเมลใหม่ก่อนใช้งานต่อ">
+                    <x-ui.input id="email" name="email" type="email" :value="old('email', $user->email)" required
+                        autocomplete="username" inputmode="email" />
+                </x-ui.field>
+
+                @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
+                    <x-ui.alert tone="warning" title="ยังไม่ได้ยืนยันอีเมล">
+                        @if (session('status') === 'verification-link-sent')
+                            ส่งลิงก์ยืนยันใหม่ไปที่ {{ $user->email }} แล้ว
+                        @else
+                            ต้องยืนยันอีเมลก่อนจึงจะใช้การจอง การสแกน และการแจ้งเตือนได้
+                        @endif
+                        <button form="send-verification" type="submit"
+                            class="mt-2 inline-flex min-h-touch items-center font-semibold text-fg underline underline-offset-4">
+                            ส่งลิงก์ยืนยันอีกครั้ง
+                        </button>
+                    </x-ui.alert>
+                @endif
+
+                <div>
+                    <x-ui.button type="submit">บันทึกข้อมูลบัญชี</x-ui.button>
                 </div>
-            @endif
+            </form>
         </div>
-
-        <div class="flex items-center gap-4">
-            <button type="submit" class="sp-btn sp-btn-primary">
-                {{ __('Save') }}
-            </button>
-
-            @if (session('status') === 'profile-updated')
-                <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-green-200 font-semibold">{{ __('Saved.') }}</p>
-            @endif
-        </div>
-    </form>
+    </div>
 </section>

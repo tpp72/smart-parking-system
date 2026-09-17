@@ -47,16 +47,23 @@ class ParkingLotController extends Controller
                         ->orWhere('landmark', 'like', "%{$q}%");
                 });
             })
+            ->withCount([
+                'slots',
+                'slots as available_count' => fn ($s) => $s->where('status', 'available'),
+                'slots as reserved_count' => fn ($s) => $s->where('status', 'reserved'),
+                'slots as occupied_count' => fn ($s) => $s->where('status', 'occupied'),
+                'reservations as active_reservations_count' => fn ($r) => $r->whereIn('status', Reservation::ACTIVE_STATUSES),
+            ])
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
 
-        return view('admin.parking-lots.index', compact('lots', 'q'));
+        return view('parking.lots.index', compact('lots', 'q') + ['scope' => 'admin']);
     }
 
     public function create()
     {
-        return view('admin.parking-lots.create');
+        return view('parking.lots.form', ['lot' => null, 'scope' => 'admin']);
     }
 
     public function store(Request $request)
@@ -80,7 +87,7 @@ class ParkingLotController extends Controller
     {
         $this->assertAdminLot($parking_lot);
 
-        return view('admin.parking-lots.edit', compact('parking_lot'));
+        return view('parking.lots.form', ['lot' => $parking_lot, 'scope' => 'admin']);
     }
 
     public function update(Request $request, ParkingLot $parking_lot)

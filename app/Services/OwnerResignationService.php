@@ -44,7 +44,7 @@ class OwnerResignationService
         ]);
 
         foreach (User::where('role', 'admin')->pluck('id') as $adminId) {
-            notify_user($adminId, 'คำร้องลาออกของ Owner',
+            notify_user($adminId, 'คำร้องลาออกของเจ้าของลาน',
                 "{$owner->name} ({$owner->email}) ยื่นคำร้องลาออกจากการเป็นเจ้าของลานจอด เหตุผล: {$reason} — รอการพิจารณา");
         }
 
@@ -69,7 +69,7 @@ class OwnerResignationService
                 return ['success' => false, 'error' => 'ผู้ใช้นี้ไม่ได้เป็นเจ้าของลานจอดแล้ว', 'summary' => null];
             }
 
-            $summary = $this->lotClosure->closeAll($owner, $admin, 'Owner ลาออก — ยกเลิกการจองอัตโนมัติ', [
+            $summary = $this->lotClosure->closeAll($owner, $admin, 'เจ้าของลานลาออก — ยกเลิกการจองอัตโนมัติ', [
                 'reason'               => 'owner_resignation',
                 'owner_resignation_id' => $locked->id,
             ]);
@@ -91,7 +91,7 @@ class OwnerResignationService
 
         if ($result['success']) {
             notify_user($result['owner']->id, 'คำร้องลาออกได้รับการอนุมัติ', sprintf(
-                'คำร้องลาออกจากการเป็นเจ้าของลานจอดได้รับการอนุมัติแล้ว บัญชีของคุณกลับเป็น User (ลบลานจอด %d แห่ง)',
+                'คำร้องลาออกจากการเป็นเจ้าของลานจอดได้รับการอนุมัติแล้ว บัญชีของคุณกลับเป็นผู้ใช้ (ลบลานจอด %d แห่ง)',
                 $result['summary']['lots_deleted']
             ));
 

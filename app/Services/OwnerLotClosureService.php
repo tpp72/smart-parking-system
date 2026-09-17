@@ -31,7 +31,7 @@ class OwnerLotClosureService
         $checkedOut = 0;
 
         foreach ($lots as $lot) {
-            $closure = "ลาน {$lot->name} ยุติการให้บริการ กรุณาติดต่อ Admin";
+            $closure = "ลาน {$lot->name} ยุติการให้บริการ กรุณาติดต่อผู้ดูแลระบบ";
 
             // 1. ยกเลิกการจองที่ยังไม่ Check-in (มัดจำที่ยังไม่ชำระ → void)
             $bookings = Reservation::where('parking_lot_id', $lot->id)->whereIn('status', ['pending', 'confirmed'])->orderBy('id')->get();

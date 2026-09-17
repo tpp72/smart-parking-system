@@ -83,7 +83,8 @@ class CarScanController extends Controller
         if (!$scan->passed()) {
             $this->scanService->alertStaff($scan);
 
-            return redirect()->back()->with([
+            // จำลานที่เลือกไว้ (ตำแหน่งกล้องเดิม) สำหรับสแกนคันถัดไป
+            return redirect()->back()->withInput($request->only('parking_lot_id'))->with([
                 'scan_result'   => $scan->id,
                 'scan_check_in' => [
                     'success'        => false,
@@ -110,12 +111,12 @@ class CarScanController extends Controller
 
             $this->scanService->discardForFullLot($scan);
 
-            return redirect()->back()->with('scan_lot_full', $lotFull);
+            return redirect()->back()->withInput($request->only('parking_lot_id'))->with('scan_lot_full', $lotFull);
         }
 
         $this->scanService->alertStaff($scan);
 
-        return redirect()->back()->with([
+        return redirect()->back()->withInput($request->only('parking_lot_id'))->with([
             'scan_result'         => $scan->id,
             'scan_reservation_id' => $outcome['reservation']?->id,
             'scan_check_in'       => [
@@ -133,11 +134,11 @@ class CarScanController extends Controller
     private function rejectionMessage(LicensePlateScan $scan): string
     {
         if ($scan->result === LicensePlateScan::RESULT_UNREADABLE) {
-            return 'AI อ่านทะเบียนหรือจังหวัดไม่ได้ — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)';
+            return 'AI อ่านทะเบียนหรือจังหวัดไม่ได้ — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้งเจ้าของลานและผู้ดูแลระบบแล้ว)';
         }
 
         return sprintf(
-            'ความแม่นยำของ AI %s ไม่เกินเกณฑ์ %s%% — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้ง Owner และ Admin แล้ว)',
+            'ความแม่นยำของ AI %s ไม่เกินเกณฑ์ %s%% — ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติจากผลนี้ได้ (แจ้งเจ้าของลานและผู้ดูแลระบบแล้ว)',
             $scan->confidence !== null ? number_format($scan->confidence, 1) . '%' : 'ไม่ทราบค่า',
             config('carscan.accuracy_threshold', 85)
         );
@@ -161,12 +162,12 @@ class CarScanController extends Controller
             ->when(in_array($result, [LicensePlateScan::RESULT_PASSED, LicensePlateScan::RESULT_LOW_ACCURACY, LicensePlateScan::RESULT_UNREADABLE], true),
                 fn($query) => $query->where('result', $result)
             )
+            // พบรถในบัญชีดำ (ทะเบียน + จังหวัดตรงกับรายการที่ใช้งานอยู่ ณ เวลาสแกน)
+            ->when($result === 'blacklist', fn ($query) => $query->where('is_suspicious', true))
             ->orderByDesc('scan_time')
             ->paginate(20)
             ->withQueryString();
 
-        $view = Auth::user()->role === 'owner' ? 'owner.scan.history' : 'admin.scan.history';
-
-        return view($view, compact('scans', 'q'));
+        return view('scan.history', compact('scans', 'q', 'result'));
     }
 }

@@ -45,7 +45,7 @@ class CheckInService
     public function checkInReservation(Reservation $reservation, ?User $actor = null, bool $allowEarly = false): array
     {
         if ($this->isParked($reservation->license_plate, $reservation->plate_province)) {
-            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
+            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-out');
         }
 
         try {
@@ -86,7 +86,7 @@ class CheckInService
                     'old_status'     => 'confirmed',
                     'new_status'     => 'checked_in',
                     'changed_by'     => $actor?->id,
-                    'note'           => ($actor ? 'Manual check-in' : 'Auto check-in') . ": รถเข้าจอดที่ช่อง {$slot->slot_number}",
+                    'note'           => ($actor ? 'Check-in โดยเจ้าหน้าที่' : 'Check-in อัตโนมัติ') . ": รถเข้าจอดที่ช่อง {$slot->slot_number}",
                 ]);
 
                 audit_by($actor, 'reservation.check_in', $reservation, [
@@ -100,7 +100,7 @@ class CheckInService
                 return $this->success($reservation, $slot, $log);
             });
         } catch (UniqueConstraintViolationException) {
-            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
+            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-out');
         }
 
         if ($result['success']) {
@@ -119,7 +119,7 @@ class CheckInService
     public function checkInWalkIn(ParkingLot $lot, string $licensePlate, string $plateProvince, ?string $brand, ?string $color): array
     {
         if ($this->isParked($licensePlate, $plateProvince)) {
-            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
+            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-out');
         }
 
         try {
@@ -170,7 +170,7 @@ class CheckInService
                 return $this->success($reservation, $slot, $log);
             });
         } catch (UniqueConstraintViolationException) {
-            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
+            return $this->fail(self::OUTCOME_ALREADY_PARKED, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-out');
         }
     }
 

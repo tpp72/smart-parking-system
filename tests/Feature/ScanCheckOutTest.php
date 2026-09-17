@@ -212,7 +212,7 @@ class ScanCheckOutTest extends TestCase
 
         $this->assertSame('checked_in', $reservation->fresh()->status);
         $this->assertDatabaseMissing('payments', ['type' => Payment::TYPE_CHECKOUT]);
-        $this->assertTrue($this->staffNotified('AI Accuracy ไม่ผ่านเกณฑ์'));
+        $this->assertTrue($this->staffNotified('ความแม่นยำของ AI ไม่ผ่านเกณฑ์'));
     }
 
     // ─── [5] รถ Blacklist ขณะออก → ยัง Check-out ได้ + แจ้งเตือน ────────────────
@@ -226,6 +226,6 @@ class ScanCheckOutTest extends TestCase
         $this->scan()->assertSessionHas('scan_check_in', fn ($v) => $v['outcome'] === 'checked_out');
 
         $this->assertSame('completed', $reservation->fresh()->status);
-        $this->assertTrue($this->staffNotified('⚠ พบรถต้องสงสัย (Blacklist)'));
+        $this->assertTrue($this->staffNotified('⚠ พบรถในบัญชีดำ'));
     }
 }

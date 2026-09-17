@@ -29,7 +29,7 @@ test('reservation happy path: book → deposit paid → auto check-in → auto c
   await user.locator('form[action$="/user/reservations"] button[type="submit"]').click();
 
   await expect(user.getByText('ส่งคำขอจองสำเร็จ')).toBeVisible();
-  await expect(user.locator('table')).toContainText(plate);
+  await expect(user.locator('#main-content')).toContainText(plate);
 
   // ── Admin ยืนยันรับเงินมัดจำ → Confirmed + Lock Slot ─────────────────────
   const admin = await loginAs(browser, baseURL, 'admin');
@@ -57,7 +57,7 @@ test('reservation happy path: book → deposit paid → auto check-in → auto c
   await expect(checkout).toHaveCount(1);
   await expect(checkout).toContainText('ชำระแล้ว');
   await expect(checkout).toContainText('฿0.00');
-  await expect(checkout).toContainText(/มัดจำ -฿/);
+  await expect(checkout).toContainText('หักมัดจำ');
 
   await expectReservationStatus(admin, plate, 'completed');
 });

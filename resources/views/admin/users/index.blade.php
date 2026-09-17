@@ -1,97 +1,96 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+{{--
+    ผู้ใช้ — ค้นหาชื่อ/อีเมล · กรองบทบาท · สถานะบัญชี (ต้องเปลี่ยนรหัสผ่าน / ยังไม่ยืนยันอีเมล) · ไปหน้าแก้ไข
+    บัญชีระบบ (Walk-in) ไม่แสดง · การเป็นเจ้าของลานต้องผ่านคำขอสมัครเท่านั้น
+--}}
+@use('App\Support\Format')
+@use('App\Support\Navigation')
 
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl font-extrabold sp-glow-text">ผู้ใช้งาน</h1>
-                    <p class="text-gray-300 mt-1">ค้นหา/กรอง/แก้ไข/Force reset password</p>
-                </div>
-                <a href="{{ route('admin.users.create') }}" class="sp-btn sp-btn-primary">+ เพิ่มผู้ใช้ใหม่</a>
+@php
+    $hasFilter = $q !== '' || $role;
+@endphp
+
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">ผู้ใช้</h1>
+                <p class="mt-1 text-fg-2">บัญชีทุกบทบาทในระบบ · เป็นเจ้าของลานได้ผ่านคำขอเป็นเจ้าของลานเท่านั้น</p>
             </div>
+            <x-ui.button :href="route('admin.users.create')">
+                <x-ui.icon name="plus" class="h-4 w-4" /> เพิ่มผู้ใช้
+            </x-ui.button>
+        </div>
 
-            @if (session('success'))
-                <div class="sp-card rounded-2xl p-4 mt-6 border border-green-600/40">
-                    <p class="text-green-200 font-semibold">{{ session('success') }}</p>
-                </div>
+        <form method="GET" role="search" class="flex flex-wrap items-end gap-3 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+            <x-ui.field label="ค้นหา" for="q" class="min-w-0 flex-1 sm:max-w-sm">
+                <x-ui.input id="q" name="q" type="search" :value="$q" placeholder="ชื่อ หรืออีเมล" />
+            </x-ui.field>
+            <x-ui.field label="บทบาท" for="role" class="w-full sm:w-48">
+                <x-ui.select id="role" name="role" placeholder="ทุกบทบาท">
+                    @foreach (Navigation::ROLE_LABELS as $key => $label)
+                        <option value="{{ $key }}" @selected($role === $key)>{{ $label }}</option>
+                    @endforeach
+                </x-ui.select>
+            </x-ui.field>
+            <x-ui.button type="submit" variant="secondary">ค้นหา</x-ui.button>
+            @if ($hasFilter)
+                <x-ui.button variant="ghost" :href="route('admin.users.index')">ล้างตัวกรอง</x-ui.button>
             @endif
+            <p class="ml-auto self-center text-label text-fg-2">พบ <span class="tabular font-semibold text-fg">{{ $users->total() }}</span> บัญชี</p>
+        </form>
 
-            <div class="sp-card rounded-2xl p-5 mt-6">
-                <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input name="q" value="{{ $q }}" placeholder="ค้นหา name/email..."
-                        class="w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600" />
-
-                    <select name="role" class="sp-select">
-                        <option value="">ทุก role</option>
-                        <option value="admin" @selected($role === 'admin')>admin</option>
-                        <option value="owner" @selected($role === 'owner')>owner</option>
-                        <option value="user" @selected($role === 'user')>user</option>
-                    </select>
-
-                    <div class="flex gap-2 md:col-span-2">
-                        <button class="sp-btn sp-btn-outline" type="submit">ค้นหา</button>
-                        <a class="sp-btn sp-btn-outline" href="{{ route('admin.users.index') }}">ล้าง</a>
-                    </div>
-                </form>
-            </div>
-
-            <div class="sp-card rounded-2xl mt-6 overflow-hidden">
-                <div class="overflow-x-auto p-6">
-                <table class="w-full sp-table min-w-[560px]">
-                    <thead>
-                        <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4 text-left">ชื่อ</th>
-                            <th class="py-3 pr-4 text-left">อีเมล</th>
-                            <th class="py-3 pr-4 text-left">role</th>
-                            <th class="py-3 pr-4 text-left">force reset</th>
-                            <th class="py-3 pr-4 text-left">อัปเดต</th>
-                            <th class="py-3 pr-4" style="text-align:right">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($users as $u)
-                            <tr class="border-b sp-divider">
-                                <td class="py-3 pr-4 font-bold">{{ $u->name }}</td>
-                                <td class="py-3 pr-4 text-gray-200">{{ $u->email }}</td>
-                                <td class="py-3 pr-4">
-                                    @if ($u->role === 'admin')
-                                        <span class="sp-badge sp-badge-warn">admin</span>
-                                    @elseif ($u->role === 'owner')
-                                        <span class="sp-badge sp-badge-owner">owner</span>
-                                    @else
-                                        <span class="sp-badge sp-badge-ok">user</span>
-                                    @endif
-                                </td>
-                                <td class="py-3 pr-4">
-                                    @if ($u->force_password_reset)
-                                        <span class="sp-badge sp-badge-bad">required</span>
-                                    @else
-                                        <span class="text-gray-400 text-sm">-</span>
-                                    @endif
-                                </td>
-                                <td class="py-3 pr-4 text-gray-400">{{ $u->updated_at?->format('Y-m-d H:i') }}</td>
-                                <td class="py-3 pr-4">
-                                    <div class="flex justify-end">
-                                        <a href="{{ route('admin.users.edit', $u) }}"
-                                            title="แก้ไข role / บังคับเปลี่ยนรหัสผ่าน"
-                                            class="sp-btn sp-btn-outline">แก้ไข</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="py-10 text-center text-gray-300">ยังไม่มีผู้ใช้</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-
-                </div>{{-- /overflow-x-auto --}}
-                <div class="px-6 py-4">
-                    {{ $users->links('vendor.pagination.sp') }}
+        <div class="mt-4">
+            @if ($users->isEmpty())
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    <x-ui.empty-state :title="$hasFilter ? 'ไม่พบผู้ใช้ที่ตรงกับตัวกรอง' : 'ยังไม่มีผู้ใช้'" description="ลองค้นหาด้วยชื่อหรืออีเมลอื่น" />
                 </div>
-            </div>
+            @else
+                <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                    @foreach ($users as $u)
+                        <li class="grid gap-3 px-4 py-4 sm:px-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center md:gap-6">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span aria-hidden="true" class="grid h-10 w-10 shrink-0 place-items-center rounded-control border border-line bg-surface-2 text-label font-semibold text-fg-2">
+                                    {{ mb_substr($u->name, 0, 1) }}
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate font-semibold text-fg">
+                                        {{ $u->name }}
+                                        @if ($u->id === auth()->id())
+                                            <span class="font-normal text-fg-3">(คุณ)</span>
+                                        @endif
+                                    </p>
+                                    <p class="truncate text-label text-fg-2">{{ $u->email }}</p>
+                                </div>
+                            </div>
 
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                                <span @class([
+                                    'inline-flex items-center rounded-control border px-2 py-0.5 font-semibold',
+                                    'border-primary-ink text-primary-ink' => $u->role === 'admin',
+                                    'border-fg text-fg' => $u->role === 'owner',
+                                    'border-line text-fg-2' => $u->role === 'user',
+                                ])>{{ Navigation::ROLE_LABELS[$u->role] ?? $u->role }}</span>
+                                @if ($u->role === 'owner')
+                                    <span class="text-fg-2">ลาน <span class="tabular">{{ $u->owned_parking_lots_count }}</span> แห่ง</span>
+                                @endif
+                                @if ($u->force_password_reset)
+                                    <span class="text-warning">ต้องเปลี่ยนรหัสผ่าน</span>
+                                @endif
+                                @unless ($u->email_verified_at)
+                                    <span class="text-warning">ยังไม่ยืนยันอีเมล</span>
+                                @endunless
+                            </div>
+
+                            <div class="flex items-center gap-3 md:justify-end">
+                                <span class="text-caption text-fg-3">แก้ไขล่าสุด {{ Format::short($u->updated_at) }}</span>
+                                <x-ui.button variant="secondary" size="sm" :href="route('admin.users.edit', $u)">จัดการ</x-ui.button>
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <x-ui.pagination :paginator="$users" class="mt-6" />
+            @endif
         </div>
     </div>
 </x-app-layout>

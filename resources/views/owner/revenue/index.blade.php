@@ -1,144 +1,145 @@
+{{--
+    รายได้ของเจ้าของลาน = เงินที่รับจริง (มัดจำ + ค่าจอด) ตามเวลาที่ยืนยันรับเงิน (project-plan.md §16.1)
+    ช่วงเวลา: วันนี้ / เดือนนี้ / ปีนี้ · กรองลาน · "รอยืนยันรับเงิน" เป็นยอด ณ ตอนนี้ ไม่ขึ้นกับช่วงเวลา
+--}}
+@use('App\Support\Format')
+
+@php
+    $periods = ['today' => 'วันนี้', 'month' => 'เดือนนี้', 'year' => 'ปีนี้'];
+    $periodLabel = $periods[$period] ?? 'เดือนนี้';
+    $scopeLabel = $lotId ? ($ownedLots->firstWhere('id', (int) $lotId)?->name ?? 'ลานที่เลือก') : 'ทุกลาน';
+@endphp
+
 <x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6">
+            <h1 class="text-h1 text-fg">รายได้</h1>
+            <p class="mt-1 text-fg-2">เงินที่รับจริง (มัดจำ + ค่าจอด) นับตามวันที่ยืนยันรับเงิน · ลานของคุณ</p>
+        </div>
 
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-extrabold sp-glow-text">รายได้ & สถิติ</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">Revenue Dashboard — ลานจอดของคุณ</p>
-                </div>
+        {{-- ── ช่วงเวลา + ลาน ─────────────────────────────────────────── --}}
+        <form method="GET" class="flex flex-wrap items-end gap-3 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+            <input type="hidden" name="period" value="{{ $period }}">
+            <nav aria-label="ช่วงเวลา" class="flex gap-1">
+                @foreach ($periods as $val => $label)
+                    <a href="{{ route('owner.revenue.index', array_filter(['period' => $val, 'lot_id' => $lotId])) }}" @if ($period === $val) aria-current="page" @endif
+                        @class([
+                            'inline-flex min-h-touch items-center rounded-card px-3 text-label transition-colors duration-fast',
+                            'bg-primary/10 font-semibold text-primary-ink' => $period === $val,
+                            'text-fg-2 hover:bg-surface-2 hover:text-fg' => $period !== $val,
+                        ])>{{ $label }}</a>
+                @endforeach
+            </nav>
+            <x-ui.field label="ลานจอด" for="lot_id" class="min-w-48">
+                <x-ui.select id="lot_id" name="lot_id" placeholder="ทุกลาน" onchange="this.form.requestSubmit()">
+                    @foreach ($ownedLots as $lot)
+                        <option value="{{ $lot->id }}" @selected((string) $lotId === (string) $lot->id)>{{ $lot->name }}</option>
+                    @endforeach
+                </x-ui.select>
+            </x-ui.field>
+            <noscript><x-ui.button type="submit" variant="secondary">แสดง</x-ui.button></noscript>
+            <p class="ml-auto text-label text-fg-3">
+                {{ $scopeLabel }} · {{ Format::parse($from)->format('d/m/Y') }}–{{ Format::parse($to)->format('d/m/Y') }}
+            </p>
+        </form>
+
+        {{-- ── ยอดในช่วงเวลา ─────────────────────────────────────────── --}}
+        <section aria-labelledby="period-title" class="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+            <div class="rounded-card border border-line bg-surface p-5 shadow-1">
+                <h2 id="period-title" class="text-label font-semibold text-fg-2">รับเงินแล้ว{{ $periodLabel }}</h2>
+                <p class="num mt-1 text-kpi text-fg">{{ Format::baht($revenueTotal) }}</p>
+                <dl class="mt-4 flex flex-col gap-1.5 border-t border-dashed border-field pt-3 text-label">
+                    <div class="flex justify-between gap-3"><dt class="text-fg-2">มัดจำ</dt><dd class="num text-fg">{{ Format::baht($depositRevenue) }}</dd></div>
+                    <div class="flex justify-between gap-3"><dt class="text-fg-2">ค่าจอด (หลัง Check-out)</dt><dd class="num text-fg">{{ Format::baht($parkingRevenue) }}</dd></div>
+                    <div class="flex justify-between gap-3 border-t border-line pt-2"><dt class="text-fg-2">จำนวนรายการที่รับเงิน</dt><dd class="tabular text-fg">{{ number_format($transactionCount) }} รายการ</dd></div>
+                    <div class="flex justify-between gap-3"><dt class="text-fg-2">การจองที่สร้าง{{ $periodLabel }}</dt><dd class="tabular text-fg">{{ number_format($reservationCount) }} รายการ</dd></div>
+                </dl>
             </div>
 
-            {{-- Period Filter --}}
-            <div class="sp-card rounded-2xl p-4">
-                <form method="GET" class="flex flex-wrap gap-3 items-center">
-                    <div class="flex gap-1">
-                        @foreach(['today' => 'วันนี้', 'month' => 'เดือนนี้', 'year' => 'ปีนี้'] as $val => $label)
-                            <a href="{{ request()->fullUrlWithQuery(['period' => $val]) }}"
-                               class="px-4 py-2 rounded-xl text-sm font-semibold transition
-                                      {{ $period === $val ? 'bg-red-600/30 text-red-200 ring-1 ring-red-700' : 'text-gray-400 hover:text-white hover:bg-white/[0.06]' }}">
-                                {{ $label }}
-                            </a>
-                        @endforeach
+            <div class="rounded-card border border-line bg-surface p-5 shadow-1">
+                <h2 class="text-label font-semibold text-fg-2">รอยืนยันรับเงิน ณ ตอนนี้</h2>
+                <p class="num mt-1 text-kpi text-fg">{{ Format::baht((float) $unpaidDeposits->amount + (float) $unpaidCheckouts->amount) }}</p>
+                <dl class="mt-4 flex flex-col gap-1.5 border-t border-dashed border-field pt-3 text-label">
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-fg-2">มัดจำ <span class="tabular">{{ $unpaidDeposits->count }}</span> รายการ</dt>
+                        <dd class="num text-fg">{{ Format::baht($unpaidDeposits->amount) }}</dd>
                     </div>
-                    <select name="lot_id" class="sp-select" onchange="this.form.submit()">
-                        <option value="">ทุกลาน</option>
-                        @foreach($ownedLots as $lot)
-                            <option value="{{ $lot->id }}" @selected((string)$lotId === (string)$lot->id)>{{ $lot->name }}</option>
-                        @endforeach
-                    </select>
-                    <input type="hidden" name="period" value="{{ $period }}" />
-                </form>
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-fg-2">ค่าจอด <span class="tabular">{{ $unpaidCheckouts->count }}</span> รายการ</dt>
+                        <dd class="num text-fg">{{ Format::baht($unpaidCheckouts->amount) }}</dd>
+                    </div>
+                </dl>
+                <p class="mt-3 text-caption text-fg-3">ไม่ขึ้นกับช่วงเวลาที่เลือก · ยังไม่นับเป็นรายได้จนกว่าจะยืนยันรับเงิน</p>
+                @if ($unpaidDeposits->count + $unpaidCheckouts->count > 0)
+                    <x-ui.button variant="secondary" size="sm" class="mt-3" :href="route('owner.payments.index', ['status' => 'unpaid'])">ไปยืนยันรับเงิน</x-ui.button>
+                @endif
             </div>
+        </section>
 
-            {{-- KPI Cards --}}
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">รายได้รวม</p>
-                    <p class="text-3xl font-extrabold text-green-400">{{ number_format($revenueTotal, 0) }}</p>
-                    <p class="text-xs text-gray-500">บาท (รับเงินแล้ว)</p>
-                    <p class="text-xs text-gray-400">มัดจำ ฿{{ number_format($depositRevenue, 0) }} · ค่าจอด ฿{{ number_format($parkingRevenue, 0) }}</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">ค่าจอดค้างชำระ</p>
-                    <p class="text-3xl font-extrabold text-yellow-400">{{ number_format($unpaidTotal, 0) }}</p>
-                    <p class="text-xs text-gray-500">บาท</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">จำนวนธุรกรรม</p>
-                    <p class="text-3xl font-extrabold text-white">{{ number_format($transactionCount) }}</p>
-                    <p class="text-xs text-gray-500">รายการ</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 uppercase font-semibold tracking-wide">% การใช้งาน</p>
-                    <p class="text-3xl font-extrabold text-red-300">{{ number_format($occupancyRate, 1) }}%</p>
-                    <p class="text-xs text-gray-500">Occupancy (ปัจจุบัน)</p>
-                </div>
+        {{-- ── 12 เดือนล่าสุด ───────────────────────────────────────── --}}
+        <section aria-labelledby="trend-title" class="mt-6 rounded-card border border-line bg-surface p-5 shadow-1">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 id="trend-title" class="text-h3 text-fg">รายได้ 12 เดือนล่าสุด</h2>
+                <p class="text-label text-fg-3">{{ $scopeLabel }} · เดือนนี้ <span class="num font-semibold text-fg">{{ Format::baht(end($revenueTrend)['value']) }}</span></p>
             </div>
+            <x-ui.bar-chart :data="$revenueTrend" caption="รายได้รายเดือน 12 เดือนล่าสุด" money class="mt-5" />
+        </section>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {{-- Revenue by Lot --}}
-                <div class="sp-card rounded-2xl p-6">
-                    <h2 class="text-lg font-bold text-gray-200 mb-4">รายได้แยกตามลาน</h2>
-                    @if($revenueByLot->isEmpty())
-                        <p class="text-gray-500 text-sm">ยังไม่มีข้อมูล</p>
-                    @else
-                        <div class="space-y-3">
-                            @foreach($revenueByLot as $item)
-                            <div class="flex items-center justify-between text-sm">
-                                <div>
-                                    <span class="font-bold text-white">{{ $item->name }}</span>
-                                    <span class="text-gray-500 ml-2 text-xs">{{ $item->transactions }} รายการ</span>
+        <div class="mt-6 grid gap-6 lg:grid-cols-2">
+            {{-- ── แยกตามลาน ─────────────────────────────────────────── --}}
+            <section aria-labelledby="bylot-title" class="rounded-card border border-line bg-surface p-5 shadow-1">
+                <h2 id="bylot-title" class="text-h3 text-fg">แยกตามลาน · {{ $periodLabel }}</h2>
+                @if ($revenueByLot->isEmpty())
+                    <p class="mt-4 text-fg-2">ยังไม่มีรายการรับเงินในช่วงนี้</p>
+                @else
+                    @php($maxLot = max(1, (float) $revenueByLot->max('revenue')))
+                    <ol class="mt-4 flex flex-col gap-4">
+                        @foreach ($revenueByLot as $item)
+                            <li>
+                                <div class="flex items-baseline justify-between gap-3 text-label">
+                                    <span class="min-w-0 truncate font-semibold text-fg">{{ $item->name }}</span>
+                                    <span class="shrink-0 text-fg-2"><span class="num font-semibold text-fg">{{ Format::baht($item->revenue) }}</span> · <span class="tabular">{{ $item->transactions }}</span> รายการ</span>
                                 </div>
-                                <span class="font-bold text-green-400">฿{{ number_format($item->revenue, 0) }}</span>
-                            </div>
-                            @php
-                                $maxRev = $revenueByLot->max('revenue') ?: 1;
-                                $pct = round($item->revenue / $maxRev * 100);
-                            @endphp
-                            <div class="h-1.5 rounded-full bg-white/5">
-                                <div class="h-1.5 rounded-full bg-green-500/60 transition-all" style="width:{{ $pct }}%"></div>
-                            </div>
-                            @endforeach
-                        </div>
+                                <div class="mt-1.5 h-2 rounded-full bg-line"><div class="h-2 rounded-full bg-primary" style="width: {{ round((float) $item->revenue / $maxLot * 100, 1) }}%"></div></div>
+                            </li>
+                        @endforeach
+                    </ol>
+                    @if ($topStats)
+                        <p class="mt-5 border-t border-line pt-3 text-label text-fg-2">
+                            ลานที่มีการจองมากสุด{{ $periodLabel }}: <span class="font-semibold text-fg">{{ $topStats->name }}</span> (<span class="tabular">{{ $topStats->reservations }}</span> การจอง)
+                        </p>
                     @endif
-                </div>
+                @endif
+            </section>
 
-                {{-- Revenue by Day --}}
-                <div class="sp-card rounded-2xl p-6">
-                    <h2 class="text-lg font-bold text-gray-200 mb-4">รายได้รายวัน</h2>
-                    @if($revenueByDay->isEmpty())
-                        <p class="text-gray-500 text-sm">ยังไม่มีข้อมูล</p>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="w-full sp-table text-sm">
-                                <thead>
-                                    <tr class="border-b sp-divider text-gray-400 text-xs">
-                                        <th class="py-2 pr-4 text-left">วันที่</th>
-                                        <th class="py-2 pr-4 text-right">รายได้ (฿)</th>
-                                        <th class="py-2 pr-4 text-right">ธุรกรรม</th>
+            {{-- ── รายวัน ─────────────────────────────────────────────── --}}
+            <section aria-labelledby="byday-title" class="rounded-card border border-line bg-surface p-5 shadow-1">
+                <h2 id="byday-title" class="text-h3 text-fg">รายวัน · {{ $periodLabel }}</h2>
+                @if ($revenueByDay->isEmpty())
+                    <p class="mt-4 text-fg-2">ยังไม่มีรายการรับเงินในช่วงนี้</p>
+                @else
+                    <div class="mt-3 max-h-80 overflow-y-auto">
+                        <table class="w-full text-label">
+                            <thead class="sticky top-0 bg-surface">
+                                <tr class="border-b border-line text-caption text-fg-3">
+                                    <th scope="col" class="py-2 text-start font-medium">วันที่</th>
+                                    <th scope="col" class="py-2 text-end font-medium">รายการ</th>
+                                    <th scope="col" class="py-2 text-end font-medium">รับเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-line">
+                                @foreach ($revenueByDay->sortByDesc('day') as $day)
+                                    <tr>
+                                        <td class="py-2 text-fg">{{ Format::parse($day->day)->translatedFormat('D d/m/Y') }}</td>
+                                        <td class="tabular py-2 text-end text-fg-2">{{ $day->transactions }}</td>
+                                        <td class="num py-2 text-end text-fg">{{ Format::baht($day->revenue) }}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($revenueByDay as $day)
-                                    <tr class="border-b sp-divider">
-                                        <td class="py-2 pr-4 text-gray-300">{{ \Carbon\Carbon::parse($day->day)->format('d/m/Y') }}</td>
-                                        <td class="py-2 pr-4 text-right text-green-400 font-bold">{{ number_format($day->revenue, 0) }}</td>
-                                        <td class="py-2 pr-4 text-right text-gray-400">{{ $day->transactions }}</td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </div>
-
-            {{-- Top Stats --}}
-            @if($topStats)
-            <div class="sp-card rounded-2xl p-6">
-                <h2 class="text-lg font-bold text-gray-200 mb-4">สถิติสูงสุด</h2>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <p class="text-gray-400 mb-1">ลานยอดนิยม</p>
-                        <p class="font-bold text-white">{{ $topStats->name }}</p>
-                        <p class="text-gray-500 text-xs">{{ $topStats->reservations }} การจอง</p>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                    <div>
-                        <p class="text-gray-400 mb-1">การจองช่วงนี้</p>
-                        <p class="font-bold text-white">{{ number_format($reservationCount) }}</p>
-                        <p class="text-gray-500 text-xs">รายการ</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-400 mb-1">ช่วงเวลา</p>
-                        <p class="font-bold text-white">{{ \Carbon\Carbon::parse($from)->format('d/m/Y') }}</p>
-                        <p class="text-gray-500 text-xs">ถึง {{ \Carbon\Carbon::parse($to)->format('d/m/Y') }}</p>
-                    </div>
-                </div>
-            </div>
-            @endif
-
+                @endif
+            </section>
         </div>
     </div>
 </x-app-layout>

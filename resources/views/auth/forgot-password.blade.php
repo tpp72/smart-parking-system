@@ -1,31 +1,20 @@
-<x-guest-layout>
-    <p class="mb-5 text-sm text-gray-400 leading-relaxed">
-        กรอกอีเมลของคุณ แล้วเราจะส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปให้
-    </p>
+<x-guest-layout title="ลืมรหัสผ่าน" description="กรอกอีเมลของบัญชี ระบบจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปให้">
+    @if (session('status'))
+        <x-ui.alert tone="success" class="mb-6">{{ session('status') }}</x-ui.alert>
+    @endif
 
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST" action="{{ route('password.email') }}">
+    <form method="POST" action="{{ route('password.email') }}" class="flex flex-col gap-5">
         @csrf
 
-        <div>
-            <x-input-label for="email" :value="__('อีเมล')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email"
-                :value="old('email')" required autofocus placeholder="your@email.com" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+        <x-ui.field label="อีเมล" for="email" required>
+            <x-ui.input id="email" type="email" name="email" :value="old('email')" required autofocus
+                autocomplete="username" inputmode="email" placeholder="name@example.com" />
+        </x-ui.field>
 
-        <div class="mt-6">
-            <x-primary-button class="w-full justify-center">
-                ส่งลิงก์รีเซ็ตรหัสผ่าน
-            </x-primary-button>
-        </div>
-
-        <p class="mt-5 text-center text-sm text-gray-400">
-            <a href="{{ route('login') }}"
-               class="text-red-400 hover:text-red-300 underline underline-offset-2 transition">
-                ← กลับไปเข้าสู่ระบบ
-            </a>
-        </p>
+        <x-ui.button type="submit" class="w-full">ส่งลิงก์ตั้งรหัสผ่านใหม่</x-ui.button>
     </form>
+
+    <p class="mt-6 border-t border-line pt-5 text-center">
+        <a href="{{ route('login') }}" class="font-semibold text-primary-ink underline-offset-4 hover:underline">กลับไปหน้าเข้าสู่ระบบ</a>
+    </p>
 </x-guest-layout>
