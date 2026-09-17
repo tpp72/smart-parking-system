@@ -108,7 +108,7 @@ class ApplicationController extends Controller
 
         // Notify the user
         notify_user($user->id, 'ส่งคำขอเป็นเจ้าของลานจอดแล้ว',
-            'คำขอของคุณอยู่ระหว่างการพิจารณาจาก Admin กรุณารอการยืนยัน');
+            'คำขอของคุณอยู่ระหว่างการพิจารณาของผู้ดูแลระบบ จะแจ้งผลผ่านการแจ้งเตือน');
 
         // Notify all admins
         $adminIds = User::where('role', 'admin')->pluck('id');
@@ -117,8 +117,9 @@ class ApplicationController extends Controller
                 "ผู้ใช้ {$user->name} ส่งคำขอเป็นเจ้าของลานจอด รอการอนุมัติ");
         }
 
-        return redirect()->route('owner.dashboard')
-            ->with('success', 'ส่งคำขอเรียบร้อยแล้ว! Admin จะพิจารณาและแจ้งผลให้คุณทราบ');
+        // ผู้สมัครยังเป็น Role User — ไปหน้าสถานะคำขอ (หน้า owner.* ต้องเป็น Owner แล้วเท่านั้น)
+        return redirect()->route('owner.application.show')
+            ->with('success', 'ส่งคำขอเรียบร้อยแล้ว — ผู้ดูแลระบบจะพิจารณาและแจ้งผลผ่านการแจ้งเตือน');
     }
 
     public function show()
@@ -217,7 +218,8 @@ class ApplicationController extends Controller
                 "ผู้ใช้ {$user->name} ส่งคำขอเป็นเจ้าของลานจอดใหม่อีกครั้ง");
         }
 
-        return redirect()->route('owner.dashboard')
+        // ผู้สมัครยังเป็น Role User — ไปหน้าสถานะคำขอ (หน้า owner.* ต้องเป็น Owner แล้วเท่านั้น)
+        return redirect()->route('owner.application.show')
             ->with('success', 'ส่งคำขอใหม่เรียบร้อยแล้ว! กรุณารอการพิจารณา');
     }
 }

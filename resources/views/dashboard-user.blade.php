@@ -1,193 +1,112 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+{{--
+    หน้าหลักของ User — บัตรทุกใบที่ยังไม่จบก่อน (กำลังจอด → ใกล้หมดเวลาเช็คอิน) · ลานที่จองได้ตอนนี้ · ประวัติล่าสุด
+--}}
+@use('App\Support\Format')
 
-            {{-- Header --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl font-extrabold sp-glow-text">Dashboard</h1>
-                    <p class="text-gray-300 mt-1">
-                        สวัสดี, <span class="font-semibold text-white">{{ auth()->user()->name }}</span>
-                    </p>
-                    <p class="text-gray-400 text-sm mt-1">
-                        จองง่าย • ดูสถานะชัด • จ่ายไว
-                    </p>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary sp-glow-btn">จองที่จอด</a>
-                    <a href="{{ route('user.reservations.index') }}" class="sp-btn sp-btn-outline">การจองของฉัน</a>
-                    <a href="{{ route('user.parking-logs.index') }}" class="sp-btn sp-btn-outline">ประวัติ</a>
-                </div>
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">สวัสดี {{ auth()->user()->name }}</h1>
+                <p class="mt-1 text-fg-2">
+                    @if ($tickets->isEmpty())
+                        ยังไม่มีการจองหรือรถที่จอดอยู่
+                    @else
+                        การจองที่ยังไม่จบ <span class="num font-semibold text-fg">{{ $tickets->count() }}</span> รายการ
+                    @endif
+                </p>
             </div>
+            @if ($tickets->isNotEmpty())
+                <x-ui.button :href="route('user.reservations.create')">
+                    <x-ui.icon name="plus" class="h-4 w-4" /> จองที่จอด
+                </x-ui.button>
+            @endif
+        </div>
 
-            {{-- Top Status Card (สำคัญสุด) --}}
-            <div class="sp-card rounded-2xl p-6 mt-6">
-                @if ($activeLog)
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                            <p class="text-sm text-gray-300">สถานะตอนนี้</p>
-                            <h2 class="text-2xl font-extrabold mt-1">กำลังจอดอยู่</h2>
+        {{-- ── บัตรที่ยังไม่จบ ──────────────────────────────────────── --}}
+        <section aria-labelledby="tickets-title" class="mt-6">
+            <h2 id="tickets-title" class="sr-only">การจองและรถที่จอดอยู่</h2>
 
-                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ทะเบียน</p>
-                                    <p class="font-extrabold">{{ $activeLog->license_plate }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ลานจอด</p>
-                                    <p class="font-extrabold">{{ $activeLog->lot_name }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ช่อง</p>
-                                    <p class="font-extrabold">{{ $activeLog->slot_number ?? '-' }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">เวลาเข้า</p>
-                                    <p class="font-extrabold">{{ $activeLog->check_in_time }}</p>
-                                </div>
-                            </div>
+            @forelse ($tickets as $reservation)
+                @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'estimate' => $estimates[$reservation->id] ?? null])
+                @unless ($loop->last)<div class="h-4"></div>@endunless
+            @empty
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    <x-ui.empty-state title="ยังไม่มีการจอง"
+                        description="เลือกลานและเวลาเริ่มจอดล่วงหน้าได้ไม่เกิน 1 วัน มัดจำเท่ากับค่าจอด 1 ชั่วโมงของลาน">
+                        <x-ui.button :href="route('user.reservations.create')">
+                            <x-ui.icon name="plus" class="h-4 w-4" /> จองที่จอด
+                        </x-ui.button>
+                    </x-ui.empty-state>
+                </div>
+            @endforelse
+        </section>
 
-                            <div class="mt-3 flex items-center gap-2 text-sm">
-                                <span class="sp-badge sp-badge-warn">active</span>
-                                @if (($activeLog->payment_status ?? null) === 'unpaid')
-                                    <span class="sp-badge sp-badge-bad">ยังไม่ชำระ</span>
-                                @elseif(($activeLog->payment_status ?? null) === 'paid')
-                                    <span class="sp-badge sp-badge-ok">ชำระแล้ว</span>
-                                @endif
-                            </div>
-                        </div>
+        <div class="mt-10 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+            {{-- ── ลานที่จองได้ตอนนี้ ───────────────────────────────────── --}}
+            <section aria-labelledby="lots-title">
+                <div class="flex items-baseline justify-between gap-3">
+                    <h2 id="lots-title" class="text-h2 text-fg">ลานที่จองได้ตอนนี้</h2>
+                    <a href="{{ route('user.reservations.create') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">เลือกจากทุกลาน</a>
+                </div>
+                <p class="mt-1 text-label text-fg-3">เปิดรับจองและยังมีช่องว่าง เรียงจากช่องว่างมากสุด</p>
 
-                        <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="{{ route('user.parking-logs.index') }}" class="sp-btn sp-btn-outline text-center">
-                                ดูประวัติการจอด
-                            </a>
-                        </div>
-                    </div>
-                @elseif($activeReservation)
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                            <p class="text-sm text-gray-300">สถานะตอนนี้</p>
-                            <h2 class="text-2xl font-extrabold mt-1">คุณมีการจอง</h2>
-
-                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ทะเบียน</p>
-                                    <p class="font-extrabold">{{ $activeReservation->license_plate }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ลานจอด</p>
-                                    <p class="font-extrabold">{{ $activeReservation->lot_name }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ช่อง</p>
-                                    <p class="font-extrabold">{{ $activeReservation->slot_number ?? '-' }}</p>
-                                </div>
-                                <div class="rounded-xl border sp-divider p-3">
-                                    <p class="text-gray-300 text-xs">ช่วงเวลา</p>
-                                    <p class="font-extrabold">
-                                        {{ $activeReservation->reserve_start }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="mt-3 flex items-center gap-2 text-sm">
-                                <span class="sp-badge sp-badge-warn">{{ $activeReservation->status }}</span>
-                                <span class="text-gray-300">มัดจำ: <span
-                                        class="text-white font-bold">{{ number_format((float) $activeReservation->deposit_amount, 2) }}
-                                        ฿</span></span>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="{{ route('user.reservations.index') }}"
-                                class="sp-btn sp-btn-primary sp-glow-btn text-center">
-                                ดูรายการจองทั้งหมด
-                            </a>
-                        </div>
-                    </div>
+                @if ($lotsAvailable->isEmpty())
+                    <p class="mt-4 rounded-card border border-line bg-surface px-4 py-6 text-center text-fg-2">ขณะนี้ไม่มีลานที่เปิดรับจองและมีช่องว่าง</p>
                 @else
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                            <p class="text-sm text-gray-300">สถานะตอนนี้</p>
-                            <h2 class="text-2xl font-extrabold mt-1">ยังไม่มีการจองหรือการจอด</h2>
-                            <p class="text-gray-300 mt-2 text-sm">กดปุ่มด้านขวาเพื่อเริ่มจองที่จอดได้ทันที</p>
-                        </div>
-
-                        <div class="flex flex-col gap-3 min-w-[220px]">
-                            <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary sp-glow-btn text-center">
-                                จองที่จอดตอนนี้
-                            </a>
-                        </div>
-                    </div>
+                    <ul class="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                        @foreach ($lotsAvailable as $lot)
+                            <li>
+                                <a href="{{ route('user.reservations.create', ['lot_id' => $lot->id]) }}"
+                                    class="group flex min-h-touch items-center gap-4 px-4 py-3 transition-colors duration-fast hover:bg-surface-2 sm:px-5">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold text-fg">{{ $lot->name }}</p>
+                                        <p class="text-label text-fg-2">
+                                            <span class="num">{{ Format::baht($lot->hourly_rate) }}</span> / ชม.
+                                        </p>
+                                    </div>
+                                    <p class="shrink-0 text-end text-label text-fg-2">
+                                        ว่าง <span class="num text-body font-semibold text-success">{{ (int) $lot->available }}</span> ช่อง
+                                    </p>
+                                    <span class="hidden shrink-0 text-label font-semibold text-primary-ink sm:inline">จองลานนี้</span>
+                                    <x-ui.icon name="chevron-right" class="h-5 w-5 text-fg-3 transition-transform duration-fast group-hover:translate-x-0.5" />
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
-            </div>
+            </section>
 
-            {{-- Lots available (แนะนำให้ user เลือกง่าย) --}}
-            <div class="sp-card rounded-2xl p-6 mt-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-extrabold">ลานที่ว่างแนะนำ</h2>
-                    <a href="{{ route('user.reservations.create') }}" class="text-red-300 hover:text-red-200 text-sm font-bold">จองเลย →</a>
+            {{-- ── ประวัติล่าสุด ───────────────────────────────────────── --}}
+            <section aria-labelledby="history-title">
+                <div class="flex items-baseline justify-between gap-3">
+                    <h2 id="history-title" class="text-h2 text-fg">จอดล่าสุด</h2>
+                    <a href="{{ route('user.parking-logs.index') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">ประวัติทั้งหมด</a>
                 </div>
+                <p class="mt-1 text-label text-fg-3">3 ครั้งล่าสุดที่ออกจากลานแล้ว</p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    @forelse($lotsAvailable as $lot)
-                        <a href="{{ route('user.reservations.create', ['lot_id' => $lot->id]) }}"
-                            class="rounded-xl border sp-divider p-4 hover:opacity-95">
-                            <div class="flex items-center justify-between">
-                                <p class="font-extrabold">{{ $lot->name }}</p>
-                                <span class="sp-badge sp-badge-ok">{{ (int) $lot->available }} ว่าง</span>
-                            </div>
-                            <p class="text-gray-300 text-xs mt-2">แตะเพื่อจองลานนี้</p>
-                        </a>
-                    @empty
-                        <p class="text-gray-300 text-sm">ยังไม่มีข้อมูลลานจอด</p>
-                    @endforelse
-                </div>
-            </div>
-
-            {{-- Recent history (สั้นๆ) --}}
-            <div class="sp-card rounded-2xl p-6 mt-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-extrabold">ประวัติล่าสุด</h2>
-                    <a href="{{ route('user.parking-logs.index') }}" class="text-red-300 hover:text-red-200 text-sm font-bold">ดูทั้งหมด →</a>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full sp-table">
-                        <thead>
-                            <tr class="border-b sp-divider">
-                                <th class="py-3 pr-4 text-left">ทะเบียน</th>
-                                <th class="py-3 pr-4 text-left">ลาน</th>
-                                <th class="py-3 pr-4 text-left">เข้า</th>
-                                <th class="py-3 pr-4 text-left">ออก</th>
-                                <th class="py-3 text-right"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($recentHistory as $h)
-                                <tr class="border-b sp-divider">
-                                    <td class="py-3 pr-4 font-bold">{{ $h->license_plate }}</td>
-                                    <td class="py-3 pr-4 text-gray-200">{{ $h->lot_name }}</td>
-                                    <td class="py-3 pr-4 text-gray-300">{{ $h->check_in_time }}</td>
-                                    <td class="py-3 pr-4 text-gray-300">{{ $h->check_out_time ?? '-' }}</td>
-                                    <td class="py-3 text-right">
-                                        <a href="{{ route('user.parking-logs.index') }}"
-                                            class="sp-btn sp-btn-outline px-3 py-1.5 text-sm">
-                                            ดู
-                                        </a>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="py-6 text-center text-gray-300">ยังไม่มีประวัติ</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
+                @if ($recentHistory->isEmpty())
+                    <p class="mt-4 rounded-card border border-line bg-surface px-4 py-6 text-center text-fg-2">ยังไม่มีประวัติการจอด</p>
+                @else
+                    <ol class="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                        @foreach ($recentHistory as $h)
+                            <li class="flex items-center gap-3 px-4 py-3 sm:px-5">
+                                <x-ui.plate :plate="$h->license_plate" :province="$h->plate_province" size="sm" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-label font-semibold text-fg">{{ $h->lot_name }}</p>
+                                    <p class="text-caption text-fg-3">{{ Format::short($h->check_out_time) }}</p>
+                                </div>
+                                @if ($h->total_amount !== null)
+                                    <div class="shrink-0 text-end">
+                                        <p class="num text-label font-semibold text-fg">{{ Format::baht($h->total_amount) }}</p>
+                                        <x-ui.status type="payment" :value="$h->payment_status" audience="user" />
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+            </section>
         </div>
     </div>
 </x-app-layout>

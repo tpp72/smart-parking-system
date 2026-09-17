@@ -1,113 +1,156 @@
+{{--
+    Audit Log — การกระทำของทุกบทบาทและเหตุการณ์ที่ระบบดำเนินการ (รวม Payment Log)
+    แสดงชื่อภาษาไทยจาก App\Support\AuditCatalog พร้อมรหัสเดิมตัวเล็ก · รายละเอียด (meta) เป็นคู่ "ชื่อ: ค่า" กดดูเพิ่มได้
+    ไฟล์ CSV ยังใช้รหัสและ JSON เดิม · ต้องการ: $rows, $actions, $subjectTypes, $roles, $filters
+--}}
+@use('App\Support\AuditCatalog')
+@use('App\Support\Navigation')
+
+@php
+    $roleLabels = Navigation::ROLE_LABELS + ['system' => 'ระบบ'];
+    $hasFilter = collect($filters)->except('page')->filter(fn ($v) => filled($v))->isNotEmpty();
+    $actionGroups = $actions->groupBy(fn ($a) => AuditCatalog::group($a));
+@endphp
+
 <x-app-layout>
-    @php
-        $roleLabels = ['user' => 'User', 'owner' => 'Owner', 'admin' => 'Admin', 'system' => 'ระบบ'];
-        $roleBadges = ['user' => 'sp-badge-ok', 'owner' => 'sp-badge-warn', 'admin' => 'sp-badge-bad', 'system' => ''];
-    @endphp
-
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl font-extrabold sp-glow-text">Audit Log</h1>
-                    <p class="text-gray-300 mt-1">การกระทำของผู้ใช้ทุก Role และเหตุการณ์ที่ระบบดำเนินการ (รวม Payment Log)</p>
-                </div>
-
-                <a href="{{ route('admin.admin-actions.export', request()->query()) }}"
-                    class="sp-btn sp-btn-outline">Export CSV</a>
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">Audit Log</h1>
+                <p class="mt-1 text-fg-2">ใครทำอะไร เมื่อไร ทั้งผู้ใช้ทุกบทบาทและระบบอัตโนมัติ (รวมการยืนยันรับเงิน)</p>
             </div>
+            <div class="flex flex-col items-start gap-1 sm:items-end">
+                <x-ui.button variant="secondary" :href="route('admin.admin-actions.export', request()->query())">
+                    <x-ui.icon name="export" class="h-4 w-4" /> ส่งออก CSV
+                </x-ui.button>
+                <span class="text-caption text-fg-3">ใช้ตัวกรองนี้ · ไฟล์ใช้รหัสเดิม</span>
+            </div>
+        </div>
 
-            <div class="sp-card rounded-2xl p-5 mt-6">
-                <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3">
-                    <input name="q" value="{{ $filters['q'] ?? '' }}" placeholder="ค้นหา: action / ชื่อ / อีเมล / ทะเบียนใน meta / #subject"
-                        class="md:col-span-2 w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600" />
-
-                    <select name="actor_role" class="sp-select">
-                        <option value="">ทุก Role</option>
+        <form method="GET" role="search" class="rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_1.2fr_1fr]">
+                <x-ui.field label="ค้นหา" for="q" class="sm:col-span-2 lg:col-span-1">
+                    <x-ui.input id="q" name="q" type="search" :value="$filters['q'] ?? ''" placeholder="ชื่อ อีเมล ทะเบียน หรือ #รหัสรายการ" />
+                </x-ui.field>
+                <x-ui.field label="ผู้กระทำ" for="actor_role">
+                    <x-ui.select id="actor_role" name="actor_role" placeholder="ทุกบทบาท">
                         @foreach ($roles as $r)
-                            <option value="{{ $r }}" @selected(($filters['actor_role'] ?? '') === $r)>{{ $roleLabels[$r] }}</option>
+                            <option value="{{ $r }}" @selected(($filters['actor_role'] ?? '') === $r)>{{ $roleLabels[$r] ?? $r }}</option>
                         @endforeach
-                    </select>
-
-                    <select name="action" class="sp-select">
-                        <option value="">ทุก action</option>
-                        @foreach ($actions as $a)
-                            <option value="{{ $a }}" @selected(($filters['action'] ?? '') === $a)>{{ $a }}</option>
+                    </x-ui.select>
+                </x-ui.field>
+                <x-ui.field label="การกระทำ" for="action">
+                    <x-ui.select id="action" name="action" placeholder="ทุกการกระทำ">
+                        @foreach ($actionGroups as $group => $items)
+                            <optgroup label="{{ $group }}">
+                                @foreach ($items as $a)
+                                    <option value="{{ $a }}" @selected(($filters['action'] ?? '') === $a)>{{ AuditCatalog::action($a) }}</option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
-                    </select>
-
-                    <select name="subject_type" class="sp-select">
-                        <option value="">ทุก subject</option>
+                    </x-ui.select>
+                </x-ui.field>
+                <x-ui.field label="รายการที่ถูกกระทำ" for="subject_type">
+                    <x-ui.select id="subject_type" name="subject_type" placeholder="ทุกประเภท">
                         @foreach ($subjectTypes as $s)
-                            <option value="{{ $s }}" @selected(($filters['subject_type'] ?? '') === $s)>{{ $s }}</option>
+                            <option value="{{ $s }}" @selected(($filters['subject_type'] ?? '') === $s)>{{ AuditCatalog::subject($s) }}</option>
                         @endforeach
-                    </select>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="text" name="from" data-flatpickr="date" value="{{ $filters['from'] ?? '' }}" class="sp-select" placeholder="วันที่เริ่ม" />
-                        <input type="text" name="to" data-flatpickr="date" value="{{ $filters['to'] ?? '' }}" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                    </div>
-
-                    <div class="flex gap-2 md:col-span-6">
-                        <button class="sp-btn sp-btn-outline" type="submit">ค้นหา</button>
-                        <a class="sp-btn sp-btn-outline" href="{{ route('admin.admin-actions.index') }}">ล้าง</a>
-                    </div>
-                </form>
+                    </x-ui.select>
+                </x-ui.field>
+                <x-ui.field label="ตั้งแต่วันที่" for="from">
+                    <x-ui.input id="from" name="from" data-flatpickr="date" :value="$filters['from'] ?? ''" placeholder="วันที่" />
+                </x-ui.field>
+                <x-ui.field label="ถึงวันที่" for="to">
+                    <x-ui.input id="to" name="to" data-flatpickr="date" :value="$filters['to'] ?? ''" placeholder="วันที่" />
+                </x-ui.field>
             </div>
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+                <x-ui.button type="submit" variant="secondary">ค้นหา</x-ui.button>
+                @if ($hasFilter)
+                    <x-ui.button variant="ghost" :href="route('admin.admin-actions.index')">ล้างตัวกรอง</x-ui.button>
+                @endif
+                <p class="ml-auto text-label text-fg-2">พบ <span class="tabular font-semibold text-fg">{{ number_format($rows->total()) }}</span> รายการ</p>
+            </div>
+        </form>
 
-            <div class="sp-card rounded-2xl mt-6 overflow-hidden">
-                <div class="overflow-x-auto p-6">
-                <table class="w-full sp-table min-w-[820px]">
-                    <thead>
-                        <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4 text-left">เวลา</th>
-                            <th class="py-3 pr-4 text-left">ผู้กระทำ</th>
-                            <th class="py-3 pr-4 text-left">Role</th>
-                            <th class="py-3 pr-4 text-left">action</th>
-                            <th class="py-3 pr-4 text-left">subject</th>
-                            <th class="py-3 pr-4 text-left">ip</th>
-                            <th class="py-3 pr-4 text-left">meta</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($rows as $r)
-                            @php $meta = \App\Http\Controllers\Admin\AdminActionController::metaText($r->meta); @endphp
-                            <tr class="border-b sp-divider">
-                                <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">{{ \Carbon\Carbon::parse($r->created_at)->format('d/m/Y H:i:s') }}</td>
-                                <td class="py-3 pr-4 text-gray-200">
-                                    @if ($r->actor_role === 'system')
-                                        <span class="text-gray-400">ระบบ</span>
-                                    @else
-                                        {{ $r->actor_name ?? 'บัญชีถูกลบ' }}
-                                        <div class="text-xs text-gray-400">{{ $r->actor_email ?? '' }}</div>
+        <div class="mt-4">
+            @if ($rows->isEmpty())
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    <x-ui.empty-state :title="$hasFilter ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีรายการ'" description="การกระทำในระบบจะถูกบันทึกที่นี่โดยอัตโนมัติ" />
+                </div>
+            @else
+                <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                    @foreach ($rows as $r)
+                        @php
+                            $meta = AuditCatalog::meta($r->meta);
+                            $preview = array_slice($meta, 0, 3);
+                            $more = array_slice($meta, 3);
+                            $isSystem = $r->actor_role === 'system';
+                        @endphp
+                        <li class="grid gap-2 px-4 py-4 sm:px-5 md:grid-cols-[9.5rem_minmax(0,1fr)] md:gap-5">
+                            <div class="text-label">
+                                @php $at = \Carbon\Carbon::parse($r->created_at); @endphp
+                                <p class="text-fg">{{ $at->isToday() ? 'วันนี้' : ($at->isYesterday() ? 'เมื่อวาน' : $at->format('d/m/Y')) }}</p>
+                                <p class="tabular text-fg-2">{{ $at->format('H:i:s') }} น.</p>
+                            </div>
+
+                            <div class="min-w-0">
+                                <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                    <span class="font-semibold text-fg">{{ AuditCatalog::action($r->action) }}</span>
+                                    @if ($r->subject_type)
+                                        <span class="text-label text-fg-2">
+                                            {{ AuditCatalog::subject($r->subject_type) }}@if ($r->subject_id) <span class="tabular">#{{ $r->subject_id }}</span>@endif
+                                        </span>
                                     @endif
-                                </td>
-                                <td class="py-3 pr-4">
-                                    <span class="sp-badge {{ $roleBadges[$r->actor_role] ?? '' }}">{{ $roleLabels[$r->actor_role] ?? $r->actor_role }}</span>
-                                </td>
-                                <td class="py-3 pr-4 font-bold">{{ $r->action }}</td>
-                                <td class="py-3 pr-4 text-gray-200">
-                                    {{ $r->subject_type ?? '-' }}{{ $r->subject_id ? ' #' . $r->subject_id : '' }}
-                                </td>
-                                <td class="py-3 pr-4 text-gray-300">{{ $r->ip_address ?? '-' }}</td>
-                                <td class="py-3 pr-4 text-gray-300">
-                                    <div class="max-w-md truncate" title="{{ $meta }}">{{ $meta ?: '-' }}</div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="py-10 text-center text-gray-300">ยังไม่มีรายการ</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-                </div>
+                                    <code class="font-mono text-[0.6875rem] text-fg-3">{{ $r->action }}</code>
+                                </p>
 
-                <div class="mt-4 px-6 pb-6">
-                    {{ $rows->links('vendor.pagination.sp') }}
-                </div>
-            </div>
+                                <p class="mt-0.5 text-label text-fg-2">
+                                    โดย
+                                    @if ($isSystem)
+                                        <span class="font-semibold text-fg">ระบบอัตโนมัติ</span>
+                                    @else
+                                        <span class="font-semibold text-fg">{{ $r->actor_name ?? 'บัญชีถูกลบ' }}</span>
+                                        <span class="text-fg-3">({{ $roleLabels[$r->actor_role] ?? $r->actor_role }})</span>
+                                        @if ($r->actor_email) · {{ $r->actor_email }} @endif
+                                    @endif
+                                    @if ($r->ip_address) · <span class="tabular text-fg-3">IP {{ $r->ip_address }}</span> @endif
+                                </p>
 
+                                @if ($meta)
+                                    <dl class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption">
+                                        @foreach ($preview as $row)
+                                            <div class="flex min-w-0 gap-1">
+                                                <dt class="shrink-0 text-fg-3">{{ $row['label'] }}:</dt>
+                                                <dd class="min-w-0 break-words text-fg">{{ $row['value'] }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                    @if ($more)
+                                        <details class="group mt-1">
+                                            <summary class="inline-flex min-h-touch cursor-pointer list-none items-center gap-1 text-caption font-semibold text-primary-ink [&::-webkit-details-marker]:hidden">
+                                                <x-ui.icon name="chevron-down" class="h-3.5 w-3.5 transition-transform duration-fast group-open:rotate-180" />
+                                                <span class="group-open:hidden">ดูรายละเอียดอีก {{ count($more) }} รายการ</span>
+                                                <span class="hidden group-open:inline">ซ่อนรายละเอียด</span>
+                                            </summary>
+                                            <dl class="grid gap-x-4 gap-y-1 rounded-control bg-surface-2 px-3 py-2 text-caption sm:grid-cols-2">
+                                                @foreach ($more as $row)
+                                                    <div class="flex min-w-0 gap-1">
+                                                        <dt class="shrink-0 text-fg-3">{{ $row['label'] }}:</dt>
+                                                        <dd class="min-w-0 break-words text-fg">{{ $row['value'] }}</dd>
+                                                    </div>
+                                                @endforeach
+                                            </dl>
+                                        </details>
+                                    @endif
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <x-ui.pagination :paginator="$rows" class="mt-6" />
+            @endif
         </div>
     </div>
 </x-app-layout>

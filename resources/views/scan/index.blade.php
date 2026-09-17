@@ -1,433 +1,114 @@
+{{--
+    AI สแกน — จำลองกล้องหน้าลาน: เลือกลาน (ตำแหน่งกล้อง) + อัปโหลดภาพรถ
+    ระบบตรวจทิศทางเอง: รถจอดอยู่ในลานนี้ → Check-out · ไม่ได้จอด → จับคู่การจอง / Walk-in (ใช้ร่วมกันทุกบทบาท)
+--}}
+@php
+    $role = auth()->user()->role;
+    $scanStoreRoute = route("{$role}.scan.store");
+    $scanHistoryRoute = in_array($role, ['admin', 'owner'], true) ? route("{$role}.scan.history") : null;
+    $threshold = config('carscan.accuracy_threshold', 85);
+    $hasResult = session()->has('scan_result') || session()->has('scan_lot_full');
+@endphp
+
 <x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">AI สแกน</h1>
+                <p class="mt-1 text-fg-2">จำลองกล้องหน้าลาน — อัปโหลดภาพรถ ระบบอ่านป้ายทะเบียนแล้ว Check-in หรือ Check-out ให้เอง</p>
+            </div>
+            @if ($scanHistoryRoute)
+                <x-ui.button variant="secondary" :href="$scanHistoryRoute">
+                    <x-ui.icon name="scan-history" class="h-4 w-4" /> ประวัติสแกน
+                </x-ui.button>
+            @endif
+        </div>
 
-            {{-- ── Header ──────────────────────────────────────────── --}}
-            @php
-                $role = auth()->user()->role;
-                $scanStoreRoute   = route("{$role}.scan.store");
-                $scanHistoryRoute = in_array($role, ['admin', 'owner'], true) ? route("{$role}.scan.history") : null;
-            @endphp
-            <div class="mb-6">
-                @if($scanHistoryRoute)
-                    <a href="{{ $scanHistoryRoute }}"
-                       class="text-gray-400 hover:text-white text-sm transition">← ประวัติการสแกน</a>
+        <div class="grid items-start gap-6 lg:grid-cols-[22rem_1fr]">
+            {{-- ── กล้อง (ฟอร์ม) ────────────────────────────────────── --}}
+            <section aria-labelledby="camera-title" @class(['rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6', 'order-2 lg:order-1' => $hasResult])>
+                <h2 id="camera-title" class="text-h3 text-fg">{{ $hasResult ? 'สแกนคันถัดไป' : 'กล้องหน้าลาน' }}</h2>
+
+                @if ($lots->isEmpty())
+                    <p class="mt-3 text-fg-2">ยังไม่มีลานจอดในระบบ</p>
                 @else
-                    <a href="{{ route('user.dashboard') }}"
-                       class="text-gray-400 hover:text-white text-sm transition">← หน้าหลัก</a>
+                    <form method="POST" action="{{ $scanStoreRoute }}" enctype="multipart/form-data" class="mt-5 flex flex-col gap-5"
+                        x-data="{
+                            preview: null, fileName: '',
+                            handleFile(event) {
+                                const file = event.target.files[0];
+                                if (!file) { this.preview = null; this.fileName = ''; return; }
+                                this.fileName = file.name;
+                                const reader = new FileReader();
+                                reader.onload = (e) => this.preview = e.target.result;
+                                reader.readAsDataURL(file);
+                            },
+                        }">
+                        @csrf
+
+                        <x-ui.field label="ลานจอด (ตำแหน่งกล้อง)" for="parking_lot_id" required hint="ระบบจริงกล้องติดอยู่ที่ลานนี้และส่งภาพมาเอง">
+                            <x-ui.select id="parking_lot_id" name="parking_lot_id" required placeholder="เลือกลานจอด">
+                                @foreach ($lots as $lot)
+                                    <option value="{{ $lot->id }}" @selected(old('parking_lot_id') == $lot->id)>{{ $lot->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </x-ui.field>
+
+                        <x-ui.field label="ภาพรถ" for="car_image" required hint="JPG หรือ PNG ไม่เกิน 5 MB · เห็นป้ายทะเบียนชัดเจน">
+                            <label for="car_image" @class([
+                                'relative flex min-h-44 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-card border-2 border-dashed bg-surface-2/60 text-center transition-colors duration-fast hover:border-fg-2',
+                                'border-danger' => $errors->has('car_image'),
+                                'border-field' => ! $errors->has('car_image'),
+                            ])>
+                                <img x-show="preview" x-cloak x-bind:src="preview" alt="ภาพรถที่เลือก" class="absolute inset-0 h-full w-full object-contain p-1">
+                                <span x-show="!preview" class="flex flex-col items-center gap-2 px-6 py-8">
+                                    <x-ui.icon name="scan" class="h-8 w-8 text-fg-3" />
+                                    <span class="font-semibold text-fg">เลือกภาพรถ</span>
+                                    <span class="text-caption text-fg-3">แตะเพื่อเลือกไฟล์ หรือลากภาพมาวาง</span>
+                                </span>
+                                <input id="car_image" name="car_image" type="file" required accept="image/jpeg,image/png"
+                                    class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                    @if ($errors->has('car_image')) aria-invalid="true" aria-describedby="car_image-error car_image-hint" @else aria-describedby="car_image-hint" @endif
+                                    x-on:change="handleFile($event)">
+                            </label>
+                            <p x-show="fileName" x-cloak class="truncate text-caption text-fg-2" x-text="'ไฟล์: ' + fileName"></p>
+                        </x-ui.field>
+
+                        <x-ui.button type="submit" class="w-full">วิเคราะห์รูปรถ</x-ui.button>
+                    </form>
                 @endif
-                <h1 class="text-2xl font-extrabold sp-glow-text mt-2">สแกนรถด้วย AI</h1>
-                <p class="text-gray-400 text-sm mt-0.5">Car Detection — อัปโหลดรูปรถเพื่อตรวจสอบทะเบียน สี และยี่ห้อ</p>
-            </div>
+            </section>
 
-            {{-- ── Validation Errors ───────────────────────────────── --}}
-            @if($errors->any())
-                <x-sp-alert type="error" class="mb-5" :dismissible="true">
-                    <ul class="space-y-0.5">
-                        @foreach($errors->all() as $e)
-                            <li>• {{ $e }}</li>
-                        @endforeach
-                    </ul>
-                </x-sp-alert>
-            @endif
-
-            {{-- ── Result Card (shown after successful scan) ────────── --}}
-            @if(session('scan_result'))
-                @php
-                    $scan = \App\Models\LicensePlateScan::find(session('scan_result'));
-                @endphp
-                @if($scan)
-                    {{-- Blacklist Alert --}}
-                    @if($scan->is_suspicious)
-                        <div class="mb-5 rounded-2xl border border-red-500/70 bg-red-950/40 p-4 flex items-start gap-3 animate-pulse">
-                            <div class="shrink-0 w-8 h-8 rounded-xl bg-red-600/30 border border-red-500/60 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="font-extrabold text-red-300 text-sm">⚠ รถอยู่ใน Blacklist</p>
-                                <p class="text-red-400 text-xs mt-0.5">
-                                    ทะเบียน <span class="font-black">{{ $scan->license_plate }}</span>
-                                    ถูกระบุว่าเป็นรถต้องสงสัย กรุณาแจ้งเจ้าหน้าที่ทันที
-                                </p>
-                            </div>
-                        </div>
-                    @endif
-
-                    {{-- AI Result Gate (Accuracy > เกณฑ์ / อ่านทะเบียนไม่ได้) --}}
-                    @if(!$scan->passed())
-                        <div class="mb-5 rounded-2xl border border-yellow-500/60 bg-yellow-950/20 p-4">
-                            <p class="font-extrabold text-yellow-300 text-sm">
-                                {{ $scan->result === \App\Models\LicensePlateScan::RESULT_UNREADABLE ? 'AI อ่านทะเบียนไม่ได้' : 'AI Accuracy ไม่ผ่านเกณฑ์' }}
-                            </p>
-                            <p class="text-yellow-400 text-xs mt-0.5">
-                                ผลต้องมี Accuracy มากกว่า {{ config('carscan.accuracy_threshold', 85) }}% จึงเช็คอินอัตโนมัติได้ — ระบบบันทึกผลและแจ้ง Owner / Admin แล้ว
-                            </p>
-                        </div>
-                    @endif
-
-                    {{-- Result Content --}}
-                    <div class="sp-card rounded-2xl p-6 mb-6">
-                        <div class="flex items-center gap-2 mb-5">
-                            <div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-500/40 flex items-center justify-center shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <h2 class="font-extrabold text-white text-base">ผลการวิเคราะห์</h2>
-                                <p class="text-xs text-gray-500">{{ $scan->scan_time->format('d/m/Y H:i:s') }}</p>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-5">
-                            {{-- License Plate --}}
-                            <div class="col-span-2 rounded-xl border border-red-800/50 bg-black/40 p-4 text-center">
-                                <p class="text-xs text-gray-500 mb-1">ทะเบียนรถ</p>
-                                <p class="text-3xl font-extrabold tracking-widest sp-glow-text">
-                                    {{ $scan->license_plate ?: '—' }}
-                                </p>
-                                @if($scan->plate_province)
-                                    <p class="text-sm text-gray-400 mt-1">{{ $scan->plate_province }}</p>
-                                @endif
-                                @if($scan->confidence)
-                                    <p class="text-xs text-gray-600 mt-1">
-                                        ความมั่นใจ {{ number_format($scan->confidence, 1) }}%
-                                    </p>
-                                @endif
-                            </div>
-
-                            {{-- Color --}}
-                            <div class="rounded-xl border border-white/10 bg-black/30 p-4">
-                                <p class="text-xs text-gray-500 mb-1">สีรถ</p>
-                                <div class="flex items-center gap-2">
-                                    @php
-                                        // Claude returns Thai color names — map directly
-                                        $colorMap = [
-                                            'ขาว'     => '#f1f5f9',
-                                            'ดำ'      => '#1e1e1e',
-                                            'เทา'     => '#9ca3af',
-                                            'เงิน'    => '#c0c0c0',
-                                            'ทอง'     => '#c8a96e',
-                                            'น้ำตาล'  => '#92400e',
-                                            'แดง'     => '#ef4444',
-                                            'ส้ม'     => '#f97316',
-                                            'เหลือง'  => '#eab308',
-                                            'เขียว'   => '#22c55e',
-                                            'น้ำเงิน' => '#3b82f6',
-                                            'ม่วง'    => '#9333ea',
-                                            'ชมพู'    => '#ec4899',
-                                        ];
-                                        $colorLabel = $scan->color ?? '';
-                                        $colorHex   = $colorMap[$colorLabel] ?? null;
-                                    @endphp
-                                    @if($colorHex)
-                                        <span class="w-5 h-5 rounded-full border border-white/20 shrink-0"
-                                              style="background:{{ $colorHex }}"></span>
-                                    @endif
-                                    <span class="font-extrabold text-white text-lg">{{ $colorLabel ?: '—' }}</span>
-                                </div>
-                            </div>
-
-                            {{-- Brand --}}
-                            <div class="rounded-xl border border-white/10 bg-black/30 p-4">
-                                <p class="text-xs text-gray-500 mb-1">ยี่ห้อรถ</p>
-                                @if($scan->brand)
-                                    <p class="font-extrabold text-white text-lg">{{ $scan->brand }}</p>
-                                @else
-                                    <p class="font-semibold text-gray-500 text-base">ไม่ระบุ</p>
-                                    <p class="text-xs text-gray-700 mt-0.5">ต้องการโมเดล AI เพิ่มเติม</p>
-                                @endif
-                            </div>
-                        </div>
-
-                        {{-- Scanned Image --}}
-                        @if($scan->image_path)
-                            <div class="rounded-xl overflow-hidden border border-white/10">
-                                <img src="{{ Storage::url($scan->image_path) }}"
-                                     alt="Scanned car"
-                                     class="w-full max-h-56 object-cover">
-                            </div>
-                        @endif
-
-                    </div>
-                @endif
-            @endif
-
-            {{-- ── ลานเต็ม: ไม่บันทึกผล Scan (ยกเว้นเหตุการณ์ Blacklist) ── --}}
-            @if(session('scan_lot_full'))
-                @php $lotFull = session('scan_lot_full'); @endphp
-                <div class="mb-5 rounded-2xl border border-red-500/60 bg-red-950/30 p-4">
-                    <p class="font-extrabold text-red-300 text-sm">ลานเต็ม</p>
-                    <p class="text-red-400 text-xs mt-0.5">{{ $lotFull['message'] }} — ระบบไม่บันทึกผลการสแกนครั้งนี้</p>
-                    <p class="text-gray-300 text-xs mt-2">
-                        ทะเบียน <span class="font-bold">{{ $lotFull['license_plate'] }}</span> {{ $lotFull['plate_province'] }}
-                    </p>
-                    @if($lotFull['is_suspicious'])
-                        <p class="text-red-300 text-xs font-bold mt-2">⚠ รถอยู่ใน Blacklist — แจ้ง Owner / Admin และบันทึกเหตุการณ์แล้ว</p>
-                    @endif
-                </div>
-            @endif
-
-            {{-- ── Auto Check-In / Walk-in Result ──────────────────── --}}
-            @if(session('scan_check_in'))
-                @php
-                    $matchedReservation = session('scan_reservation_id')
-                        ? \App\Models\Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'user:id,name'])
-                            ->find(session('scan_reservation_id'))
-                        : null;
-                    $checkIn = session('scan_check_in');
-                @endphp
-
-                {{-- Auto Check-In Result --}}
-                @if($checkIn !== null)
-                    @if($checkIn['success'])
-                        <div class="mb-5 rounded-2xl border border-green-500/60 bg-green-950/30 p-4 flex items-start gap-3">
-                            <div class="shrink-0 w-8 h-8 rounded-xl bg-green-500/20 border border-green-500/40 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="font-extrabold text-green-300 text-sm">
-                                    {{ match ($checkIn['outcome']) {
-                                        'walk_in'     => 'เช็คอินอัตโนมัติสำเร็จ (Walk-in)',
-                                        'checked_out' => 'เช็คเอาท์อัตโนมัติสำเร็จ',
-                                        default       => 'เช็คอินอัตโนมัติสำเร็จ',
-                                    } }}
-                                </p>
-                                <p class="text-green-400 text-xs mt-0.5">
-                                    @if($checkIn['outcome'] === 'checked_out')
-                                        รถออกจากช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — ระบบคืนช่องจอดแล้ว
-                                    @else
-                                        ระบบจัดสรรช่อง <span class="font-bold">{{ $checkIn['slot'] }}</span> — รถเข้าจอดเรียบร้อยแล้ว
-                                    @endif
-                                </p>
-                                <p class="{{ $checkIn['staff_notified'] ? 'text-yellow-300' : 'text-gray-400' }} text-xs mt-1">{{ $checkIn['message'] }}</p>
-                            </div>
-                        </div>
-                    @else
-                        <div class="mb-5 rounded-2xl border border-yellow-500/50 bg-yellow-950/20 p-4 flex items-start gap-3">
-                            <div class="shrink-0 w-8 h-8 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="font-extrabold text-yellow-300 text-sm">ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติได้</p>
-                                <p class="text-yellow-400 text-xs mt-0.5">{{ $checkIn['message'] }}</p>
-                            </div>
-                        </div>
-                    @endif
+            {{-- ── ผลล่าสุด / วิธีทำงาน ─────────────────────────────── --}}
+            <div @class(['flex flex-col gap-4', 'order-1 lg:order-2' => $hasResult])>
+                @if ($errors->any())
+                    <x-ui.alert tone="danger" title="สแกนไม่สำเร็จ">{{ $errors->first() }}</x-ui.alert>
                 @endif
 
-                {{-- Reservation Info Card --}}
-                @if($matchedReservation)
-                    <div class="sp-card rounded-2xl p-5 mb-6 border
-                        @if($matchedReservation->status === 'checked_in') border-sky-500/30
-                        @elseif($matchedReservation->status === 'confirmed') border-green-500/30
-                        @else border-white/10 @endif">
-
-                        <div class="flex items-center gap-2 mb-4">
-                            <div class="w-7 h-7 rounded-lg
-                                @if($matchedReservation->status === 'checked_in') bg-sky-500/20 border border-sky-500/40
-                                @else bg-green-500/20 border border-green-500/40 @endif
-                                flex items-center justify-center shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 @if($matchedReservation->status === 'checked_in') text-sky-400 @else text-green-400 @endif" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="font-extrabold text-white text-sm">
-                                    {{ $matchedReservation->is_walk_in ? 'Walk-in' : 'การจอง' }} #{{ $matchedReservation->id }}
-                                </h3>
-                                <p class="text-xs text-gray-500">
-                                    @if($matchedReservation->status === 'confirmed')
-                                        <span class="text-green-400">● ยืนยันแล้ว</span>
-                                    @elseif($matchedReservation->status === 'checked_in')
-                                        <span class="text-sky-400">● เช็คอินแล้ว</span>
-                                    @elseif($matchedReservation->status === 'pending')
-                                        <span class="text-yellow-400">● รอยืนยันรับเงินมัดจำ</span>
-                                    @endif
-                                </p>
-                            </div>
-                        </div>
-
-                        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                            <div>
-                                <dt class="text-gray-500">ผู้จอง</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->user?->name ?? '—' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-gray-500">ทะเบียน</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->license_plate ?? '—' }}</dd>
-                            </div>
-                            @if($matchedReservation->plate_province)
-                                <div>
-                                    <dt class="text-gray-500">จังหวัดที่แจ้งไว้</dt>
-                                    <dd class="font-semibold text-gray-200">{{ $matchedReservation->plate_province }}</dd>
-                                </div>
-                            @endif
-                            @if($matchedReservation->brand || $matchedReservation->color)
-                                <div>
-                                    <dt class="text-gray-500">ยี่ห้อ/สีที่แจ้งไว้</dt>
-                                    <dd class="font-semibold text-gray-200">
-                                        {{ $matchedReservation->brand ?? '—' }} / {{ $matchedReservation->color ?? '—' }}
-                                    </dd>
-                                </div>
-                            @endif
-                            <div>
-                                <dt class="text-gray-500">ลานจอด</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->parkingLot?->name ?? '—' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-gray-500">ช่องจอด</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->parkingSlot?->slot_number ?? 'ยังไม่ระบุ' }}</dd>
-                            </div>
-                            <div class="col-span-2">
-                                <dt class="text-gray-500">เวลาจอง</dt>
-                                <dd class="font-semibold text-gray-200">{{ $matchedReservation->reserve_start?->format('d/m/Y H:i') }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-                @endif
-            @endif
-
-            {{-- ── Upload Form ─────────────────────────────────────── --}}
-            @if($lots->isEmpty())
-                <div class="sp-card rounded-2xl p-6 text-center text-gray-300">
-                    ยังไม่มีลานจอดที่คุณมีสิทธิ์สแกนได้
-                </div>
-            @else
-            <div class="sp-card rounded-2xl p-6"
-                 x-data="{
-                     preview: null,
-                     loading: false,
-                     handleFile(event) {
-                         const file = event.target.files[0];
-                         if (!file) return;
-                         const reader = new FileReader();
-                         reader.onload = e => { this.preview = e.target.result; };
-                         reader.readAsDataURL(file);
-                     }
-                 }">
-
-                <form method="POST"
-                      action="{{ $scanStoreRoute }}"
-                      enctype="multipart/form-data"
-                      class="space-y-5"
-                      @submit="loading = true">
-                    @csrf
-
-                    {{-- ลานจอด (จำลองตำแหน่งกล้อง) --}}
-                    <div>
-                        <x-input-label for="parking_lot_id" value="ลานจอด (จำลองตำแหน่งกล้อง)" />
-                        <select id="parking_lot_id" name="parking_lot_id" required
-                                class="sp-select w-full @error('parking_lot_id') border-red-500 @enderror">
-                            <option value="">-- เลือกลานจอด --</option>
-                            @foreach($lots as $lot)
-                                <option value="{{ $lot->id }}" @selected(old('parking_lot_id') == $lot->id)>
-                                    {{ $lot->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">ระบบจริงกล้องจะติดอยู่ที่ลานนี้และส่งข้อมูลมาอัตโนมัติ</p>
-                        <x-input-error :messages="$errors->get('parking_lot_id')" class="mt-2" />
-                    </div>
-
-                    {{-- Drop Zone --}}
-                    <div>
-                        <label for="car_image"
-                               class="block text-sm font-semibold text-gray-300 mb-2">
-                            รูปภาพรถ
-                            <span class="text-gray-600 font-normal ml-1">(JPG / PNG ไม่เกิน 5 MB)</span>
-                        </label>
-
-                        <label for="car_image"
-                               class="relative flex flex-col items-center justify-center w-full min-h-[180px]
-                                      rounded-2xl border-2 border-dashed cursor-pointer transition-all
-                                      border-red-900/60 hover:border-red-600/80 bg-black/30 hover:bg-black/50"
-                               :class="preview ? 'border-red-600/50' : ''">
-
-                            {{-- Preview Image --}}
-                            <template x-if="preview">
-                                <img :src="preview" alt="Preview"
-                                     class="absolute inset-0 w-full h-full object-contain rounded-2xl p-1">
-                            </template>
-
-                            {{-- Placeholder --}}
-                            <template x-if="!preview">
-                                <div class="flex flex-col items-center gap-2 p-8 text-center">
-                                    <div class="w-12 h-12 rounded-2xl bg-red-900/20 border border-red-900/40 flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-                                        </svg>
+                @if ($hasResult)
+                    @include('scan.partials.result')
+                @else
+                    <section aria-labelledby="how-title" class="rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
+                        <h2 id="how-title" class="text-h3 text-fg">ระบบตัดสินใจที่ประตูลานอย่างไร</h2>
+                        <ol class="mt-4 flex flex-col gap-4">
+                            @foreach ([
+                                ['AI อ่านภาพ', "อ่านป้ายทะเบียน จังหวัด ยี่ห้อ สี และความแม่นยำ — ต้องแม่นยำเกิน {$threshold}% ถ้าไม่ผ่านจะบันทึกผลและแจ้งเจ้าหน้าที่ แต่ไม่ Check-in / Check-out ให้"],
+                                ['ตรวจทิศทาง', 'ถ้ารถคันนี้กำลังจอดอยู่ในลานที่เลือก ระบบ Check-out และคิดค่าจอดทันที'],
+                                ['จับคู่การจอง', 'ทะเบียนและจังหวัดตรง พร้อมยี่ห้อหรือสีตรง และอยู่ภายใน 60 นาทีหลังเวลาเริ่มจอง → Check-in ด้วยการจองนั้น'],
+                                ['Walk-in', 'ไม่มีการจองที่ใช้ได้ → เข้าแบบ Walk-in ถ้าลานเต็มจะแจ้ง "ลานเต็ม" และไม่บันทึกผล · รถในบัญชีดำแจ้งเตือนแต่ยังให้เข้า'],
+                            ] as [$title, $text])
+                                <li class="grid grid-cols-[2rem_1fr] gap-3">
+                                    <span class="num flex h-8 w-8 items-center justify-center rounded-control border border-line text-label text-fg-2">{{ $loop->iteration }}</span>
+                                    <div>
+                                        <p class="font-semibold text-fg">{{ $title }}</p>
+                                        <p class="mt-0.5 text-label text-fg-2">{{ $text }}</p>
                                     </div>
-                                    <p class="text-gray-300 font-semibold text-sm">คลิกเพื่อเลือกรูปภาพ</p>
-                                    <p class="text-gray-600 text-xs">หรือลากไฟล์มาวางที่นี่</p>
-                                </div>
-                            </template>
-
-                            <input id="car_image" name="car_image" type="file"
-                                   accept="image/jpg,image/jpeg,image/png"
-                                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                   @change="handleFile($event)">
-                        </label>
-
-                        {{-- Change button when preview shown --}}
-                        <template x-if="preview">
-                            <p class="text-center text-xs text-gray-500 mt-2">
-                                คลิกรูปเพื่อเปลี่ยนภาพ
-                            </p>
-                        </template>
-
-                        <x-input-error :messages="$errors->get('car_image')" class="mt-2" />
-                    </div>
-
-                    {{-- Submit --}}
-                    <button type="submit"
-                            class="sp-btn sp-btn-primary sp-glow-btn w-full justify-center py-3 gap-2"
-                            :disabled="!preview || loading"
-                            :class="(!preview || loading) ? 'opacity-50 cursor-not-allowed' : ''">
-
-                        <template x-if="!loading">
-                            <span class="flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
-                                </svg>
-                                วิเคราะห์รูปรถ
-                            </span>
-                        </template>
-
-                        <template x-if="loading">
-                            <span class="flex items-center gap-2">
-                                <svg class="animate-spin w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                </svg>
-                                กำลังวิเคราะห์ AI...
-                            </span>
-                        </template>
-                    </button>
-
-                    <p class="text-center text-xs text-gray-600">
-                        ระบบใช้ Claude Vision AI วิเคราะห์ทะเบียน สี และยี่ห้อรถโดยอัตโนมัติ
-                    </p>
-                </form>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </section>
+                @endif
             </div>
-            @endif
-
-            {{-- Admin/Owner: link to history --}}
-            @if($scanHistoryRoute)
-                <div class="mt-4 text-center">
-                    <a href="{{ $scanHistoryRoute }}"
-                       class="text-sm text-gray-500 hover:text-gray-300 transition">
-                        ดูประวัติการสแกนทั้งหมด →
-                    </a>
-                </div>
-            @endif
-
         </div>
     </div>
 </x-app-layout>

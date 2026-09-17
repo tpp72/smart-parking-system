@@ -17,7 +17,7 @@ class OwnerApprovedMiddleware
 
         if ($user->owner_status !== 'approved') {
             return redirect()->route('owner.dashboard')
-                ->with('warning', 'ต้องได้รับการอนุมัติจาก Admin ก่อนจึงจะสามารถใช้งานฟีเจอร์นี้ได้');
+                ->with('warning', 'ต้องได้รับการอนุมัติจากผู้ดูแลระบบก่อนจึงจะใช้งานส่วนนี้ได้');
         }
 
         return $next($request);

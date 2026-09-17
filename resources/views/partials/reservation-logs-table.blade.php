@@ -1,94 +1,104 @@
-{{-- ตัวกรอง + ตาราง Reservation Log ใช้ร่วมกันระหว่าง Admin และ Owner — ต้องส่ง $logs, $lots, $statuses, $filters, $indexRoute --}}
-<div class="sp-card rounded-2xl p-5 mt-6">
-    <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3">
-        <input name="q" value="{{ $filters['q'] ?? '' }}" placeholder="ค้นหา: ทะเบียน / ชื่อ / อีเมล / หมายเหตุ / #การจอง"
-            class="md:col-span-2 w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600" />
+{{--
+    ตัวกรอง + รายการ Log การจอง ใช้ร่วมกันระหว่าง Admin และ Owner — ต้องส่ง $logs, $lots, $statuses, $filters, $indexRoute
+    แต่ละแถว: เวลา · การจอง/รถ · สถานะเดิม → สถานะใหม่ (ป้ายภาษาไทย) · ผู้ทำรายการ · หมายเหตุ
+--}}
+@use('App\Support\Format')
+@use('App\Support\StatusCatalog')
+@use('App\Support\Navigation')
 
-        <select name="lot_id" class="sp-select">
-            <option value="">ทุกลาน</option>
-            @foreach ($lots as $lot)
-                <option value="{{ $lot->id }}" @selected((string) ($filters['lot_id'] ?? '') === (string) $lot->id)>{{ $lot->name }}</option>
-            @endforeach
-        </select>
+@php
+    $hasFilter = collect($filters)->filter(fn ($v) => filled($v))->isNotEmpty();
+@endphp
 
-        <select name="new_status" class="sp-select">
-            <option value="">ทุกสถานะใหม่</option>
-            @foreach ($statuses as $s)
-                <option value="{{ $s }}" @selected(($filters['new_status'] ?? '') === $s)>{{ $s }}</option>
-            @endforeach
-        </select>
+<form method="GET" role="search" class="mt-6 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <x-ui.field label="ค้นหา" for="q" class="sm:col-span-2 lg:col-span-1">
+            <x-ui.input id="q" name="q" type="search" :value="$filters['q'] ?? ''" placeholder="ทะเบียน ชื่อ อีเมล หมายเหตุ หรือ #การจอง" />
+        </x-ui.field>
+        <x-ui.field label="ลานจอด" for="lot_id">
+            <x-ui.select id="lot_id" name="lot_id" placeholder="ทุกลาน">
+                @foreach ($lots as $lot)
+                    <option value="{{ $lot->id }}" @selected((string) ($filters['lot_id'] ?? '') === (string) $lot->id)>{{ $lot->name }}</option>
+                @endforeach
+            </x-ui.select>
+        </x-ui.field>
+        <x-ui.field label="เปลี่ยนเป็นสถานะ" for="new_status">
+            <x-ui.select id="new_status" name="new_status" placeholder="ทุกสถานะ">
+                @foreach ($statuses as $s)
+                    <option value="{{ $s }}" @selected(($filters['new_status'] ?? '') === $s)>{{ StatusCatalog::label('reservation', $s, 'staff') }}</option>
+                @endforeach
+            </x-ui.select>
+        </x-ui.field>
+        <x-ui.field label="ผู้ทำรายการ" for="changed_by">
+            <x-ui.select id="changed_by" name="changed_by" placeholder="ทุกคน">
+                <option value="system" @selected(($filters['changed_by'] ?? '') === 'system')>เฉพาะระบบ</option>
+            </x-ui.select>
+        </x-ui.field>
+        <x-ui.field label="ตั้งแต่วันที่" for="from">
+            <x-ui.input id="from" name="from" data-flatpickr="date" :value="$filters['from'] ?? ''" placeholder="วันที่" />
+        </x-ui.field>
+        <x-ui.field label="ถึงวันที่" for="to">
+            <x-ui.input id="to" name="to" data-flatpickr="date" :value="$filters['to'] ?? ''" placeholder="วันที่" />
+        </x-ui.field>
+    </div>
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+        <x-ui.button type="submit" variant="secondary">ค้นหา</x-ui.button>
+        @if ($hasFilter)
+            <x-ui.button variant="ghost" :href="route($indexRoute)">ล้างตัวกรอง</x-ui.button>
+        @endif
+        <p class="ml-auto text-label text-fg-2">พบ <span class="tabular font-semibold text-fg">{{ $logs->total() }}</span> รายการ</p>
+    </div>
+</form>
 
-        <select name="changed_by" class="sp-select">
-            <option value="">ทุกผู้ทำรายการ</option>
-            <option value="system" @selected(($filters['changed_by'] ?? '') === 'system')>เฉพาะระบบ</option>
-        </select>
-
-        <div class="grid grid-cols-2 gap-3">
-            <input type="text" name="from" data-flatpickr="date" value="{{ $filters['from'] ?? '' }}" class="sp-select" placeholder="วันที่เริ่ม" />
-            <input type="text" name="to" data-flatpickr="date" value="{{ $filters['to'] ?? '' }}" class="sp-select" placeholder="วันที่สิ้นสุด" />
+<div class="mt-4">
+    @if ($logs->isEmpty())
+        <div class="rounded-card border border-line bg-surface shadow-1">
+            <x-ui.empty-state :title="$hasFilter ? 'ไม่พบ Log ที่ตรงกับตัวกรอง' : 'ยังไม่มี Log การจอง'"
+                description="ทุกครั้งที่การจองเปลี่ยนสถานะ ไม่ว่าคนหรือระบบทำ จะถูกบันทึกที่นี่" />
         </div>
+    @else
+        <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+            @foreach ($logs as $row)
+                <li class="grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[8.5rem_minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-5">
+                    <p class="text-label text-fg-2">{{ Format::short($row->created_at) }}</p>
 
-        <div class="flex gap-2 md:col-span-6">
-            <button class="sp-btn sp-btn-outline" type="submit">ค้นหา</button>
-            <a class="sp-btn sp-btn-outline" href="{{ route($indexRoute) }}">ล้าง</a>
-        </div>
-    </form>
-</div>
+                    <div class="flex min-w-0 items-center gap-3">
+                        <x-ui.plate :plate="$row->license_plate" :province="$row->plate_province" size="sm" />
+                        <div class="min-w-0 text-label">
+                            <p class="font-semibold text-fg">
+                                <span class="tabular">#{{ $row->reservation_id }}</span>
+                                @if ($row->is_walk_in) <span class="font-normal text-fg-2">· Walk-in</span> @endif
+                            </p>
+                            <p class="truncate text-fg-2">{{ $row->lot_name }}</p>
+                        </div>
+                    </div>
 
-<div class="sp-card rounded-2xl mt-6 overflow-hidden">
-    <div class="overflow-x-auto p-6">
-        <table class="w-full sp-table min-w-[760px]">
-            <thead>
-                <tr class="border-b sp-divider">
-                    <th class="py-3 pr-4 text-left">เวลา</th>
-                    <th class="py-3 pr-4 text-left">การจอง</th>
-                    <th class="py-3 pr-4 text-left">ลาน</th>
-                    <th class="py-3 pr-4 text-left">ทะเบียน</th>
-                    <th class="py-3 pr-4 text-left">สถานะ</th>
-                    <th class="py-3 pr-4 text-left">ผู้ทำรายการ</th>
-                    <th class="py-3 pr-4 text-left">หมายเหตุ</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($logs as $row)
-                    <tr class="border-b sp-divider">
-                        <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">{{ \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') }}</td>
-                        <td class="py-3 pr-4 font-bold">
-                            #{{ $row->reservation_id }}
-                            @if($row->is_walk_in)
-                                <span class="block text-xs font-normal text-gray-400">Walk-in</span>
-                            @endif
-                        </td>
-                        <td class="py-3 pr-4 text-gray-300">{{ $row->lot_name }}</td>
-                        <td class="py-3 pr-4 font-extrabold">
-                            {{ $row->license_plate }}
-                            <span class="block text-xs font-normal text-gray-500">{{ $row->plate_province }}</span>
-                        </td>
-                        <td class="py-3 pr-4 whitespace-nowrap">
-                            <span class="sp-badge sp-badge-warn">{{ $row->old_status ?? 'ใหม่' }}</span>
-                            <span class="text-gray-400 mx-1">→</span>
-                            <span class="sp-badge sp-badge-ok">{{ $row->new_status }}</span>
-                        </td>
-                        <td class="py-3 pr-4 text-gray-200">
-                            @if(!$row->changed_by)
-                                <span class="text-gray-400">ระบบ</span>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        @if ($row->old_status)
+                            <x-ui.status type="reservation" :value="$row->old_status" audience="staff" />
+                        @else
+                            <span class="rounded-control border border-line px-1.5 py-0.5 text-caption text-fg-2">สร้างใหม่</span>
+                        @endif
+                        <x-ui.icon name="chevron-right" class="h-4 w-4 text-fg-3" />
+                        <span class="sr-only">เปลี่ยนเป็น</span>
+                        <x-ui.status type="reservation" :value="$row->new_status" audience="staff" />
+                    </div>
+
+                    <div class="min-w-0 text-label">
+                        <p class="text-fg">
+                            @if (! $row->changed_by)
+                                ระบบ
                             @else
                                 {{ $row->changed_by_name ?? 'บัญชีถูกลบ' }}
-                                <span class="block text-xs text-gray-400">{{ $row->changed_by_role }} · {{ $row->changed_by_email }}</span>
+                                <span class="text-fg-2">· {{ Navigation::ROLE_LABELS[$row->changed_by_role] ?? $row->changed_by_role }}</span>
                             @endif
-                        </td>
-                        <td class="py-3 pr-4 text-gray-300 text-xs max-w-xs">{{ $row->note ?? '—' }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="py-10 text-center text-gray-300">ยังไม่มีประวัติการจอง</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                        </p>
+                        <p class="text-fg-2">{{ $row->note ?? '—' }}</p>
+                    </div>
+                </li>
+            @endforeach
+        </ol>
 
-    <div class="px-6 pb-6">
-        {{ $logs->links('vendor.pagination.sp') }}
-    </div>
+        <x-ui.pagination :paginator="$logs" class="mt-6" />
+    @endif
 </div>

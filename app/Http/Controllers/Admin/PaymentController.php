@@ -38,7 +38,7 @@ class PaymentController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.payments.index', compact('payments', 'status'));
+        return view('staff.payments', compact('payments', 'status') + ['scope' => 'admin']);
     }
 
     /**
@@ -64,7 +64,7 @@ class PaymentController extends Controller
             }
 
             if ($result['outcome'] === ReservationService::OUTCOME_LOT_FULL) {
-                return back()->withErrors(['error' => "ลานจอดเต็ม — ยกเลิกการจอง #{$payment->reservation_id} อัตโนมัติและเปลี่ยนเงินมัดจำเป็น void"]);
+                return back()->withErrors(['error' => "ลานจอดเต็ม — ยกเลิกการจอง #{$payment->reservation_id} อัตโนมัติและยกเลิกรายการมัดจำแล้ว"]);
             }
 
             return back()->with('success', sprintf(

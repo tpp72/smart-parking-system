@@ -1,123 +1,102 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+{{--
+    การจองของฉัน — แท็บ "กำลังดำเนินการ" (บัตรเต็มพร้อมแถบเวลาเช็คอินและปุ่มแก้ไข/ยกเลิก)
+    และ "จบแล้ว" (รายการย่อ: เสร็จสิ้น / ยกเลิก / หมดอายุ)
+--}}
+@use('App\Support\Format')
 
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <div>
-                    <h1 class="text-3xl font-extrabold sp-glow-text">การจองของฉัน</h1>
-                    <p class="text-gray-300 mt-1">รายการจองที่จอดรถทั้งหมดของคุณ</p>
-                </div>
-                <a href="{{ route('user.reservations.create') }}" class="sp-btn sp-btn-primary">+ จองที่จอด</a>
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">การจองของฉัน</h1>
+                <p class="mt-1 text-fg-2">แก้ไขข้อมูลรถหรือยกเลิกได้จนกว่ารถจะ Check-in</p>
             </div>
+            <x-ui.button :href="route('user.reservations.create')">
+                <x-ui.icon name="plus" class="h-4 w-4" /> จองที่จอด
+            </x-ui.button>
+        </div>
 
-            @if (session('success'))
-                <div class="sp-card rounded-2xl p-4 mb-6 border border-green-600/40">
-                    <p class="text-green-200 font-semibold">{{ session('success') }}</p>
+        @if ($errors->has('error'))
+            <x-ui.alert tone="danger" class="mt-6">{{ $errors->first('error') }}</x-ui.alert>
+        @endif
+
+        <nav aria-label="กลุ่มการจอง" class="mt-6 flex gap-1 border-b border-line">
+            @foreach (['active' => 'กำลังดำเนินการ', 'done' => 'จบแล้ว'] as $key => $label)
+                <a href="{{ route('user.reservations.index', $key === 'active' ? [] : ['tab' => $key]) }}"
+                    @if ($tab === $key) aria-current="page" @endif
+                    @class([
+                        'inline-flex min-h-touch items-center gap-2 px-3 text-label transition-colors duration-fast',
+                        'font-semibold text-fg shadow-[inset_0_-2px_0_rgb(var(--color-primary-ink))]' => $tab === $key,
+                        'text-fg-2 hover:text-fg' => $tab !== $key,
+                    ])>
+                    {{ $label }}
+                    <span class="num rounded-control bg-surface-2 px-1.5 text-caption text-fg-2">{{ $counts[$key] }}</span>
+                </a>
+            @endforeach
+        </nav>
+
+        <div class="mt-6">
+            <h2 class="sr-only">{{ $tab === 'active' ? 'การจองที่กำลังดำเนินการ' : 'การจองที่จบแล้ว' }}</h2>
+            @if ($reservations->isEmpty())
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    @if ($tab === 'active')
+                        <x-ui.empty-state title="ไม่มีการจองที่กำลังดำเนินการ" description="การจองที่รอยืนยันรับมัดจำ ยืนยันแล้ว หรือรถที่จอดอยู่จะแสดงที่นี่">
+                            <x-ui.button :href="route('user.reservations.create')">จองที่จอด</x-ui.button>
+                        </x-ui.empty-state>
+                    @else
+                        <x-ui.empty-state title="ยังไม่มีการจองที่จบแล้ว" description="การจองที่เสร็จสิ้น ถูกยกเลิก หรือหมดอายุจะย้ายมาอยู่ที่นี่" />
+                    @endif
                 </div>
-            @endif
-
-            @if ($errors->has('error'))
-                <div class="sp-card rounded-2xl p-4 mb-6 border border-red-600/40">
-                    <p class="text-red-300 font-semibold">{{ $errors->first('error') }}</p>
+            @elseif ($tab === 'active')
+                <div class="flex flex-col gap-4">
+                    @foreach ($reservations as $reservation)
+                        @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'estimate' => $estimates[$reservation->id] ?? null])
+                    @endforeach
                 </div>
-            @endif
+            @else
+                <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                    @foreach ($reservations as $r)
+                        @php
+                            $checkout = $r->parkingLog?->payment;
+                            $depositState = $r->depositPayment?->payment_status;
+                        @endphp
+                        <li class="grid gap-3 px-4 py-4 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-5 sm:px-5">
+                            <x-ui.plate :plate="$r->license_plate" :province="$r->plate_province" size="sm" />
 
-            <div class="sp-card rounded-2xl p-6 overflow-x-auto">
-                <table class="w-full sp-table">
-                    <thead>
-                        <tr class="border-b sp-divider">
-                            <th class="py-3 pr-4 text-left">ทะเบียน</th>
-                            <th class="py-3 pr-4 text-left">ลาน / ช่อง</th>
-                            <th class="py-3 pr-4 text-left whitespace-nowrap">เวลาเริ่ม</th>
-                            <th class="py-3 pr-4 text-right whitespace-nowrap">มัดจำ</th>
-                            <th class="py-3 pr-4 text-center">สถานะ</th>
-                            <th class="py-3 text-center">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($reservations as $r)
-                            <tr class="border-b sp-divider hover:bg-white/5 transition">
-                                <td class="py-3 pr-4 font-bold text-red-300 tracking-wider">
-                                    {{ $r->license_plate ?? '—' }}
-                                </td>
-                                <td class="py-3 pr-4 text-gray-300">
-                                    {{ $r->parkingLot?->name ?? '-' }}
+                            <div class="min-w-0">
+                                <p class="font-semibold text-fg">
+                                    {{ $r->parkingLot?->name ?? 'ลานจอด' }}
                                     @if ($r->parkingSlot)
-                                        <span class="text-gray-500">/ {{ $r->parkingSlot->slot_number }}</span>
+                                        <span class="font-normal text-fg-2">· ช่อง <span class="tabular">{{ $r->parkingSlot->slot_number }}</span></span>
                                     @endif
-                                </td>
-                                <td class="py-3 pr-4 text-gray-300 whitespace-nowrap">
-                                    {{ \Carbon\Carbon::parse($r->reserve_start)->format('d/m/Y H:i') }}
-                                </td>
-                                <td class="py-3 pr-4 text-right whitespace-nowrap">
+                                </p>
+                                <p class="mt-0.5 text-label text-fg-2">
+                                    <span class="tabular text-fg-3">#{{ $r->id }}</span> · เริ่มจอง {{ Format::short($r->reserve_start) }}
                                     @if ((float) $r->deposit_amount > 0)
-                                        <span class="text-yellow-300">฿{{ number_format((float) $r->deposit_amount, 2) }}</span>
-                                        @php
-                                            [$depositLabel, $depositClass] = match ($r->depositPayment?->payment_status) {
-                                                'paid'   => ['ยืนยันรับเงินแล้ว', 'text-green-400'],
-                                                'void'   => ['ยกเลิก (void)', 'text-gray-500'],
-                                                'unpaid' => ['รอยืนยันรับเงิน', 'text-yellow-500'],
-                                                default  => ['', ''],
-                                            };
-                                        @endphp
-                                        @if ($depositLabel)
-                                            <span class="block text-xs {{ $depositClass }}">{{ $depositLabel }}</span>
+                                        · มัดจำ <span class="tabular">{{ Format::baht($r->deposit_amount) }}</span>
+                                        @if ($depositState === 'paid')
+                                            ({{ $r->status === 'completed' ? 'หักจากค่าจอดแล้ว' : 'ชำระแล้ว ไม่คืน' }})
+                                        @elseif ($depositState === 'void')
+                                            (ยกเลิก ไม่ต้องชำระ)
                                         @endif
-                                    @else
-                                        <span class="text-gray-600">—</span>
                                     @endif
-                                </td>
-                                <td class="py-3 pr-4 text-center">
-                                    @php
-                                        $badgeClass = match($r->status) {
-                                            'confirmed'  => 'sp-badge-ok',
-                                            'checked_in' => 'sp-badge-ok',
-                                            'completed'  => 'sp-badge-ok',
-                                            'pending'    => 'sp-badge-warn',
-                                            default      => 'sp-badge-bad',
-                                        };
-                                    @endphp
-                                    <span class="sp-badge {{ $badgeClass }}">{{ $r->status }}</span>
-                                </td>
-                                <td class="py-3 text-center">
-                                    <div class="flex gap-1.5 justify-center">
-                                        @if(in_array($r->status, ['pending', 'confirmed']))
-                                            <a href="{{ route('user.reservations.edit', $r) }}"
-                                               title="แก้ไขป้ายทะเบียน"
-                                               class="sp-btn sp-btn-outline text-xs px-2.5 py-1">แก้ไข</a>
+                                </p>
+                            </div>
 
-                                            <form method="POST"
-                                                  action="{{ route('user.reservations.cancel', $r) }}"
-                                                  onsubmit="return confirm('ยืนยันยกเลิกการจอง #{{ $r->id }} ?')">
-                                                @csrf
-                                                <button type="submit"
-                                                        title="ยกเลิกการจอง #{{ $r->id }}"
-                                                        class="sp-btn sp-btn-danger text-xs px-2.5 py-1">
-                                                    ยกเลิก
-                                                </button>
-                                            </form>
-                                        @else
-                                            <span class="text-gray-600 text-xs">—</span>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="py-10 text-center text-gray-400">
-                                    ยังไม่มีการจอง —
-                                    <a href="{{ route('user.reservations.create') }}" class="text-red-300 underline">
-                                        จองเลย
-                                    </a>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                            <div class="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
+                                <x-ui.status type="reservation" :value="$r->status" audience="user" />
+                                @if ($checkout)
+                                    <p class="text-label text-fg-2">
+                                        ค่าจอด <span class="tabular font-semibold text-fg">{{ Format::baht($checkout->total_amount) }}</span>
+                                    </p>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
 
-                <div class="mt-4">{{ $reservations->links('vendor.pagination.sp') }}</div>
-            </div>
-
+            <x-ui.pagination :paginator="$reservations" class="mt-6" />
         </div>
     </div>
 </x-app-layout>

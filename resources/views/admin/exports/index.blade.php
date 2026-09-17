@@ -1,125 +1,94 @@
+{{--
+    ส่งออก CSV — ข้อมูลทั้งระบบ ทุกลาน (กรองลานได้) · 5 ชุดข้อมูล แต่ละชุดมีตัวกรองของตัวเองและดาวน์โหลดทันที
+    ไฟล์ใช้หัวคอลัมน์และรหัสสถานะภาษาอังกฤษ เพื่อเปิดใน Excel / นำไปประมวลผลต่อ · ต้องการ: $lots, $statuses
+--}}
+@use('App\Support\Navigation')
+@use('App\Support\StatusCatalog')
+
+@php
+    $sets = [
+        'reservations' => ['การจอง', 'การจองทุกรายการรวม Walk-in พร้อมมัดจำและเวลา Check-in', 'ช่วงวันที่นับจากเวลาเริ่มจอง', route('admin.exports.reservations')],
+        'parking-logs' => ['ประวัติการจอด', 'เวลาเข้า-ออก อัตราค่าจอด และยอดชำระหลัง Check-out', 'ช่วงวันที่นับจากเวลาเข้าลาน', route('admin.exports.parking-logs')],
+        'revenue' => ['รายงานรายได้รายวัน', '1 แถว = 1 วัน × 1 ลาน · เงินที่รับจริง แยกมัดจำและค่าจอด', 'นับตามวันที่ยืนยันรับเงิน · ไม่ระบุช่วงวันที่ = เดือนนี้', route('admin.exports.revenue')],
+        'reservation-logs' => ['Log การจอง', 'ประวัติการเปลี่ยนสถานะการจอง รวมรายการที่ระบบดำเนินการ', 'ช่วงวันที่นับจากเวลาที่เปลี่ยนสถานะ', route('admin.reservation-logs.export')],
+        'audit' => ['Audit Log', 'การกระทำของทุกบทบาทและเหตุการณ์ที่ระบบดำเนินการ', 'ช่วงวันที่นับจากเวลาที่เกิดเหตุการณ์', route('admin.admin-actions.export')],
+    ];
+@endphp
+
 <x-app-layout>
-    @php
-        $inputClass = 'w-full rounded-xl bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600';
-    @endphp
+    <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <h1 class="text-h1 text-fg">ส่งออก CSV</h1>
+        <p class="mt-1 text-fg-2">ข้อมูลครอบคลุมทุกลานในระบบ เลือกตัวกรองแล้วดาวน์โหลด · ไฟล์ใช้หัวคอลัมน์ภาษาอังกฤษ เปิดด้วย Excel หรือ Google Sheets ได้</p>
 
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        @if ($errors->any())
+            <x-ui.alert tone="danger" class="mt-6">{{ $errors->first() }}</x-ui.alert>
+        @endif
 
-            <div>
-                <h1 class="text-3xl font-extrabold sp-glow-text">Export CSV</h1>
-                <p class="text-gray-300 mt-1">
-                    เลือกประเภทข้อมูลและตัวกรอง แล้วดาวน์โหลดเป็นไฟล์ CSV — ข้อมูลครอบคลุมทั้งระบบ ทุกลาน (เลือกกรองลานได้)
-                </p>
-            </div>
+        <div class="mt-6 flex flex-col gap-4">
+            @foreach ($sets as $key => [$title, $description, $dateNote, $action])
+                <form method="GET" action="{{ $action }}" aria-labelledby="export-{{ $key }}" class="rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 max-w-xl">
+                            <h2 id="export-{{ $key }}" class="text-h3 text-fg">{{ $title }}</h2>
+                            <p class="mt-0.5 text-label text-fg-2">{{ $description }}</p>
+                        </div>
+                        <x-ui.button type="submit" variant="secondary" class="shrink-0">
+                            <x-ui.icon name="export" class="h-4 w-4" /> ดาวน์โหลด
+                        </x-ui.button>
+                    </div>
 
-            @if ($errors->any())
-                <div class="sp-card rounded-2xl p-4 border border-red-600/40">
-                    <p class="text-red-300 font-semibold">{{ $errors->first() }}</p>
-                </div>
-            @endif
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        @if (in_array($key, ['reservations', 'parking-logs'], true))
+                            <x-ui.field label="ค้นหา" :for="$key.'-q'">
+                                <x-ui.input :id="$key.'-q'" name="q" type="search" :placeholder="$key === 'reservations' ? 'ทะเบียน ชื่อ หรืออีเมล' : 'ทะเบียน'" />
+                            </x-ui.field>
+                        @endif
 
-            @php
-                $lotSelect = function () use ($lots) {
-                    $options = '<option value="">ทุกลาน</option>';
-                    foreach ($lots as $lot) {
-                        $owner = $lot->owner ? 'Owner: ' . $lot->owner->name : 'ลานของ Admin';
-                        $options .= '<option value="' . $lot->id . '">' . e($lot->name) . ' (' . e($owner) . ')</option>';
-                    }
-                    return $options;
-                };
-            @endphp
+                        @if ($key !== 'audit')
+                            <x-ui.field label="ลานจอด" :for="$key.'-lot'">
+                                <x-ui.select :id="$key.'-lot'" name="lot_id" placeholder="ทุกลาน">
+                                    @foreach ($lots as $lot)
+                                        <option value="{{ $lot->id }}">{{ $lot->name }} — {{ $lot->owner ? 'เจ้าของ '.$lot->owner->name : 'ลานของผู้ดูแลระบบ' }}</option>
+                                    @endforeach
+                                </x-ui.select>
+                            </x-ui.field>
+                        @endif
 
-            {{-- ประวัติการจอง --}}
-            <form method="GET" action="{{ route('admin.exports.reservations') }}" class="sp-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h2 class="text-lg font-extrabold">ประวัติการจอง (Reservation)</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">การจองทุกรายการรวม Walk-in — ช่วงวันที่นับจากเวลาเริ่มจอง</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <input name="q" placeholder="ทะเบียน / ชื่อ / อีเมล" class="{{ $inputClass }}" />
-                    <select name="lot_id" class="sp-select">{!! $lotSelect() !!}</select>
-                    <select name="status" class="sp-select">
-                        <option value="">ทุกสถานะ</option>
-                        @foreach ($statuses as $st)
-                            <option value="{{ $st }}">{{ $st }}</option>
-                        @endforeach
-                    </select>
-                    <input type="text" name="from" data-flatpickr="date" class="sp-select" placeholder="วันที่เริ่ม" />
-                    <input type="text" name="to" data-flatpickr="date" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                </div>
-                <div class="flex justify-end"><button type="submit" class="sp-btn sp-btn-primary">ดาวน์โหลด CSV</button></div>
-            </form>
+                        @if ($key === 'reservations')
+                            <x-ui.field label="สถานะ" for="reservations-status">
+                                <x-ui.select id="reservations-status" name="status" placeholder="ทุกสถานะ">
+                                    @foreach ($statuses as $st)
+                                        <option value="{{ $st }}">{{ StatusCatalog::label('reservation', $st, 'staff') }}</option>
+                                    @endforeach
+                                </x-ui.select>
+                            </x-ui.field>
+                        @elseif ($key === 'parking-logs')
+                            <x-ui.field label="สถานะรถ" for="parking-logs-state">
+                                <x-ui.select id="parking-logs-state" name="state" placeholder="ทั้งหมด">
+                                    <option value="parked">ยังจอดอยู่</option>
+                                    <option value="completed">Check-out แล้ว</option>
+                                </x-ui.select>
+                            </x-ui.field>
+                        @elseif ($key === 'audit')
+                            <x-ui.field label="ผู้กระทำ" for="audit-role">
+                                <x-ui.select id="audit-role" name="actor_role" placeholder="ทุกบทบาท">
+                                    @foreach (Navigation::ROLE_LABELS + ['system' => 'ระบบ'] as $role => $label)
+                                        <option value="{{ $role }}">{{ $label }}</option>
+                                    @endforeach
+                                </x-ui.select>
+                            </x-ui.field>
+                        @endif
 
-            {{-- ประวัติการจอด --}}
-            <form method="GET" action="{{ route('admin.exports.parking-logs') }}" class="sp-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h2 class="text-lg font-extrabold">ประวัติการจอด (Parking Log)</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">เวลาเข้า-ออก อัตราค่าจอด และยอดชำระหลัง Check-out — ช่วงวันที่นับจากเวลาเข้า</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <input name="q" placeholder="ทะเบียนรถ" class="{{ $inputClass }}" />
-                    <select name="lot_id" class="sp-select">{!! $lotSelect() !!}</select>
-                    <select name="state" class="sp-select">
-                        <option value="">ทั้งหมด</option>
-                        <option value="parked">กำลังจอด</option>
-                        <option value="completed">เช็คเอาท์แล้ว</option>
-                    </select>
-                    <input type="text" name="from" data-flatpickr="date" class="sp-select" placeholder="วันที่เริ่ม" />
-                    <input type="text" name="to" data-flatpickr="date" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                </div>
-                <div class="flex justify-end"><button type="submit" class="sp-btn sp-btn-primary">ดาวน์โหลด CSV</button></div>
-            </form>
-
-            {{-- รายงานรายได้ --}}
-            <form method="GET" action="{{ route('admin.exports.revenue') }}" class="sp-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h2 class="text-lg font-extrabold">รายงานรายได้รายวัน (Revenue)</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">
-                        1 แถว = 1 วัน × 1 ลาน · เงินที่รับจริง แยกมัดจำ / ค่าจอด นับตามวันที่ยืนยันรับเงิน — ไม่ระบุช่วงวัน = เดือนนี้
-                    </p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <select name="lot_id" class="sp-select">{!! $lotSelect() !!}</select>
-                    <input type="text" name="from" data-flatpickr="date" class="sp-select" placeholder="วันที่เริ่ม" />
-                    <input type="text" name="to" data-flatpickr="date" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                </div>
-                <div class="flex justify-end"><button type="submit" class="sp-btn sp-btn-primary">ดาวน์โหลด CSV</button></div>
-            </form>
-
-            {{-- Reservation Log --}}
-            <form method="GET" action="{{ route('admin.reservation-logs.export') }}" class="sp-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h2 class="text-lg font-extrabold">Reservation Log</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">ประวัติการเปลี่ยนสถานะการจอง รวมรายการที่ระบบดำเนินการ</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <select name="lot_id" class="sp-select">{!! $lotSelect() !!}</select>
-                    <input type="text" name="from" data-flatpickr="date" class="sp-select" placeholder="วันที่เริ่ม" />
-                    <input type="text" name="to" data-flatpickr="date" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                </div>
-                <div class="flex justify-end"><button type="submit" class="sp-btn sp-btn-primary">ดาวน์โหลด CSV</button></div>
-            </form>
-
-            {{-- Audit Log --}}
-            <form method="GET" action="{{ route('admin.admin-actions.export') }}" class="sp-card rounded-2xl p-6 space-y-4">
-                <div>
-                    <h2 class="text-lg font-extrabold">Audit Log</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">การกระทำของทุก Role และเหตุการณ์ที่ระบบดำเนินการ</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <select name="actor_role" class="sp-select">
-                        <option value="">ทุก Role</option>
-                        @foreach (['user', 'owner', 'admin', 'system'] as $role)
-                            <option value="{{ $role }}">{{ $role }}</option>
-                        @endforeach
-                    </select>
-                    <input type="text" name="from" data-flatpickr="date" class="sp-select" placeholder="วันที่เริ่ม" />
-                    <input type="text" name="to" data-flatpickr="date" class="sp-select" placeholder="วันที่สิ้นสุด" />
-                </div>
-                <div class="flex justify-end"><button type="submit" class="sp-btn sp-btn-primary">ดาวน์โหลด CSV</button></div>
-            </form>
-
+                        <x-ui.field label="ตั้งแต่วันที่" :for="$key.'-from'">
+                            <x-ui.input :id="$key.'-from'" name="from" data-flatpickr="date" placeholder="วันที่" />
+                        </x-ui.field>
+                        <x-ui.field label="ถึงวันที่" :for="$key.'-to'">
+                            <x-ui.input :id="$key.'-to'" name="to" data-flatpickr="date" placeholder="วันที่" />
+                        </x-ui.field>
+                    </div>
+                    <p class="mt-3 text-caption text-fg-3">{{ $dateNote }}</p>
+                </form>
+            @endforeach
         </div>
     </div>
 </x-app-layout>

@@ -1,124 +1,100 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+{{--
+    บัญชีดำทะเบียนรถ — รายการกลางของทั้งระบบ กล้องทุกลานตรวจด้วย ทะเบียน + จังหวัด
+    แต่ละแถว: ป้ายทะเบียน · เหตุผล · ระดับความเสี่ยง · ใช้งาน/ระงับ · ผู้เพิ่ม · ระงับ/เปิดใช้ · แก้ไข · ลบ
+--}}
+@use('App\Support\Format')
 
-            {{-- Header --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight sp-glow-text">บัญชีดำทะเบียนรถ</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">Suspicious Vehicle Blacklist</p>
-                </div>
-                <a href="{{ route('admin.suspicious-vehicles.create') }}" class="sp-btn sp-btn-danger inline-flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    เพิ่มทะเบียน
-                </a>
+@php
+    $levels = ['low' => 'ต่ำ', 'medium' => 'กลาง', 'high' => 'สูง'];
+@endphp
+
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h1 class="text-h1 text-fg">บัญชีดำ</h1>
+                <p class="mt-1 text-fg-2">ใช้กับกล้องทุกลานในระบบ · เมื่อพบรถที่ใช้งานอยู่ในรายการ ระบบแจ้งผู้ดูแลระบบและเจ้าของลานนั้น</p>
             </div>
+            <x-ui.button :href="route('admin.suspicious-vehicles.create')">
+                <x-ui.icon name="plus" class="h-4 w-4" /> เพิ่มทะเบียน
+            </x-ui.button>
+        </div>
 
-            {{-- Flash --}}
-            @if(session('success'))
-                <div class="rounded-xl border border-green-600/40 bg-green-900/20 px-4 py-3 text-sm text-green-300">
-                    {{ session('success') }}
-                </div>
+        @if ($errors->any())
+            <x-ui.alert tone="danger" class="mb-4">{{ $errors->first() }}</x-ui.alert>
+        @endif
+
+        <form method="GET" role="search" class="flex flex-wrap items-end gap-3 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
+            <x-ui.field label="ค้นหา" for="q" class="min-w-0 flex-1 sm:max-w-sm">
+                <x-ui.input id="q" name="q" type="search" :value="$q" placeholder="ทะเบียน จังหวัด หรือเหตุผล" />
+            </x-ui.field>
+            <x-ui.button type="submit" variant="secondary">ค้นหา</x-ui.button>
+            @if ($q !== '')
+                <x-ui.button variant="ghost" :href="route('admin.suspicious-vehicles.index')">ล้างคำค้น</x-ui.button>
             @endif
-            @if($errors->any())
-                <div class="rounded-xl border border-red-600/40 bg-red-900/20 px-4 py-3 text-sm text-red-300">
-                    {{ $errors->first() }}
+            <p class="ml-auto self-center text-label text-fg-2">พบ <span class="tabular font-semibold text-fg">{{ $entries->total() }}</span> รายการ</p>
+        </form>
+
+        <div class="mt-4">
+            @if ($entries->isEmpty())
+                <div class="rounded-card border border-line bg-surface shadow-1">
+                    <x-ui.empty-state :title="$q !== '' ? 'ไม่พบทะเบียนที่ตรงกับคำค้น' : 'ยังไม่มีทะเบียนในบัญชีดำ'"
+                        description="เพิ่มทะเบียนและจังหวัดของรถที่ต้องการให้กล้องแจ้งเตือน">
+                        @if ($q === '')
+                            <x-ui.button :href="route('admin.suspicious-vehicles.create')">เพิ่มทะเบียน</x-ui.button>
+                        @endif
+                    </x-ui.empty-state>
                 </div>
+            @else
+                <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                    @foreach ($entries as $entry)
+                        <li @class([
+                            'grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6',
+                            'bg-surface-2/60' => ! $entry->is_active,
+                        ])>
+                            <x-ui.plate :plate="$entry->license_plate" :province="$entry->plate_province" size="sm" class="justify-self-start" />
+
+                            <div class="min-w-0">
+                                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                                    @if ($entry->is_active)
+                                        <span class="inline-flex items-center gap-1.5 font-semibold text-danger">
+                                            <span aria-hidden="true" class="h-2 w-2 rounded-full bg-danger"></span> ใช้งาน
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 font-semibold text-fg-2">
+                                            <span aria-hidden="true" class="h-2 w-2 rounded-full border border-fg-3"></span> ระงับ
+                                        </span>
+                                    @endif
+                                    <span @class(['text-fg-2', 'font-semibold text-danger' => $entry->level === 'high'])>ความเสี่ยง{{ $levels[$entry->level] ?? $entry->level }}</span>
+                                </p>
+                                <p class="mt-1 text-fg">{{ $entry->reason ?: 'ไม่ได้ระบุเหตุผล' }}</p>
+                                <p class="text-caption text-fg-3">เพิ่มโดย {{ $entry->addedBy?->name ?? 'บัญชีถูกลบ' }} · {{ Format::short($entry->created_at) }}</p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <form method="POST" action="{{ route('admin.suspicious-vehicles.toggle', $entry) }}"
+                                    @if ($entry->is_active)
+                                        data-confirm="ระงับทะเบียน {{ $entry->license_plate }} {{ $entry->plate_province }} — กล้องจะไม่แจ้งเตือนรถคันนี้จนกว่าจะเปิดใช้งานอีกครั้ง"
+                                        data-confirm-title="ระงับรายการนี้?" data-confirm-label="ระงับ" data-confirm-cancel="ใช้งานต่อ"
+                                    @endif>
+                                    @csrf
+                                    <x-ui.button type="submit" variant="secondary" size="sm">{{ $entry->is_active ? 'ระงับ' : 'เปิดใช้งาน' }}</x-ui.button>
+                                </form>
+                                <x-ui.button variant="ghost" size="sm" :href="route('admin.suspicious-vehicles.edit', $entry)">แก้ไข</x-ui.button>
+                                <form method="POST" action="{{ route('admin.suspicious-vehicles.destroy', $entry) }}"
+                                    data-confirm="ลบทะเบียน {{ $entry->license_plate }} {{ $entry->plate_province }} ออกจากบัญชีดำถาวร — กล้องจะไม่แจ้งเตือนรถคันนี้อีก"
+                                    data-confirm-title="ลบออกจากบัญชีดำ?" data-confirm-label="ลบถาวร" data-confirm-tone="danger" data-confirm-cancel="เก็บไว้">
+                                    @csrf
+                                    @method('DELETE')
+                                    <x-ui.button type="submit" variant="ghost" size="sm" class="text-danger">ลบ</x-ui.button>
+                                </form>
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <x-ui.pagination :paginator="$entries" class="mt-6" />
             @endif
-
-            {{-- Search --}}
-            <form method="GET" action="{{ route('admin.suspicious-vehicles.index') }}" class="flex gap-2">
-                <input type="text" name="q" value="{{ $q }}" placeholder="ค้นหาทะเบียน หรือเหตุผล…"
-                    class="sp-input flex-1 rounded-xl px-4 py-2 text-sm bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-red-500/60">
-                <button type="submit" class="sp-btn sp-btn-outline px-4">ค้นหา</button>
-                @if($q)
-                    <a href="{{ route('admin.suspicious-vehicles.index') }}" class="sp-btn sp-btn-outline px-4">ล้าง</a>
-                @endif
-            </form>
-
-            {{-- Table --}}
-            <div class="sp-card rounded-2xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="sp-table w-full text-sm">
-                        <thead>
-                            <tr class="text-xs text-gray-500 uppercase tracking-wider border-b border-white/10">
-                                <th class="px-4 py-3 text-left font-medium">ทะเบียน</th>
-                                <th class="px-4 py-3 text-left font-medium">เหตุผล</th>
-                                <th class="px-4 py-3 text-left font-medium">ระดับ</th>
-                                <th class="px-4 py-3 text-left font-medium">สถานะ</th>
-                                <th class="px-4 py-3 text-left font-medium">เพิ่มโดย</th>
-                                <th class="px-4 py-3 text-left font-medium">วันที่เพิ่ม</th>
-                                <th class="px-4 py-3 text-right font-medium">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            @forelse($entries as $entry)
-                                <tr class="hover:bg-white/[0.03] transition">
-                                    <td class="px-4 py-3 font-bold font-mono tracking-wide">{{ $entry->license_plate }}<span class="block text-xs font-normal text-gray-500">{{ $entry->plate_province }}</span></td>
-                                    <td class="px-4 py-3 text-gray-300 max-w-xs truncate">{{ $entry->reason ?? '—' }}</td>
-                                    <td class="px-4 py-3">
-                                        @if($entry->level === 'high')
-                                            <span class="sp-badge text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">สูง</span>
-                                        @elseif($entry->level === 'medium')
-                                            <span class="sp-badge text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">กลาง</span>
-                                        @else
-                                            <span class="sp-badge text-xs px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-300 border border-gray-500/30">ต่ำ</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        @if($entry->is_active)
-                                            <span class="sp-badge text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">ใช้งาน</span>
-                                        @else
-                                            <span class="sp-badge text-xs px-2 py-0.5 rounded-full bg-gray-600/20 text-gray-400 border border-gray-600/30">ระงับ</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-400 text-xs">{{ $entry->addedBy?->name ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-gray-400 text-xs">{{ $entry->created_at->format('d/m/Y H:i') }}</td>
-                                    <td class="px-4 py-3 text-right">
-                                        <div class="inline-flex items-center gap-2">
-                                            {{-- Toggle --}}
-                                            <form method="POST" action="{{ route('admin.suspicious-vehicles.toggle', $entry) }}">
-                                                @csrf
-                                                <button type="submit"
-                                                    class="text-xs px-2.5 py-1 rounded-lg border transition {{ $entry->is_active ? 'border-gray-600/40 text-gray-400 hover:border-yellow-500/40 hover:text-yellow-300' : 'border-green-600/40 text-green-400 hover:bg-green-500/10' }}">
-                                                    {{ $entry->is_active ? 'ระงับ' : 'เปิด' }}
-                                                </button>
-                                            </form>
-                                            {{-- Edit --}}
-                                            <a href="{{ route('admin.suspicious-vehicles.edit', $entry) }}"
-                                                class="sp-btn sp-btn-outline text-xs px-2.5 py-1">แก้ไข</a>
-                                            {{-- Delete --}}
-                                            <form method="POST" action="{{ route('admin.suspicious-vehicles.destroy', $entry) }}"
-                                                onsubmit="return confirm('ลบทะเบียน {{ $entry->license_plate }} ออกจากบัญชีดำ?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="sp-btn sp-btn-danger text-xs px-2.5 py-1">ลบ</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="px-4 py-12 text-center text-gray-500">
-                                        @if($q)
-                                            ไม่พบทะเบียน "<span class="text-gray-300">{{ $q }}</span>"
-                                        @else
-                                            ยังไม่มีทะเบียนในบัญชีดำ
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                @if($entries->hasPages())
-                    <div class="px-4 py-4 border-t border-white/10">
-                        {{ $entries->links('vendor.pagination.sp') }}
-                    </div>
-                @endif
-            </div>
-
         </div>
     </div>
 </x-app-layout>

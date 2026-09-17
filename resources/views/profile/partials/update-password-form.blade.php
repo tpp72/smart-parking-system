@@ -1,54 +1,41 @@
-<section>
-    <header>
-        <h2 class="text-lg font-extrabold text-white">
-            {{ __('Update Password') }}
-        </h2>
+@php($passwordErrors = $errors->updatePassword)
 
-        <p class="mt-1 text-sm text-gray-300">
-            {{ __('Ensure your account is using a long, random password to stay secure.') }}
-        </p>
-    </header>
+<section id="update-password" aria-labelledby="update-password-title" class="rounded-card border border-line bg-surface shadow-1">
+    <div class="grid gap-6 p-5 sm:p-6 md:grid-cols-[14rem_1fr] md:gap-10">
+        <header>
+            <h2 id="update-password-title" class="text-h3 text-fg">เปลี่ยนรหัสผ่าน</h2>
+            <p class="mt-1 text-label text-fg-3">ใช้รหัสผ่านอย่างน้อย 8 ตัวอักษร และไม่ซ้ำกับบริการอื่น</p>
+        </header>
 
-    <form method="post" action="{{ route('password.update') }}" class="mt-6 space-y-6">
-        @csrf
-        @method('put')
-
-        <div>
-            <x-input-label for="update_password_current_password" :value="__('Current Password')" class="text-gray-200" />
-            <x-text-input id="update_password_current_password" name="current_password" type="password"
-                class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                autocomplete="current-password" />
-            <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
-        </div>
-
-        <div>
-            <x-input-label for="update_password_password" :value="__('New Password')" class="text-gray-200" />
-            <x-text-input id="update_password_password" name="password" type="password"
-                class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                autocomplete="new-password" />
-            <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
-        </div>
-
-        <div>
-            <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" class="text-gray-200" />
-            <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password"
-                class="mt-1 block w-full bg-black/40 border border-red-900/60 text-white placeholder-gray-400 focus:ring-0 focus:border-red-600"
-                autocomplete="new-password" />
-            <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center gap-4">
-            {{-- ใช้ปุ่มธีมเรา --}}
-            <button type="submit" class="sp-btn sp-btn-primary">
-                {{ __('Save') }}
-            </button>
+        <form method="post" action="{{ route('password.update') }}" class="flex flex-col gap-5">
+            @csrf
+            @method('put')
 
             @if (session('status') === 'password-updated')
-                <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-green-200 font-semibold">
-                    {{ __('Saved.') }}
-                </p>
+                <x-ui.alert tone="success">เปลี่ยนรหัสผ่านแล้ว</x-ui.alert>
             @endif
-        </div>
-    </form>
+
+            <x-ui.field label="รหัสผ่านปัจจุบัน" for="update_password_current_password" required
+                :error="$passwordErrors->get('current_password')"
+                :hint="$user->force_password_reset ? 'ใช้รหัสผ่านชั่วคราวที่ได้รับจากผู้ดูแลระบบ' : null">
+                <x-password-input id="update_password_current_password" name="current_password" autocomplete="current-password"
+                    :invalid="$passwordErrors->has('current_password')" required />
+            </x-ui.field>
+
+            <x-ui.field label="รหัสผ่านใหม่" for="update_password_password" required :error="$passwordErrors->get('password')">
+                <x-password-input id="update_password_password" name="password" autocomplete="new-password"
+                    :invalid="$passwordErrors->has('password')" required />
+            </x-ui.field>
+
+            <x-ui.field label="ยืนยันรหัสผ่านใหม่" for="update_password_password_confirmation" required
+                :error="$passwordErrors->get('password_confirmation')">
+                <x-password-input id="update_password_password_confirmation" name="password_confirmation" autocomplete="new-password"
+                    :invalid="$passwordErrors->has('password_confirmation')" required />
+            </x-ui.field>
+
+            <div>
+                <x-ui.button type="submit">เปลี่ยนรหัสผ่าน</x-ui.button>
+            </div>
+        </form>
+    </div>
 </section>

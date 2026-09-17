@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
  * Admin จัดการบัญชีผู้ใช้ที่มีผลต่อข้อมูลการจอง/ลานจอด (project-plan.md §5.1.1)
  * - ปลด Owner → User: ปิดลานทั้งหมดของ Owner แบบเดียวกับอนุมัติคำร้องลาออก
  * - ลบบัญชี: เคลียร์การจองค้าง/รถที่จอดอยู่ของผู้ใช้ (และปิดลานถ้าเป็น Owner) ก่อนลบ เพื่อไม่ให้ช่องจอดค้างสถานะ
+ * - ผู้ใช้ลบบัญชีตัวเอง: เฉพาะ Role User · ยกเลิกการจองที่ยังไม่ Check-in ทั้งหมด · มีรถจอดอยู่ลบไม่ได้
  */
 class UserAccountService
 {
@@ -32,7 +33,7 @@ class UserAccountService
                 return ['success' => false, 'error' => 'ผู้ใช้นี้ไม่ได้เป็นเจ้าของลานจอด', 'summary' => null];
             }
 
-            $summary = $this->lotClosure->closeAll($locked, $admin, 'Admin ปลด Owner — ยกเลิกการจองอัตโนมัติ', [
+            $summary = $this->lotClosure->closeAll($locked, $admin, 'ผู้ดูแลระบบปลดเจ้าของลาน — ยกเลิกการจองอัตโนมัติ', [
                 'reason' => 'owner_demoted',
             ]);
 
@@ -53,7 +54,7 @@ class UserAccountService
 
         if ($result['success']) {
             notify_user($owner->id, 'บัญชีของคุณถูกปลดจากการเป็นเจ้าของลานจอด', sprintf(
-                'Admin ปลดบัญชีของคุณจากการเป็นเจ้าของลานจอด เหตุผล: %s — ลานจอด %d แห่งถูกลบ และบัญชีกลับเป็น User',
+                'ผู้ดูแลระบบปลดบัญชีของคุณจากการเป็นเจ้าของลานจอด เหตุผล: %s — ลานจอด %d แห่งถูกลบ และบัญชีกลับเป็นผู้ใช้',
                 $reason,
                 $result['summary']['lots_deleted']
             ));
@@ -79,13 +80,13 @@ class UserAccountService
             $locked = User::whereKey($user->id)->lockForUpdate()->first();
 
             $summary = $locked->role === 'owner'
-                ? $this->lotClosure->closeAll($locked, $admin, 'Admin ลบบัญชี Owner — ยกเลิกการจองอัตโนมัติ', ['reason' => 'user_deleted'])
+                ? $this->lotClosure->closeAll($locked, $admin, 'ผู้ดูแลระบบลบบัญชีเจ้าของลาน — ยกเลิกการจองอัตโนมัติ', ['reason' => 'user_deleted'])
                 : ['reservations_cancelled' => 0, 'cars_checked_out' => 0, 'lots_deleted' => 0];
 
             // การจองของผู้ใช้เอง (ในฐานะผู้จอง) — คืนช่องจอดก่อนการจองถูกลบตามบัญชี
             $bookings = Reservation::where('user_id', $locked->id)->whereIn('status', ['pending', 'confirmed'])->orderBy('id')->get();
             foreach ($bookings as $booking) {
-                $summary['reservations_cancelled'] += (int) $this->reservations->cancel($booking, $admin, 'Admin ลบบัญชีผู้ใช้')['success'];
+                $summary['reservations_cancelled'] += (int) $this->reservations->cancel($booking, $admin, 'ผู้ดูแลระบบลบบัญชีผู้ใช้')['success'];
             }
 
             $parked = Reservation::where('user_id', $locked->id)->where('status', 'checked_in')->orderBy('id')->get();
@@ -101,5 +102,52 @@ class UserAccountService
         });
 
         return ['success' => true, 'error' => null, 'summary' => $summary];
+    }
+
+    /** เหตุที่บัญชีนี้ลบตัวเองจากหน้าโปรไฟล์ไม่ได้ (null = ลบได้) */
+    public function selfDeletionBlocker(User $user): ?string
+    {
+        return match (true) {
+            (bool) $user->is_system => 'ไม่สามารถลบบัญชีระบบได้',
+            $user->role === 'admin' => 'บัญชีผู้ดูแลระบบลบตัวเองไม่ได้ ให้ผู้ดูแลระบบคนอื่นเป็นผู้ลบ',
+            $user->role === 'owner' => 'เจ้าของลานต้องยื่นคำร้องลาออกและได้รับอนุมัติก่อน จึงจะลบบัญชีได้',
+            Reservation::where('user_id', $user->id)->where('status', 'checked_in')->exists()
+                => 'ยังมีรถของคุณจอดอยู่ในลาน ลบบัญชีได้หลัง Check-out แล้ว',
+            default => null,
+        };
+    }
+
+    /**
+     * ผู้ใช้ลบบัญชีตัวเอง (หน้าโปรไฟล์) — เฉพาะ Role User ที่ไม่มีรถจอดอยู่
+     * ยกเลิกการจอง pending / confirmed ทั้งหมดก่อน (คืนช่องจอด · มัดจำที่ยังไม่ชำระ → void)
+     * $beforeDelete ทำงานก่อนลบแถวผู้ใช้ — เช่น Logout ซึ่ง Audit ต้องอ้างถึงบัญชีที่ยังอยู่
+     *
+     * @return array{success: bool, error: ?string, summary: ?array{reservations_cancelled: int}}
+     */
+    public function deleteSelf(User $user, ?callable $beforeDelete = null): array
+    {
+        return DB::transaction(function () use ($user, $beforeDelete) {
+            $locked = User::whereKey($user->id)->lockForUpdate()->first();
+
+            if ($error = $this->selfDeletionBlocker($locked)) {
+                return ['success' => false, 'error' => $error, 'summary' => null];
+            }
+
+            $cancelled = 0;
+            $bookings = Reservation::where('user_id', $locked->id)->whereIn('status', ['pending', 'confirmed'])->orderBy('id')->get();
+            foreach ($bookings as $booking) {
+                $cancelled += (int) $this->reservations->cancel($booking, $locked, 'ผู้ใช้ลบบัญชี')['success'];
+            }
+
+            audit_by($locked, 'profile.delete', $locked, ['email' => $locked->email, 'role' => $locked->role, 'reservations_cancelled' => $cancelled]);
+
+            if ($beforeDelete) {
+                $beforeDelete();
+            }
+
+            $locked->delete();
+
+            return ['success' => true, 'error' => null, 'summary' => ['reservations_cancelled' => $cancelled]];
+        });
     }
 }

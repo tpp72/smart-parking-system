@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\UserAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,10 +15,11 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): View
+    public function edit(Request $request, UserAccountService $accounts): View
     {
         return view('profile.edit', [
             'user' => $request->user(),
+            'deletionBlocker' => $accounts->selfDeletionBlocker($request->user()),
         ]);
     }
 
@@ -42,21 +44,19 @@ class ProfileController extends Controller
     }
 
     /**
-     * Delete the user's account.
+     * ลบบัญชีตัวเอง — เฉพาะ User ที่ไม่มีรถจอดอยู่ ระบบยกเลิกการจองที่ยังไม่ Check-in ให้ก่อน (UserAccountService)
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, UserAccountService $accounts): RedirectResponse
     {
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
         ]);
 
-        $user = $request->user();
+        $result = $accounts->deleteSelf($request->user(), beforeDelete: fn () => Auth::logout());
 
-        audit_log('profile.delete', $user, ['email' => $user->email, 'role' => $user->role]);
-
-        Auth::logout();
-
-        $user->delete();
+        if (! $result['success']) {
+            return Redirect::route('profile.edit')->withErrors(['account' => $result['error']], 'userDeletion');
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

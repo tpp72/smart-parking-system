@@ -59,7 +59,7 @@ class OwnerResignationController extends Controller
         }
 
         return redirect()->route('admin.owner-resignations.index')->with('success', sprintf(
-            'อนุมัติคำร้องลาออกแล้ว — ยกเลิกการจอง %d รายการ · เช็คเอาท์รถ %d คัน · ลบลานจอด %d แห่ง · บัญชีกลับเป็น User',
+            'อนุมัติคำร้องลาออกแล้ว — ยกเลิกการจอง %d รายการ · เช็คเอาท์รถ %d คัน · ลบลานจอด %d แห่ง · บัญชีกลับเป็นผู้ใช้',
             $result['summary']['reservations_cancelled'],
             $result['summary']['cars_checked_out'],
             $result['summary']['lots_deleted']
@@ -81,6 +81,6 @@ class OwnerResignationController extends Controller
             return back()->withErrors(['error' => $result['error']]);
         }
 
-        return redirect()->route('admin.owner-resignations.index')->with('success', 'ไม่อนุมัติคำร้องลาออก — แจ้งเหตุผลให้ Owner แล้ว');
+        return redirect()->route('admin.owner-resignations.index')->with('success', 'ไม่อนุมัติคำร้องลาออก — แจ้งเหตุผลให้เจ้าของลานแล้ว');
     }
 }

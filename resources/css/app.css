@@ -1,33 +1,128 @@
-@import "./theme-dark-red.css";
-@import "./theme-light-red.css";
-
-[x-cloak] { display: none !important; }
+@import '@fontsource-variable/anuphan';
+@import '@fontsource-variable/martian-mono';
+@import './tokens.css';
+@import './vendor/flatpickr.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Base ─────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    @apply bg-page text-fg font-sans;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
 
-/* ===== Dark Red Theme ===== */
-.glow-text {
-    text-shadow: 0 0 8px #dc2626, 0 0 20px #b91c1c;
+  body {
+    @apply bg-page text-body text-fg antialiased;
+  }
+
+  /* ไม่มี letter-spacing กับข้อความไทย (ครอบทั้งหน้า รวมหน้าเก่า) */
+  body, h1, h2, h3, h4, h5, h6, p, label, button, input, select, textarea { letter-spacing: normal; }
+
+  h1 { @apply text-h1; }
+  h2 { @apply text-h2; }
+  h3 { @apply text-h3; }
+
+  a { text-underline-offset: 3px; }
+
+  ::selection { background: rgb(var(--color-primary) / 0.22); color: rgb(var(--color-fg)); }
+
+  input, textarea { caret-color: rgb(var(--color-primary-ink)); }
+
+  /* Focus ring เดียวทั้งระบบ — แสดงเมื่อใช้คีย์บอร์ดเท่านั้น */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-primary-ink));
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar จาก token */
+  * { scrollbar-color: rgb(var(--color-fg-3) / 0.45) transparent; scrollbar-width: thin; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--color-fg-3) / 0.45); border-radius: 2px; border: 2px solid transparent; background-clip: padding-box; }
+
+  [x-cloak] { display: none !important; }
+
+  /* ช่องกรอกที่ไม่ได้สร้างจาก x-ui.input (เช่น altInput ของ flatpickr) — ปลั๊กอิน forms ใส่พื้นขาวตายตัว จึงผูกกับธีม */
+  :is([type='text'], [type='email'], [type='url'], [type='password'], [type='number'], [type='date'],
+      [type='datetime-local'], [type='month'], [type='search'], [type='tel'], [type='time'], [type='week'],
+      [multiple], textarea, select) {
+    background-color: rgb(var(--color-surface));
+    color: rgb(var(--color-fg));
+    border-color: rgb(var(--color-field));
+  }
+  :is(input, textarea)::placeholder { color: rgb(var(--color-fg-3)); opacity: 1; }
+
+  /* ลูกศร select: ปลั๊กอิน forms ฝังสีใน SVG (ใช้ CSS variable ไม่ได้) จึงกำหนดสี fg-3 ของแต่ละธีมตรง ๆ */
+  select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235C636A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    padding-right: 2.5rem;
+  }
+  [data-theme="dark"] select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23959B97' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+  [type='checkbox'], [type='radio'] { color: rgb(var(--color-primary)); border-color: rgb(var(--color-field)); background-color: rgb(var(--color-surface)); }
+  [type='checkbox']:checked, [type='radio']:checked { background-color: currentColor; border-color: transparent; }
 }
 
-.glow-btn {
-    box-shadow: 0 0 10px #dc2626, 0 0 20px rgba(220,38,38,0.5);
+/* ── แถบความคืบหน้าตอนเปลี่ยนหน้า (ไม่บังเนื้อหา) ─────────────────── */
+#sp-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: rgb(var(--color-primary-ink));
+}
+#sp-progress[data-state="running"] {
+  opacity: 1;
+  transform: scaleX(0.85);
+  transition: opacity var(--duration-fast) linear, transform 8s var(--ease-out);
+}
+#sp-progress[data-state="done"] {
+  opacity: 0;
+  transform: scaleX(1);
+  transition: opacity var(--duration-base) linear, transform var(--duration-fast) linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  #sp-progress[data-state="running"] { transform: scaleX(1); opacity: 0.7; }
 }
 
-.bg-animated {
-    background: radial-gradient(circle at 20% 20%, rgba(220,38,38,0.25), transparent 40%),
-                radial-gradient(circle at 80% 80%, rgba(220,38,38,0.15), transparent 40%),
-                #000000;
+/* ── Utilities เฉพาะระบบ ───────────────────────────────────────────── */
+@layer utilities {
+  /* ตัวเลขเงิน/เวลา/รหัสช่องจอด: Martian Mono + tabular numerals */
+  .num { @apply font-mono; font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "tnum" 1; }
+  .tabular { font-variant-numeric: tabular-nums; }
 }
 
-.fade-in {
-    animation: fadeIn 1.2s ease-in-out forwards;
+/* ── ลดการเคลื่อนไหวตามการตั้งค่าของผู้ใช้ ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+/* ── App Shell: เว้นที่ให้แถบล่างบนมือถือ (toast ไม่ทับเมนู) ─────────── */
+@media (max-width: 1023.98px) {
+  body.sp-has-bottom-bar {
+    --sp-bottom-offset: 3.75rem;
+  }
+}
+
+/* ลิงก์ #anchor ไม่ถูกแถบบน (sticky 56px) บัง */
+html {
+  scroll-padding-top: 4.5rem;
 }

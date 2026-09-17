@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
 use App\Models\User;
+use App\Support\StatusCatalog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -67,7 +68,7 @@ class ReservationService
                 'old_status'     => null,
                 'new_status'     => 'pending',
                 'changed_by'     => $user->id,
-                'note'           => sprintf('User สร้างการจอง — มัดจำ ฿%s รอยืนยันรับเงิน', number_format($deposit, 2)),
+                'note'           => sprintf('ผู้ใช้สร้างการจอง — มัดจำ ฿%s รอยืนยันรับเงิน', number_format($deposit, 2)),
             ]);
 
             audit_by($user, 'reservation.create', $reservation, [
@@ -108,7 +109,7 @@ class ReservationService
                 return;
             }
             if ($payment->payment_status === Payment::STATUS_VOID) {
-                $result = $this->fail('รายการนี้ถูกยกเลิกแล้ว (void) — ไม่สามารถยืนยันรับเงินได้');
+                $result = $this->fail('รายการนี้ถูกยกเลิกแล้ว — ยืนยันรับเงินไม่ได้');
                 return;
             }
 
@@ -126,7 +127,7 @@ class ReservationService
                     'success'     => false,
                     'outcome'     => self::OUTCOME_EXPIRED,
                     'error'       => sprintf(
-                        'การจอง #%d หมดอายุแล้ว (ไม่ Check-in ภายใน %d นาทีหลังเวลาจอง) — ยกเลิกเงินมัดจำเป็น void',
+                        'การจอง #%d หมดอายุแล้ว (ไม่ Check-in ภายใน %d นาทีหลังเวลาจอง) — ยกเลิกรายการมัดจำแล้ว',
                         $reservation->id, Reservation::gracePeriodMinutes()
                     ),
                     'reservation' => $reservation,
@@ -147,7 +148,7 @@ class ReservationService
                     'old_status'     => 'pending',
                     'new_status'     => 'cancelled',
                     'changed_by'     => $actor->id,
-                    'note'           => 'ลานเต็มขณะยืนยันรับเงินมัดจำ — ยกเลิกการจองอัตโนมัติ (มัดจำ void)',
+                    'note'           => 'ลานเต็มขณะยืนยันรับเงินมัดจำ — ยกเลิกการจองอัตโนมัติ (ยกเลิกรายการมัดจำ)',
                 ]);
 
                 audit_by($actor, 'payment.void', $payment, ['reservation_id' => $reservation->id, 'reason' => 'lot_full']);
@@ -171,7 +172,7 @@ class ReservationService
                 'old_status'     => 'pending',
                 'new_status'     => 'confirmed',
                 'changed_by'     => $actor->id,
-                'note'           => sprintf('ยืนยันรับเงินมัดจำ ฿%s — ระบบจัดสรรและ Lock ช่อง %s', number_format((float) $payment->total_amount, 2), $slot->slot_number),
+                'note'           => sprintf('ยืนยันรับเงินมัดจำ ฿%s — ระบบจัดสรรและล็อกช่อง %s', number_format((float) $payment->total_amount, 2), $slot->slot_number),
             ]);
 
             audit_by($actor, 'payment.mark_paid', $payment, [
@@ -224,7 +225,7 @@ class ReservationService
             $locked = Reservation::whereKey($reservation->id)->lockForUpdate()->first();
 
             if (!$locked->canTransitionTo('cancelled')) {
-                $result = ['success' => false, 'error' => "ไม่สามารถยกเลิกการจองที่มีสถานะ \"{$locked->status}\" ได้", 'deposit_forfeited' => false];
+                $result = ['success' => false, 'error' => 'ยกเลิกได้เฉพาะก่อน Check-in — การจองนี้' . StatusCatalog::label('reservation', $locked->status, 'user'), 'deposit_forfeited' => false];
                 return;
             }
 
@@ -346,9 +347,9 @@ class ReservationService
             'new_status'     => 'expired',
             'changed_by'     => null,
             'note'           => sprintf(
-                'Auto-expired: ไม่ Check-in ภายใน %d นาทีหลังเวลาจอง%s',
+                'หมดอายุอัตโนมัติ: ไม่ Check-in ภายใน %d นาทีหลังเวลาจอง%s',
                 Reservation::gracePeriodMinutes(),
-                $depositVoided ? ' (มัดจำ void)' : ''
+                $depositVoided ? ' (ยกเลิกรายการมัดจำ)' : ''
             ),
         ]);
 

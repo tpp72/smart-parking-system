@@ -1,344 +1,197 @@
-<x-app-layout>
-    <div class="sp-bg min-h-screen text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+{{--
+    ภาพรวมเจ้าของลาน: งานที่ต้องทำก่อน → สถานะรายลาน ณ ตอนนี้ → รถที่จอดอยู่ / การจองที่กำลังจะมาถึง → ลาออก
+    (กราฟรายได้อยู่หน้า "รายได้")
+--}}
+@use('App\Support\Format')
 
-            @if($ownerStatus === 'pending')
-            {{-- ============================================================ --}}
-            {{--  PENDING STATE                                                --}}
-            {{-- ============================================================ --}}
-            <div class="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center">
-                <div class="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
+<x-app-layout flash-toast>
+    <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        @if ($ownerStatus !== 'approved')
+            {{-- บัญชีที่ยังไม่ได้รับอนุมัติ: ดูสถานะคำขอ --}}
+            <div class="rounded-card border border-line bg-surface shadow-1">
+                <x-ui.empty-state
+                    :title="$ownerStatus === 'rejected' ? 'คำขอเป็นเจ้าของลานไม่ได้รับการอนุมัติ' : 'คำขอเป็นเจ้าของลานรอการพิจารณา'"
+                    :description="$ownerStatus === 'rejected' ? ($application?->rejection_reason ? 'เหตุผล: '.$application->rejection_reason : 'แก้ไขข้อมูลแล้วส่งคำขอใหม่ได้') : 'ผู้ดูแลระบบจะแจ้งผลผ่านการแจ้งเตือน'">
+                    <x-ui.button :href="route('owner.application.show')">ดูสถานะคำขอ</x-ui.button>
+                </x-ui.empty-state>
+            </div>
+        @else
+            <div class="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                    <h1 class="text-2xl font-extrabold sp-glow-text mb-2">รอการอนุมัติ</h1>
-                    <p class="text-gray-400 max-w-md">คำขอของคุณอยู่ระหว่างการพิจารณาจาก Admin<br>กรุณารอการแจ้งผล เราจะส่งการแจ้งเตือนให้คุณทราบ</p>
+                    <h1 class="text-h1 text-fg">ภาพรวม</h1>
+                    <p class="mt-1 text-fg-2">ลานของคุณ <span class="tabular font-semibold text-fg">{{ $totals['lots'] }}</span> ลาน · ข้อมูล ณ {{ Format::time(now()) }}</p>
                 </div>
-                @if($application)
-                <div class="sp-card rounded-2xl p-6 max-w-md w-full text-left space-y-2">
-                    <p class="text-xs text-gray-400 uppercase tracking-wide font-semibold">รายละเอียดคำขอ</p>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                        <span class="text-gray-400">ชื่อธุรกิจ</span><span class="font-medium">{{ $application->business_name }}</span>
-                        <span class="text-gray-400">ลานจอด</span><span class="font-medium">{{ $application->parking_lot_name }}</span>
-                        <span class="text-gray-400">ส่งเมื่อ</span><span class="font-medium">{{ $application->created_at->diffForHumans() }}</span>
-                        <span class="text-gray-400">สถานะ</span><span class="font-medium text-yellow-400">รอพิจารณา</span>
+                <x-ui.button variant="secondary" :href="route('owner.parking-lots.create')">
+                    <x-ui.icon name="plus" class="h-4 w-4" /> เพิ่มลานจอด
+                </x-ui.button>
+            </div>
+
+            {{-- ── งานที่ต้องทำ ───────────────────────────────────────── --}}
+            <section aria-labelledby="tasks-title" class="mt-6">
+                <h2 id="tasks-title" class="sr-only">งานที่ต้องทำ</h2>
+                <div class="grid overflow-hidden rounded-card border border-line bg-surface shadow-1 sm:grid-cols-3 sm:divide-x sm:divide-line">
+                    @foreach ([
+                        ['ยืนยันรับเงินมัดจำ', $tasks['deposits']['count'], 'รายการ · '.Format::baht($tasks['deposits']['amount']), 'จองจะยืนยันและได้ช่องจอดเมื่อยืนยันรับเงิน', route('owner.payments.index', ['status' => 'unpaid'])],
+                        ['ยืนยันรับเงินค่าจอด', $tasks['checkouts']['count'], 'รายการ · '.Format::baht($tasks['checkouts']['amount']), 'ยอดหลัง Check-out ที่ยังไม่ได้รับเงิน', route('owner.payments.index', ['status' => 'unpaid'])],
+                        ['ถึงเวลาเข้าลาน', $tasks['arriving'], 'การจอง', 'ถ้ากล้องอ่านป้ายไม่ได้ ใช้ Manual Check-in ในหน้าการจอง', route('owner.reservations.index', ['status' => 'confirmed'])],
+                    ] as [$label, $count, $unit, $hint, $href])
+                        <a href="{{ $href }}" @class([
+                            'group flex flex-col gap-1 border-b border-line px-5 py-4 transition-colors duration-fast last:border-b-0 hover:bg-surface-2 sm:border-b-0',
+                            'bg-warning/10' => $count > 0,
+                        ])>
+                            <span class="text-label font-semibold text-fg">{{ $label }}</span>
+                            <span class="flex items-baseline gap-2">
+                                <span @class(['num text-kpi leading-none', 'text-fg' => $count > 0, 'text-fg-3' => $count === 0])>{{ $count }}</span>
+                                <span class="text-label text-fg-2">{{ $unit }}</span>
+                            </span>
+                            <span class="text-caption text-fg-3">{{ $count > 0 ? $hint : 'ไม่มีงานค้าง' }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+
+            {{-- ── สถานะรายลาน ─────────────────────────────────────────── --}}
+            <section aria-labelledby="lots-title" class="mt-10">
+                <div class="flex flex-wrap items-baseline justify-between gap-3">
+                    <h2 id="lots-title" class="text-h2 text-fg">ลานของคุณตอนนี้</h2>
+                    <a href="{{ route('owner.parking-lots.index') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">จัดการลานจอด</a>
+                </div>
+
+                @if ($lots->isEmpty())
+                    <div class="mt-4 rounded-card border border-line bg-surface shadow-1">
+                        <x-ui.empty-state title="ยังไม่มีลานจอด" description="เพิ่มลานจอดและช่องจอดก่อน ลูกค้าจึงจะจองได้">
+                            <x-ui.button :href="route('owner.parking-lots.create')">เพิ่มลานจอด</x-ui.button>
+                        </x-ui.empty-state>
                     </div>
-                </div>
+                @else
+                    <ol class="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                        @foreach ($lots as $lot)
+                            <li class="grid gap-3 px-4 py-4 sm:px-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_8rem] md:items-center md:gap-6">
+                                <div class="min-w-0">
+                                    <p class="truncate font-semibold text-fg">{{ $lot->name }}</p>
+                                    <p class="text-label text-fg-2">
+                                        <span class="tabular">{{ Format::baht($lot->hourly_rate) }}</span>/ชม. ·
+                                        {{ $lot->reservations_enabled ? 'เปิดรับจอง' : 'ปิดรับจองล่วงหน้า' }}
+                                    </p>
+                                </div>
+                                <x-ui.occupancy-bar :available="$lot->available" :reserved="$lot->reserved" :occupied="$lot->occupied" />
+                                <div class="md:text-end">
+                                    <p class="text-caption text-fg-3">รับเงินวันนี้</p>
+                                    <p class="num font-semibold text-fg">{{ Format::baht($lot->revenue_today) }}</p>
+                                </div>
+                            </li>
+                        @endforeach
+                        @if ($lots->count() > 1)
+                            <li class="grid gap-3 bg-surface-2/60 px-4 py-4 sm:px-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_8rem] md:items-center md:gap-6">
+                                <p class="font-semibold text-fg">รวมทุกลาน</p>
+                                <x-ui.occupancy-bar :available="$totals['available']" :reserved="$totals['reserved']" :occupied="$totals['occupied']" />
+                                <div class="md:text-end">
+                                    <p class="text-caption text-fg-3">รับเงินวันนี้</p>
+                                    <p class="num font-semibold text-fg">{{ Format::baht($totals['revenue_today']) }}</p>
+                                </div>
+                            </li>
+                        @endif
+                    </ol>
                 @endif
-                <a href="{{ route('owner.application.show') }}" class="sp-btn sp-btn-outline">ดูรายละเอียดคำขอ</a>
-            </div>
+            </section>
 
-            @elseif($ownerStatus === 'rejected')
-            {{-- ============================================================ --}}
-            {{--  REJECTED STATE                                               --}}
-            {{-- ============================================================ --}}
-            <div class="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center">
-                <div class="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-2xl font-extrabold text-red-300 mb-2">คำขอไม่ได้รับการอนุมัติ</h1>
-                    <p class="text-gray-400 max-w-md">คุณสามารถแก้ไขข้อมูลและส่งคำขอใหม่ได้</p>
-                </div>
-                @if($application && $application->rejection_reason)
-                <div class="sp-card rounded-2xl p-6 max-w-md w-full text-left border border-red-500/30">
-                    <p class="text-xs text-red-300 uppercase tracking-wide font-semibold mb-2">เหตุผลที่ไม่อนุมัติ</p>
-                    <p class="text-sm text-gray-300">{{ $application->rejection_reason }}</p>
-                </div>
-                @endif
-                <div class="flex gap-3">
-                    <a href="{{ route('owner.application.edit') }}" class="sp-btn sp-btn-primary">แก้ไขและส่งใหม่</a>
-                    <a href="{{ route('owner.application.show') }}" class="sp-btn sp-btn-outline">ดูรายละเอียด</a>
-                </div>
-            </div>
-
-            @else
-            {{-- ============================================================ --}}
-            {{--  APPROVED — Full Dashboard                                    --}}
-            {{-- ============================================================ --}}
-
-            {{-- Header --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight sp-glow-text">Owner Dashboard</h1>
-                    <p class="text-gray-400 text-sm mt-0.5">ภาพรวมลานจอดของคุณ — {{ now()->format('d M Y, H:i') }}</p>
-                </div>
-                <a href="{{ route('owner.parking-lots.create') }}" class="sp-btn sp-btn-primary">+ เพิ่มลานจอด</a>
-            </div>
-
-            {{-- Quick Actions --}}
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <a href="{{ route('owner.parking-lots.index') }}" class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>
-                    <span class="text-sm font-semibold">ลานจอด</span>
-                </a>
-                <a href="{{ route('owner.parking-slots.index') }}" class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>
-                    <span class="text-sm font-semibold">ช่องจอด</span>
-                </a>
-                <a href="{{ route('owner.reservations.index') }}" class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    <span class="text-sm font-semibold">การจอง</span>
-                    @if($stats['pending_reservations'] > 0)
-                        <span class="text-xs bg-red-500/30 text-red-300 rounded-full px-1.5">{{ $stats['pending_reservations'] }}</span>
-                    @endif
-                </a>
-                <a href="{{ route('owner.revenue.index') }}" class="sp-btn sp-btn-outline flex-col items-center justify-center py-3 gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-sm font-semibold">รายได้</span>
-                </a>
-            </div>
-
-            {{-- KPI Cards --}}
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">ลานจอดทั้งหมด</p>
-                    <p class="text-3xl font-extrabold text-white">{{ $stats['lots_total'] }}</p>
-                    <p class="text-xs text-gray-500">Parking Lots</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">จอดอยู่ตอนนี้</p>
-                    <p class="text-3xl font-extrabold text-red-400">{{ $stats['active_now'] }}</p>
-                    <p class="text-xs text-gray-500">Active / {{ $stats['slots_total'] }} ช่อง</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">รายได้วันนี้</p>
-                    <p class="text-3xl font-extrabold text-green-400">{{ number_format($stats['revenue_today'], 0) }}</p>
-                    <p class="text-xs text-gray-500">บาท</p>
-                </div>
-                <div class="sp-card rounded-2xl p-5 flex flex-col gap-1">
-                    <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide">รายได้เดือนนี้</p>
-                    <p class="text-3xl font-extrabold text-green-300">{{ number_format($stats['revenue_month'], 0) }}</p>
-                    <p class="text-xs text-gray-500">บาท / {{ $stats['reservations_today'] }} จองวันนี้</p>
-                </div>
-            </div>
-
-            {{-- Analytics Charts --}}
-            <div>
-                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Analytics</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <x-dashboard-chart
-                        type="line"
-                        title="รายได้ 12 เดือนล่าสุด"
-                        :labels="$chartRevenueTrend['labels']"
-                        :datasets="$chartRevenueTrend['datasets']"
-                        height="220px"
-                    />
-                    <x-dashboard-chart
-                        type="pie"
-                        title="สถานะการจอง"
-                        :labels="$chartReservationStatus['labels']"
-                        :datasets="$chartReservationStatus['datasets']"
-                    />
-                    <x-dashboard-chart
-                        type="bar"
-                        title="สถานะช่องจอด"
-                        :labels="$chartSlotOccupancy['labels']"
-                        :datasets="$chartSlotOccupancy['datasets']"
-                    />
-                </div>
-            </div>
-
-            {{-- Slot Status Bar --}}
-            @if($stats['slots_total'] > 0)
-            <div class="sp-card rounded-2xl p-5">
-                <h2 class="text-sm font-bold text-gray-300 mb-3">สถานะช่องจอดรวม</h2>
-                <div class="flex gap-4 text-sm mb-3">
-                    <span class="text-green-400 font-bold">{{ $stats['slots_available'] }} ว่าง</span>
-                    <span class="text-yellow-400 font-bold">{{ $stats['slots_reserved'] }} จอง</span>
-                    <span class="text-red-400 font-bold">{{ $stats['slots_occupied'] }} ใช้งาน</span>
-                    <span class="text-gray-400">{{ $stats['slots_total'] }} ทั้งหมด</span>
-                </div>
-                <div class="flex h-3 rounded-full overflow-hidden bg-white/5">
-                    @php
-                        $total = max($stats['slots_total'], 1);
-                        $availPct = round($stats['slots_available'] / $total * 100);
-                        $resPct   = round($stats['slots_reserved']  / $total * 100);
-                        $occPct   = round($stats['slots_occupied']  / $total * 100);
-                    @endphp
-                    @if($availPct > 0)<div class="bg-green-500/70 transition-all" style="width:{{ $availPct }}%"></div>@endif
-                    @if($resPct > 0)<div class="bg-yellow-500/70 transition-all" style="width:{{ $resPct }}%"></div>@endif
-                    @if($occPct > 0)<div class="bg-red-500/70 transition-all" style="width:{{ $occPct }}%"></div>@endif
-                </div>
-            </div>
-            @endif
-
-            {{-- Lots Overview --}}
-            @if($lotsOverview->isNotEmpty())
-            <div class="sp-card rounded-2xl p-6">
-                <h2 class="text-lg font-bold text-gray-200 mb-4">ภาพรวมรายลาน</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full sp-table">
-                        <thead>
-                            <tr class="border-b sp-divider text-xs text-gray-400 uppercase">
-                                <th class="py-2 pr-4 text-left">ลาน</th>
-                                <th class="py-2 pr-4 text-right">ว่าง</th>
-                                <th class="py-2 pr-4 text-right">จอง</th>
-                                <th class="py-2 pr-4 text-right">ใช้งาน</th>
-                                <th class="py-2 pr-4 text-right">ทั้งหมด</th>
-                                <th class="py-2 pr-4 text-right">เรท/ชม.</th>
-                                <th class="py-2 pr-4 text-right">รับจอง</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($lotsOverview as $lot)
-                            <tr class="border-b sp-divider">
-                                <td class="py-3 pr-4 font-bold">
-                                    <a href="{{ route('owner.parking-lots.edit', $lot->id) }}" class="hover:text-red-300 transition">{{ $lot->name }}</a>
-                                </td>
-                                <td class="py-3 pr-4 text-right text-green-400 font-bold">{{ $lot->available }}</td>
-                                <td class="py-3 pr-4 text-right text-yellow-400">{{ $lot->reserved }}</td>
-                                <td class="py-3 pr-4 text-right text-red-400">{{ $lot->occupied }}</td>
-                                <td class="py-3 pr-4 text-right text-gray-300">{{ $lot->total_slots }}</td>
-                                <td class="py-3 pr-4 text-right text-gray-300">{{ number_format((float)$lot->hourly_rate, 0) }}</td>
-                                <td class="py-3 pr-4 text-right">
-                                    @if($lot->reservations_enabled)
-                                        <span class="sp-badge sp-badge-ok">เปิด</span>
-                                    @else
-                                        <span class="sp-badge sp-badge-danger">ปิด</span>
+            <div class="mt-10 grid gap-10 lg:grid-cols-2">
+                {{-- ── รถที่จอดอยู่ ─────────────────────────────────────── --}}
+                <section aria-labelledby="parked-title" class="min-w-0">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h2 id="parked-title" class="text-h2 text-fg">รถที่จอดอยู่</h2>
+                        <a href="{{ route('owner.reservations.index', ['status' => 'checked_in']) }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">ดูทั้งหมด</a>
+                    </div>
+                    @if ($parked->isEmpty())
+                        <p class="mt-4 rounded-card border border-line bg-surface px-4 py-6 text-center text-fg-2">ไม่มีรถจอดอยู่ในลานของคุณ</p>
+                    @else
+                        <ol class="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                            @foreach ($parked as $r)
+                                <li class="flex items-center gap-3 px-4 py-3 sm:px-5">
+                                    <x-ui.plate :plate="$r->license_plate" :province="$r->plate_province" size="sm" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-label font-semibold text-fg">{{ $r->parkingLot?->name }} · ช่อง <span class="tabular">{{ $r->parkingSlot?->slot_number ?? '—' }}</span></p>
+                                        <p class="text-caption text-fg-3">
+                                            เข้า {{ Format::short($r->parkingLog?->check_in_time) }}
+                                            @if ($r->parkingLog)
+                                                · จอดมาแล้ว {{ Format::duration((int) $r->parkingLog->check_in_time->diffInMinutes(now())) }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    @if ($r->is_walk_in)
+                                        <span class="shrink-0 text-caption text-fg-3">Walk-in</span>
                                     @endif
-                                </td>
-                            </tr>
+                                </li>
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            @endif
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {{-- Active Now --}}
-                <div class="sp-card rounded-2xl p-6">
-                    <h2 class="text-lg font-bold text-gray-200 mb-4">รถที่จอดอยู่ตอนนี้</h2>
-                    @if($activeNow->isEmpty())
-                        <p class="text-gray-500 text-sm">ไม่มีรถจอดอยู่ในขณะนี้</p>
-                    @else
-                        <div class="space-y-2">
-                            @foreach($activeNow as $log)
-                            <div class="flex items-center justify-between text-sm py-2 border-b sp-divider last:border-0">
-                                <span class="font-bold text-red-300">{{ $log->license_plate }}</span>
-                                <span class="text-gray-400">{{ $log->lot_name }} {{ $log->slot_number ? '· '.$log->slot_number : '' }}</span>
-                                <span class="text-gray-500 text-xs">{{ \Carbon\Carbon::parse($log->check_in_time)->format('H:i') }}</span>
-                            </div>
-                            @endforeach
-                        </div>
+                        </ol>
                     @endif
-                </div>
+                </section>
 
-                {{-- Recent Reservations --}}
-                <div class="sp-card rounded-2xl p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-bold text-gray-200">การจองล่าสุด</h2>
-                        <a href="{{ route('owner.reservations.index') }}" class="text-xs text-red-400 hover:text-red-300">ดูทั้งหมด →</a>
+                {{-- ── การจองที่กำลังจะมาถึง ───────────────────────────── --}}
+                <section aria-labelledby="upcoming-title" class="min-w-0">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h2 id="upcoming-title" class="text-h2 text-fg">กำลังจะมาถึง</h2>
+                        <a href="{{ route('owner.reservations.index') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">การจองทั้งหมด</a>
                     </div>
-                    @if($recentReservations->isEmpty())
-                        <p class="text-gray-500 text-sm">ยังไม่มีการจอง</p>
+                    <p class="mt-1 text-label text-fg-3">การจองที่ยังไม่เข้าลาน ภายใน 24 ชั่วโมง</p>
+                    @if ($upcoming->isEmpty())
+                        <p class="mt-4 rounded-card border border-line bg-surface px-4 py-6 text-center text-fg-2">ไม่มีการจองที่กำลังจะมาถึง</p>
                     @else
-                        <div class="space-y-2">
-                            @foreach($recentReservations as $r)
-                            <div class="flex items-center justify-between text-sm py-2 border-b sp-divider last:border-0">
-                                <div>
-                                    <span class="font-bold text-red-300">{{ $r->license_plate }}</span>
-                                    <span class="text-gray-400 ml-2 text-xs">{{ $r->lot_name }}</span>
-                                </div>
-                                <div class="text-right">
-                                    @php
-                                        $badgeClass = match($r->status) {
-                                            'confirmed'  => 'sp-badge-ok',
-                                            'checked_in' => 'sp-badge-ok',
-                                            'completed'  => 'sp-badge-ok',
-                                            'pending'    => 'sp-badge-warn',
-                                            default      => 'sp-badge-danger',
-                                        };
-                                    @endphp
-                                    <span class="sp-badge {{ $badgeClass }}">{{ $r->status }}</span>
-                                </div>
-                            </div>
+                        <ol class="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
+                            @foreach ($upcoming as $r)
+                                <li class="flex items-center gap-3 px-4 py-3 sm:px-5">
+                                    <x-ui.plate :plate="$r->license_plate" :province="$r->plate_province" size="sm" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-label font-semibold text-fg">{{ Format::short($r->reserve_start) }} · {{ $r->parkingLot?->name }}</p>
+                                        <p class="truncate text-caption text-fg-3">{{ $r->user?->name }} · มัดจำ <span class="tabular">{{ Format::baht($r->deposit_amount) }}</span></p>
+                                    </div>
+                                    <x-ui.status type="reservation" :value="$r->status" audience="staff" class="shrink-0" />
+                                </li>
                             @endforeach
-                        </div>
+                        </ol>
                     @endif
-                </div>
+                </section>
             </div>
 
-            {{-- ============================================================ --}}
-            {{--  คำร้องลาออก — มีผลเมื่อ Admin อนุมัติ (project-plan.md §16)   --}}
-            {{-- ============================================================ --}}
-            @if($ownerStatus === 'approved' && $resignation?->isPending())
-            <div class="sp-card rounded-2xl p-6 border border-yellow-600/40">
-                <h2 class="text-sm font-bold text-yellow-300">คำร้องลาออกรอการพิจารณา</h2>
-                <p class="text-xs text-gray-400 mt-1">
-                    ส่งเมื่อ {{ $resignation->created_at->format('d/m/Y H:i') }} — คุณยังคงเป็นเจ้าของลานจอดและใช้งานได้ตามปกติจนกว่า Admin จะอนุมัติ
-                </p>
-                <p class="text-sm text-gray-300 mt-2">เหตุผล: {{ $resignation->reason }}</p>
-            </div>
-            @elseif($ownerStatus === 'approved')
-            <div class="sp-card rounded-2xl p-6 border border-red-900/40"
-                 x-data="{ open: {{ $errors->has('reason') ? 'true' : 'false' }}, reason: @js(old('reason', '')) }">
-                @if($resignation?->status === 'rejected')
-                    <div class="mb-4 rounded-xl border border-red-500/30 p-3 text-sm">
-                        <p class="text-red-300 font-semibold">คำร้องลาออกครั้งล่าสุดไม่ได้รับการอนุมัติ</p>
-                        <p class="text-gray-300 mt-1">เหตุผล: {{ $resignation->rejection_reason }}</p>
+            {{-- ── ลาออกจากการเป็นเจ้าของลาน (มีผลเมื่อผู้ดูแลระบบอนุมัติ — project-plan.md §16) ── --}}
+            <section id="owner-resignation" aria-labelledby="resign-title" class="mt-12 rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
+                @if ($resignation?->isPending())
+                    <h2 id="resign-title" class="text-h3 text-fg">คำร้องลาออกรอการพิจารณา</h2>
+                    <p class="mt-1 text-fg-2">ส่งเมื่อ {{ Format::short($resignation->created_at) }} — ยังจัดการลานได้ตามปกติจนกว่าผู้ดูแลระบบจะอนุมัติ</p>
+                    <p class="mt-3 text-label text-fg-2"><span class="font-semibold text-fg">เหตุผล:</span> {{ $resignation->reason }}</p>
+                @else
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="max-w-2xl">
+                            <h2 id="resign-title" class="text-h3 text-fg">ลาออกจากการเป็นเจ้าของลาน</h2>
+                            <p class="mt-1 text-label text-fg-2">
+                                ต้องได้รับอนุมัติจากผู้ดูแลระบบ เมื่ออนุมัติ: การจองที่ยังไม่ Check-in ถูกยกเลิก · รถที่จอดอยู่ถูก Check-out ·
+                                ลานจอดทั้งหมดของคุณถูกลบ · บัญชีกลับเป็นผู้ใช้
+                            </p>
+                        </div>
+                        <x-ui.button variant="secondary" class="text-danger" x-data x-on:click="$dispatch('open-modal', 'owner-resign')">ยื่นคำร้องลาออก</x-ui.button>
                     </div>
-                @endif
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <h2 class="text-sm font-bold text-gray-300">ลาออกจากการเป็นเจ้าของลานจอด</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            ต้องได้รับอนุมัติจาก Admin — เมื่ออนุมัติ การจองที่ยังไม่ Check-in จะถูกยกเลิก รถที่จอดอยู่จะถูกเช็คเอาท์
-                            ลานจอดทั้งหมดของคุณจะถูกลบ และบัญชีกลับเป็น User
-                        </p>
-                    </div>
-                    <button type="button" @click="open = true"
-                        title="ยื่นคำร้องลาออกให้ Admin พิจารณา"
-                        class="sp-btn sp-btn-danger text-sm whitespace-nowrap">
-                        ยื่นคำร้องลาออก
-                    </button>
-                </div>
 
-                {{-- Modal --}}
-                <div x-show="open" x-cloak
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-                    @keydown.escape.window="open = false">
-                    <div class="sp-card rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-red-700/50"
-                        @click.stop>
-                        <h3 class="text-lg font-extrabold text-red-300 mb-2">ยื่นคำร้องลาออกจาก Owner</h3>
-                        <p class="text-sm text-gray-400 mb-4">
-                            คำร้องจะมีผลเมื่อ Admin อนุมัติ ระหว่างนี้คุณยังจัดการลานจอดได้ตามปกติ
-                        </p>
-                        @error('reason')
-                            <p class="text-sm text-red-300 mb-3">{{ $message }}</p>
-                        @enderror
+                    @if ($resignation?->status === 'rejected')
+                        <x-ui.alert tone="warning" title="คำร้องครั้งล่าสุดไม่ได้รับการอนุมัติ" class="mt-4">
+                            เหตุผล: {{ $resignation->rejection_reason }}
+                        </x-ui.alert>
+                    @endif
 
-                        <form method="POST" action="{{ route('owner.resignation.store') }}">
+                    <x-ui.modal name="owner-resign" :show="$errors->has('reason')" maxWidth="md" title="ยื่นคำร้องลาออก"
+                        description="คำร้องมีผลเมื่อผู้ดูแลระบบอนุมัติ ระหว่างนี้ยังจัดการลานได้ตามปกติ">
+                        <form method="POST" action="{{ route('owner.resignation.store') }}" id="owner-resign-form" class="px-5 py-4">
                             @csrf
-                            <div class="mb-4">
-                                <label class="block text-sm text-red-300 font-semibold mb-1">
-                                    เหตุผลในการลาออก *
-                                </label>
-                                <textarea name="reason" x-model="reason" rows="3" required
-                                    class="w-full rounded-xl bg-black/40 border border-red-700/60 text-white focus:ring-0 focus:border-red-500 text-sm"
-                                    placeholder="โปรดระบุเหตุผล..."></textarea>
-                            </div>
-                            <div class="flex gap-3 justify-end">
-                                <button type="button" @click="open = false" class="sp-btn sp-btn-outline">ยกเลิก</button>
-                                <button type="submit" :disabled="reason.trim() === ''"
-                                    class="sp-btn sp-btn-danger"
-                                    :class="{ 'opacity-40 cursor-not-allowed': reason.trim() === '' }">
-                                    ยืนยันลาออก
-                                </button>
-                            </div>
+                            <x-ui.field label="เหตุผลในการลาออก" for="reason" required>
+                                <x-ui.textarea id="reason" name="reason" rows="4" required maxlength="1000">{{ old('reason') }}</x-ui.textarea>
+                            </x-ui.field>
                         </form>
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            @endif {{-- end approved state --}}
-
-        </div>
+                        <x-slot name="footer">
+                            <x-ui.button variant="secondary" x-on:click="$dispatch('close')">ยกเลิก</x-ui.button>
+                            <x-ui.button type="submit" form="owner-resign-form" variant="danger">ส่งคำร้องลาออก</x-ui.button>
+                        </x-slot>
+                    </x-ui.modal>
+                @endif
+            </section>
+        @endif
     </div>
 </x-app-layout>

@@ -15,7 +15,8 @@ class ReservationLogController extends Controller
 {
     public function index(Request $request)
     {
-        return view('admin.reservation-logs.index', [
+        return view('staff.reservation-logs', [
+            'scope'    => 'admin',
             'logs'     => ReservationLogQuery::build($request)->paginate(20)->withQueryString(),
             'lots'     => ParkingLot::orderBy('name')->get(['id', 'name']),
             'statuses' => Reservation::STATUSES,

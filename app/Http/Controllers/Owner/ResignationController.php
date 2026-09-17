@@ -28,6 +28,6 @@ class ResignationController extends Controller
         }
 
         return redirect()->route('owner.dashboard')
-            ->with('success', 'ส่งคำร้องลาออกแล้ว — คุณยังคงเป็นเจ้าของลานจอดจนกว่า Admin จะอนุมัติ');
+            ->with('success', 'ส่งคำร้องลาออกแล้ว — คุณยังคงเป็นเจ้าของลานจอดจนกว่าผู้ดูแลระบบจะอนุมัติ');
     }
 }
