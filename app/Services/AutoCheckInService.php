@@ -38,7 +38,7 @@ class AutoCheckInService
         $lot = $scan->parkingLot;
 
         if ($this->checkIn->isParked($scan->license_plate, $scan->plate_province)) {
-            return $this->result(self::OUTCOME_ALREADY_PARKED, false, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-Out');
+            return $this->result(self::OUTCOME_ALREADY_PARKED, false, 'รถคันนี้กำลังจอดอยู่แล้ว ยังไม่ได้ Check-out');
         }
 
         $booking = Reservation::booking()

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Owner;
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLot;
 use App\Models\ParkingSlot;
+use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,32 +24,37 @@ class ParkingSlotController extends Controller
         );
     }
 
+    /** แผนผังช่องจอดทีละลาน — ทุกช่องของลานที่เลือก + การจอง/รถที่ใช้ช่องนั้นอยู่ */
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $lotId = $request->query('lot_id');
-        $status = $request->query('status');
+        $status = in_array($request->query('status'), ['available', 'reserved', 'occupied'], true) ? $request->query('status') : null;
 
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        $lotIds = $lots->pluck('id');
+        $lot = $lots->firstWhere('id', (int) $request->query('lot_id')) ?? $lots->first();
 
-        $slots = ParkingSlot::with(['parkingLot:id,name'])
-            ->whereIn('parking_lot_id', $lotIds)
-            ->when($q !== '', fn($query) => $query->where('slot_number', 'like', "%{$q}%"))
-            ->when($lotId, fn($query) => $query->where('parking_lot_id', $lotId))
-            ->when($status, fn($query) => $query->where('status', $status))
-            ->orderBy('parking_lot_id')
-            ->orderBy('slot_number')
-            ->paginate(15)
-            ->withQueryString();
+        $slots = $lot
+            ? ParkingSlot::where('parking_lot_id', $lot->id)->get(['id', 'parking_lot_id', 'slot_number', 'status'])
+                ->sortBy('slot_number', SORT_NATURAL)->values()
+            : collect();
 
-        return view('owner.parking-slots.index', compact('slots', 'lots', 'q', 'lotId', 'status'));
+        // ช่องที่ถูก Lock (ยืนยันแล้ว) หรือมีรถจอด (Check-in แล้ว) → การจองที่ใช้ช่องนั้น
+        $occupants = $lot
+            ? Reservation::with(['user:id,name', 'parkingLog:id,reservation_id,check_in_time'])
+                ->where('parking_lot_id', $lot->id)
+                ->whereIn('status', ['confirmed', 'checked_in'])
+                ->whereNotNull('parking_slot_id')
+                ->get()
+                ->keyBy('parking_slot_id')
+            : collect();
+
+        return view('parking.slots.index', compact('lots', 'lot', 'slots', 'occupants', 'q', 'status') + ['scope' => 'owner']);
     }
 
     public function create()
     {
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        return view('owner.parking-slots.create', compact('lots'));
+        return view('parking.slots.form', ['slot' => null, 'lots' => $lots, 'scope' => 'owner', 'selectedLotId' => (int) request()->query('lot_id')]);
     }
 
     public function store(Request $request)
@@ -67,15 +73,15 @@ class ParkingSlotController extends Controller
 
         audit_log('parking_slot.create', $slot, ['parking_lot_id' => $slot->parking_lot_id, 'slot_number' => $slot->slot_number]);
 
-        return redirect()->route('owner.parking-slots.index')
-            ->with('success', 'เพิ่มช่องจอดเรียบร้อยแล้ว');
+        return redirect()->route('owner.parking-slots.index', ['lot_id' => $slot->parking_lot_id])
+            ->with('success', "เพิ่มช่องจอด {$slot->slot_number} เรียบร้อยแล้ว");
     }
 
     public function edit(ParkingSlot $parking_slot)
     {
         $this->assertLotOwned($parking_slot->parking_lot_id);
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        return view('owner.parking-slots.edit', ['slot' => $parking_slot, 'lots' => $lots]);
+        return view('parking.slots.form', ['slot' => $parking_slot, 'lots' => $lots, 'scope' => 'owner', 'selectedLotId' => $parking_slot->parking_lot_id]);
     }
 
     /** แก้ไขได้เฉพาะเลขช่อง / ลาน — ช่องที่ถูกจองหรือมีรถจอดอยู่ย้ายลานไม่ได้ */
@@ -104,8 +110,8 @@ class ParkingSlotController extends Controller
 
         audit_log('parking_slot.update', $parking_slot, ['changes' => audit_changes($before, $parking_slot)]);
 
-        return redirect()->route('owner.parking-slots.index')
-            ->with('success', 'อัปเดตช่องจอดเรียบร้อยแล้ว');
+        return redirect()->route('owner.parking-slots.index', ['lot_id' => $parking_slot->parking_lot_id])
+            ->with('success', "อัปเดตช่องจอด {$parking_slot->slot_number} เรียบร้อยแล้ว");
     }
 
     public function destroy(ParkingSlot $parking_slot)
@@ -119,7 +125,7 @@ class ParkingSlotController extends Controller
                 return 'ไม่สามารถลบช่องจอดที่มีรถจอดอยู่';
             }
             if ($slot->status === 'reserved') {
-                return 'ไม่สามารถลบช่องจอดที่ถูก Lock ให้การจองที่ยืนยันแล้ว';
+                return 'ไม่สามารถลบช่องจอดที่ถูกล็อกให้การจองที่ยืนยันแล้ว';
             }
 
             $slot->delete();
@@ -132,14 +138,20 @@ class ParkingSlotController extends Controller
 
         audit_log('parking_slot.delete', $parking_slot, ['parking_lot_id' => $parking_slot->parking_lot_id, 'slot_number' => $parking_slot->slot_number]);
 
-        return redirect()->route('owner.parking-slots.index')
-            ->with('success', 'ลบช่องจอดเรียบร้อยแล้ว');
+        return redirect()->route('owner.parking-slots.index', ['lot_id' => $parking_slot->parking_lot_id])
+            ->with('success', "ลบช่องจอด {$parking_slot->slot_number} เรียบร้อยแล้ว");
     }
 
     public function bulkCreate()
     {
         $lots = ParkingLot::where('owner_id', Auth::id())->orderBy('name')->get(['id', 'name']);
-        return view('owner.parking-slots.bulk', compact('lots'));
+        // เลขช่องที่มีอยู่แล้วของแต่ละลาน — ให้หน้าตัวอย่างเตือนเลขซ้ำก่อนกดบันทึก (bulkStore ยังตรวจซ้ำอีกชั้น)
+        $existing = ParkingSlot::whereIn('parking_lot_id', $lots->pluck('id'))
+            ->get(['parking_lot_id', 'slot_number'])
+            ->groupBy('parking_lot_id')
+            ->map(fn ($slots) => $slots->pluck('slot_number')->values());
+
+        return view('parking.slots.bulk', ['lots' => $lots, 'existing' => $existing, 'scope' => 'owner', 'selectedLotId' => (int) request()->query('lot_id')]);
     }
 
     public function bulkStore(Request $request)
@@ -216,7 +228,7 @@ class ParkingSlotController extends Controller
             'slot_numbers' => array_slice($slotNumbers, 0, 50),
         ]);
 
-        return redirect()->route('owner.parking-slots.index')
+        return redirect()->route('owner.parking-slots.index', ['lot_id' => $data['parking_lot_id']])
             ->with('success', 'เพิ่มช่องจอดแบบหลายรายการเรียบร้อยแล้ว (' . count($slotNumbers) . ' ช่อง)');
     }
 }

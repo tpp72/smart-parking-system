@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\CsvExport;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,35 +27,21 @@ class AdminActionController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $query = $this->query($request);
-        $filename = 'audit_log_' . now()->format('Ymd_His') . '.csv';
-
-        return response()->streamDownload(function () use ($query) {
-            $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
-
-            fputcsv($out, ['id', 'created_at', 'actor_role', 'actor_name', 'actor_email', 'action', 'subject_type', 'subject_id', 'ip', 'user_agent', 'meta']);
-
-            $query->chunk(1000, function ($rows) use ($out) {
-                foreach ($rows as $r) {
-                    fputcsv($out, [
-                        $r->id,
-                        $r->created_at,
-                        $r->actor_role,
-                        $r->actor_role === 'system' ? 'ระบบ' : ($r->actor_name ?? 'บัญชีถูกลบ'),
-                        $r->actor_email,
-                        $r->action,
-                        $r->subject_type,
-                        $r->subject_id,
-                        $r->ip_address,
-                        $r->user_agent,
-                        self::metaText($r->meta),
-                    ]);
-                }
-            });
-
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return CsvExport::download('audit_log', [
+            'id', 'created_at', 'actor_role', 'actor_name', 'actor_email', 'action', 'subject_type', 'subject_id', 'ip', 'user_agent', 'meta',
+        ], $this->query($request), fn ($r) => [
+            $r->id,
+            $r->created_at,
+            $r->actor_role,
+            $r->actor_role === 'system' ? 'ระบบ' : ($r->actor_name ?? 'บัญชีถูกลบ'),
+            $r->actor_email,
+            $r->action,
+            $r->subject_type,
+            $r->subject_id,
+            $r->ip_address,
+            $r->user_agent,
+            self::metaText($r->meta),
+        ]);
     }
 
     /** Meta สำหรับแสดงผล (คงภาษาไทยไว้ ไม่ escape เป็น \uXXXX) */

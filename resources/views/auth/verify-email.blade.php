@@ -1,30 +1,26 @@
-<x-guest-layout>
-    <p class="mb-5 text-sm text-gray-400 leading-relaxed">
-        ขอบคุณที่สมัครสมาชิก! กรุณายืนยันอีเมลของคุณโดยคลิกลิงก์ที่ส่งไปในอีเมล
-    </p>
-
+<x-guest-layout title="ยืนยันอีเมล" description="ต้องยืนยันอีเมลก่อนจึงจะใช้การจอง การสแกน และการแจ้งเตือนได้">
     @if (session('status') == 'verification-link-sent')
-        <div class="mb-4 rounded-xl border border-green-800 bg-green-900/20 px-4 py-3
-                    text-sm font-semibold text-green-400">
-            ส่งลิงก์ยืนยันอีเมลใหม่ไปให้คุณแล้ว
-        </div>
+        <x-ui.alert tone="success" class="mb-6">ส่งลิงก์ยืนยันใหม่ไปที่ {{ auth()->user()->email }} แล้ว</x-ui.alert>
     @endif
 
-    <div class="flex items-center justify-between gap-3">
+    <p class="text-fg-2">
+        ระบบส่งลิงก์ยืนยันไปที่
+        <span class="font-semibold text-fg">{{ auth()->user()->email }}</span>
+        เปิดอีเมลแล้วกดลิงก์เพื่อเริ่มใช้งาน หากไม่พบ ให้ดูในโฟลเดอร์จดหมายขยะ
+    </p>
+
+    <div class="mt-6 flex flex-col gap-3">
         <form method="POST" action="{{ route('verification.send') }}">
             @csrf
-            <x-primary-button>
-                ส่งอีเมลยืนยันอีกครั้ง
-            </x-primary-button>
+            <x-ui.button type="submit" class="w-full">ส่งลิงก์ยืนยันอีกครั้ง</x-ui.button>
         </form>
 
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
-            <button type="submit"
-                class="text-sm text-gray-400 hover:text-red-400 underline underline-offset-2
-                       focus:outline-none focus:ring-2 focus:ring-red-500/60 rounded transition">
-                ออกจากระบบ
-            </button>
-        </form>
+        <div class="grid grid-cols-2 gap-3">
+            <x-ui.button variant="secondary" :href="route('profile.edit')">แก้ไขอีเมล</x-ui.button>
+            <form method="POST" action="{{ route('logout') }}" data-no-busy>
+                @csrf
+                <x-ui.button type="submit" variant="ghost" class="w-full">ออกจากระบบ</x-ui.button>
+            </form>
+        </div>
     </div>
 </x-guest-layout>

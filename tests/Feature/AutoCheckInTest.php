@@ -312,7 +312,7 @@ class AutoCheckInTest extends TestCase
 
         $this->assertDatabaseCount('license_plate_scans', 0);
         $this->assertDatabaseCount('reservations', 0);
-        $this->assertTrue($this->staffNotified('⚠ พบรถต้องสงสัย (Blacklist)'));
+        $this->assertTrue($this->staffNotified('⚠ พบรถในบัญชีดำ'));
         $this->assertDatabaseHas('admin_actions', [
             'action'       => 'ai_scan.blacklist_detected',
             'actor_role'   => 'system',

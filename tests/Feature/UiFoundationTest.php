@@ -1,0 +1,113 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\LicensePlateScan;
+use App\Models\OwnerResignation;
+use App\Models\Payment;
+use App\Models\Reservation;
+use App\Support\StatusCatalog;
+use Illuminate\Support\Js;
+use Illuminate\View\ViewException;
+use Tests\TestCase;
+
+/** UI Phase 1 — Foundation: status mapping, component, toast, theme, loading */
+class UiFoundationTest extends TestCase
+{
+    public function test_every_system_status_has_a_thai_label_without_english(): void
+    {
+        $sets = [
+            'reservation' => Reservation::STATUSES,
+            'payment'     => [Payment::STATUS_UNPAID, Payment::STATUS_PAID, Payment::STATUS_VOID],
+            'slot'        => ['available', 'reserved', 'occupied'],
+            'scan'        => [LicensePlateScan::RESULT_PASSED, LicensePlateScan::RESULT_LOW_ACCURACY, LicensePlateScan::RESULT_UNREADABLE],
+            'review'      => [OwnerResignation::STATUS_PENDING, OwnerResignation::STATUS_APPROVED, OwnerResignation::STATUS_REJECTED],
+        ];
+
+        foreach ($sets as $type => $values) {
+            $this->assertEqualsCanonicalizing($values, StatusCatalog::values($type), "{$type}: catalog ต้องครบทุกสถานะของระบบ");
+
+            foreach ($values as $value) {
+                foreach (StatusCatalog::AUDIENCES as $audience) {
+                    $status = StatusCatalog::resolve($type, $value, $audience);
+                    $this->assertTrue($status['known']);
+                    $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $status['label'], "{$type}.{$value} ห้ามมีภาษาอังกฤษ");
+                    $this->assertContains($status['tone'], StatusCatalog::TONES);
+                    $this->assertContains($status['shape'], StatusCatalog::SHAPES);
+                }
+            }
+        }
+    }
+
+    public function test_pending_reservation_wording_depends_on_audience_and_unknown_values_never_leak(): void
+    {
+        $this->assertSame('รอเจ้าหน้าที่ยืนยันรับเงิน', StatusCatalog::label('reservation', 'pending', 'user'));
+        $this->assertSame('รอยืนยันรับมัดจำ', StatusCatalog::label('reservation', 'pending', 'staff'));
+
+        $unknown = StatusCatalog::resolve('reservation', 'on_hold');
+        $this->assertFalse($unknown['known']);
+        $this->assertSame('ไม่ทราบสถานะ', $unknown['label']);
+        $this->assertSame('unknown', $unknown['key']);
+    }
+
+    public function test_status_component_renders_thai_label_shape_and_no_raw_value_text(): void
+    {
+        $this->blade('<x-ui.status type="payment" value="paid" />')
+            ->assertSee('ชำระแล้ว')
+            ->assertSee('data-status="paid"', false)
+            ->assertSee('<svg', false)
+            ->assertDontSee('>paid<', false);
+
+        $this->blade('<x-ui.status type="reservation" value="checked_in" audience="user" />')
+            ->assertSee('เช็คอินแล้ว')
+            ->assertDontSee('>checked_in<', false);
+    }
+
+    public function test_icon_only_button_requires_an_accessible_label(): void
+    {
+        $this->blade('<x-ui.button icon-only label="ปิดหน้าต่าง">x</x-ui.button>')
+            ->assertSee('aria-label="ปิดหน้าต่าง"', false);
+
+        try {
+            $this->blade('<x-ui.button icon-only>x</x-ui.button>');
+            $this->fail('ปุ่มไอคอนอย่างเดียวที่ไม่มี label ต้องถูกปฏิเสธ');
+        } catch (ViewException $e) {
+            $this->assertStringContainsString('aria-label', $e->getMessage());
+        }
+    }
+
+    public function test_flash_messages_become_toasts_only_when_enabled(): void
+    {
+        session()->flash('success', 'บันทึกการชำระเงินแล้ว');
+
+        $expected = Js::from([['tone' => 'success', 'message' => 'บันทึกการชำระเงินแล้ว']])->toHtml();
+
+        $this->blade('<x-ui.toast-region :flash="true" />')->assertSee($expected, false);
+        $this->blade('<x-ui.toast-region />')->assertDontSee($expected, false);
+    }
+
+    public function test_layout_sets_theme_before_paint_and_has_no_fullscreen_loader(): void
+    {
+        $response = $this->get(route('login'))->assertOk();
+
+        $response->assertSee("localStorage.getItem('sp-theme')", false)
+            ->assertSee('data-theme-preference', false)
+            ->assertSee('id="sp-progress"', false)
+            ->assertSee('role="radiogroup"', false)
+            ->assertDontSee('sp-page-loader', false)
+            ->assertDontSee('light-theme', false);
+    }
+
+    public function test_foundation_showcase_is_not_available_outside_local(): void
+    {
+        $this->get('/_ui')->assertNotFound();
+    }
+
+    public function test_foundation_showcase_view_renders(): void
+    {
+        $this->view('dev.ui-foundation')
+            ->assertSee('Foundation')
+            ->assertSee('รอเจ้าหน้าที่ยืนยันรับเงิน')
+            ->assertSee('role="tablist"', false);
+    }
+}

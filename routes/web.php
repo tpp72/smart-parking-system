@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\ReservationLogController;
 use App\Http\Controllers\Admin\AdminActionController;
+use App\Http\Controllers\Admin\ExportController;
 use App\Http\Controllers\Admin\ParkingLogController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\SuspiciousVehicleController;
@@ -34,6 +35,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// หน้าทดสอบ Design System (UI Phase 1 Foundation) — เปิดเฉพาะ APP_ENV=local ไม่ใช่ฟีเจอร์ของระบบ
+if (app()->environment('local')) {
+    Route::view('/_ui', 'dev.ui-foundation')->name('dev.ui-foundation');
+}
 
 // Smart redirect by role
 Route::get('/dashboard', function () {
@@ -78,6 +84,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.p
     // Admin Actions Log
     Route::get('admin-actions', [AdminActionController::class, 'index'])->name('admin-actions.index');
     Route::get('admin-actions/export', [AdminActionController::class, 'export'])->name('admin-actions.export');
+
+    // CSV Export (ทั้งระบบ กรองลานได้)
+    Route::get('exports', [ExportController::class, 'index'])->name('exports.index');
+    Route::get('exports/reservations', [ExportController::class, 'reservations'])->name('exports.reservations');
+    Route::get('exports/parking-logs', [ExportController::class, 'parkingLogs'])->name('exports.parking-logs');
+    Route::get('exports/revenue', [ExportController::class, 'revenue'])->name('exports.revenue');
     // Parking Log History
     Route::get('parking-logs', [ParkingLogController::class, 'index'])->name('parking-logs.index');
     // Payments

@@ -16,7 +16,8 @@ class ReservationLogController extends Controller
     {
         $lots = ParkingLot::ownedBy(Auth::id())->orderBy('name')->get(['id', 'name']);
 
-        return view('owner.reservation-logs.index', [
+        return view('staff.reservation-logs', [
+            'scope'    => 'owner',
             'logs'     => ReservationLogQuery::build($request, $lots->pluck('id'))->paginate(20)->withQueryString(),
             'lots'     => $lots,
             'statuses' => Reservation::STATUSES,

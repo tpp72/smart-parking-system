@@ -174,7 +174,7 @@ class CheckoutPaymentTest extends TestCase
         $this->actingAs($this->makeUser('admin'))
             ->get(route('admin.payments.index', ['status' => 'all']))
             ->assertOk()
-            ->assertSee('มัดจำ -฿40.00')
-            ->assertSee('ส่วนลด -฿40.00');
+            // ใบเสร็จย่อ: ชื่อรายการและยอดหักอยู่คนละช่อง
+            ->assertSeeInOrder(['หักมัดจำ', '−฿40.00', 'ส่วนลดการจอง', '−฿40.00']);
     }
 }

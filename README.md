@@ -5,86 +5,40 @@
 ![Laravel](https://img.shields.io/badge/Laravel-12-red)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 ![Claude](https://img.shields.io/badge/AI-Claude%20Vision-blueviolet)
-![Tests](https://img.shields.io/badge/E2E-Playwright-green)
+![Tests](https://img.shields.io/badge/tests-272%20passed-green)
 ![License](https://img.shields.io/badge/License-MIT-gray)
+
+> **Requirement ฉบับเต็มอยู่ที่ `docs/project-plan.md`** (Source of Truth) — README นี้สรุปเฉพาะสิ่งที่ระบบทำได้จริงในโค้ดปัจจุบัน
 
 ---
 
 ## สารบัญ
 
-1. [Features Overview](#features-overview)
+1. [ภาพรวมระบบ](#ภาพรวมระบบ)
 2. [Tech Stack](#tech-stack)
-3. [Requirements](#requirements)
-4. [Installation](#installation)
-5. [Demo Accounts (Seed Data)](#demo-accounts-seed-data)
-6. [Dev Commands](#dev-commands)
-7. [Roles & Permissions](#roles--permissions)
-8. [Business Logic](#business-logic)
-   - [เจตนาหลักของระบบ (Core System Intent)](#เจตนาหลักของระบบ-core-system-intent)
-   - [Reservation Lifecycle](#reservation-lifecycle)
-   - [Check-In Logic](#check-in-logic)
-   - [Check-Out & Fee Calculation](#check-out--fee-calculation)
-   - [Duplicate Guards](#duplicate-guards)
-   - [Grace Period & Auto-Expire](#grace-period--auto-expire)
-   - [User Reservation Management](#user-reservation-management)
-   - [Suspicious Vehicle Management](#suspicious-vehicle-management)
-   - [Dashboard Analytics Charts](#dashboard-analytics-charts)
-   - [AI Car Scan](#ai-car-scan)
-   - [Payment System](#payment-system)
-   - [Force Password Reset](#force-password-reset)
-9. [Database Schema](#database-schema)
-10. [E2E Testing (Playwright)](#e2e-testing-playwright)
+3. [Installation](#installation)
+4. [Demo Accounts](#demo-accounts)
+5. [Dev Commands](#dev-commands)
+6. [Roles & Permissions](#roles--permissions)
+7. [Business Logic](#business-logic)
+8. [Database Schema](#database-schema)
+9. [Routes](#routes)
+10. [Testing](#testing)
 11. [Project Structure](#project-structure)
 12. [Environment Variables](#environment-variables)
 
 ---
 
-## Features Overview
+## ภาพรวมระบบ
 
-### Admin Features
+รถเข้าลานได้ 2 ทาง: **จองล่วงหน้า** หรือ **Walk-in** (ขับเข้ามาเลย) ทั้งสองทางจบลงที่ Reservation หนึ่งรายการเสมอ
+กล้องที่ลาน (จำลองด้วยการอัปโหลดรูป) ส่งภาพให้ AI อ่านป้ายทะเบียน ระบบจึงเช็คอิน/เช็คเอาท์และจัดช่องจอดให้อัตโนมัติ
 
-| Feature | คำอธิบาย |
+| Role | ทำอะไรได้ |
 |---|---|
-| **Dashboard KPI** | Slots available/occupied/reserved, รายได้ (วันนี้/7 วัน/เดือน), รถที่กำลังจอด, ค้างชำระ, การจองใหม่, AI scans ล่าสุด |
-| **Dashboard Charts** | Pie: สถานะการจอง · Bar: สถานะช่องจอด · Horizontal Bar: Top 5 ลานจอด (Chart.js 4) |
-| **Parking Lots** | CRUD ลานจอด — ชื่อ, ที่อยู่, จำนวนช่อง, อัตรา/ชม. |
-| **Parking Slots** | CRUD ช่องจอดทีละตัว หรือ bulk create (สร้างหลายช่องพร้อมกัน) |
-| **Users** | จัดการผู้ใช้ — แก้ไขชื่อ/อีเมล/role, force password reset |
-| **Reservations** | CRUD การจองทั้งหมด — ยืนยัน, ค้นหา, กรองตามสถานะ/ลาน/วัน |
-| **Reservation Logs** | Audit log ทุก status change พร้อม export CSV |
-| **Admin Actions Log** | บันทึกทุก action ของ admin พร้อม export CSV |
-| **Manual Check-In** | เช็คอินรถ — auto-detect reservation ที่ตรงกัน |
-| **Manual Check-Out** | เช็คเอาท์รถ — คำนวณค่าจอด + สร้าง payment อัตโนมัติ |
-| **Parking Logs** | ประวัติ check-in/out ทั้งระบบ กรองตามทะเบียน/วัน |
-| **Vehicles** | CRUD ข้อมูลรถทั้งหมดในระบบ |
-| **Payments** | ติดตาม unpaid/paid, mark as paid |
-| **Suspicious Vehicles** | บัญชีดำทะเบียนรถ — เพิ่ม/แก้ไข/ลบ/toggle, ระดับความเสี่ยง (low/medium/high), เชื่อมกับ AI scan |
-| **AI Car Scan** | อัปโหลดรูป → Claude Vision → ได้ทะเบียน/สี/ยี่ห้อ พร้อม history |
-| **Notifications** | ดูและ mark read การแจ้งเตือน |
-
-### Owner Features
-
-| Feature | คำอธิบาย |
-|---|---|
-| **Owner Application** | สมัครเป็น owner ผ่าน `/owner/apply` — รอ admin อนุมัติ |
-| **Dashboard Charts** | Line: รายได้ 12 เดือน · Pie: สถานะการจอง · Bar: สถานะช่องจอด (เฉพาะลานของตัวเอง) |
-| **Parking Lots** | สร้าง/จัดการลานจอดของตัวเอง |
-| **Parking Slots** | สร้างช่องจอดทีละตัว หรือ bulk create |
-| **Reservations** | ดูการจองทั้งหมดของลานตัวเอง, ยืนยันการจอง |
-| **Revenue** | ดูรายได้ของลานจอด |
-| **Marketplace** | ลานจอดจะแสดงใน Marketplace เมื่อ active |
-| **Notifications** | รับแจ้งเตือนการจอง |
-
-### User Features
-
-| Feature | คำอธิบาย |
-|---|---|
-| **Dashboard** | สถานะการจอดปัจจุบัน, การจองที่รออยู่, ประวัติล่าสุด, ลานที่มีช่องว่าง |
-| **Reservations** | จองล่วงหน้า (สูงสุด 24 ชม.) โดยกรอกทะเบียนรถโดยตรง, แก้ไขทะเบียนก่อน Check-In, ยกเลิก (pending/confirmed เท่านั้น) |
-| **Parking Logs** | ดูประวัติการจอดของตัวเอง |
-| **AI Car Scan** | สแกนรถด้วย Claude Vision — ระบบจับคู่การจองอัตโนมัติ + auto check-in |
-| **Notifications** | รับแจ้งเตือนทุก event: ยืนยัน, ยกเลิก, หมดอายุ, check-in, check-out |
-| **Profile** | แก้ไขชื่อ, อีเมล, เปลี่ยนรหัสผ่าน |
+| **User** | จองล่วงหน้าไม่เกิน 1 วันโดยกรอกทะเบียนเอง, แก้ไขข้อมูลรถก่อนเช็คอิน, ยกเลิก, ดูประวัติการจอด, สแกนรถ, รับการแจ้งเตือน, สมัครเป็น Owner |
+| **Owner** | จัดการลาน/ช่องจอดของตัวเอง, ดูการจองและประวัติของลานตัวเอง, ยืนยันรับเงิน, Manual Check-in/out, ดูรายได้, ยื่นคำร้องลาออก |
+| **Admin** | ดูภาพรวมทั้งระบบทุกลาน, จัดการลานของ Admin (`owner_id = NULL`), จัดการผู้ใช้, อนุมัติคำขอ/คำร้องลาออกของ Owner, บัญชีดำ, Audit Log, CSV Export |
 
 ---
 
@@ -93,887 +47,252 @@
 | Layer | Technology |
 |---|---|
 | Backend | PHP 8.4, Laravel 12 |
-| Frontend | Blade, Tailwind CSS, Alpine.js, Vite 7 |
+| Frontend | Blade, Tailwind CSS 3, Alpine.js, Vite 7, flatpickr |
 | Database | PostgreSQL 18 |
-| AI Vision | Anthropic Claude Vision (claude-opus-4-8) |
-| Auth | Laravel Breeze |
-| Scheduler | Laravel built-in scheduler (auto-expire reservations) |
-| E2E Testing | Playwright (multi-browser, multi-viewport) |
-
----
-
-## Requirements
-
-- PHP 8.4+ (extensions: pdo_pgsql, gd, fileinfo, zip)
-- PostgreSQL 15+
-- Node.js 18+
-- Composer
-- Anthropic API Key — [console.anthropic.com](https://console.anthropic.com)
+| AI Vision | Anthropic Claude Vision (`anthropic-ai/sdk`) |
+| Scheduler | Laravel scheduler (หมดอายุการจองอัตโนมัติทุกนาที) |
+| Testing | PHPUnit (Feature) + Playwright (E2E) |
 
 ---
 
 ## Installation
 
 ```bash
-# 1. Clone
 git clone https://github.com/tpp72/smart-parking-system.git
 cd smart-parking-system
 
-# 2. Dependencies
 composer install
 npm install
 
-# 3. Environment
 cp .env.example .env
 php artisan key:generate
 ```
 
-แก้ไข `.env`:
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=smart-parking-system
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-
-ANTHROPIC_API_KEY=sk-ant-...
-CARSCAN_MODEL=claude-opus-4-8
-
-# Grace period สำหรับ late check-in (นาที, default 30)
-RESERVATION_GRACE_PERIOD=30
-```
+แก้ไข `.env` (ดู [Environment Variables](#environment-variables)) แล้ว:
 
 ```bash
-# 4. Database + Build
-php artisan migrate
+php artisan migrate --seed     # --seed เพื่อสร้างข้อมูลตัวอย่าง
 php artisan storage:link
 npm run build
-
-# 5. Run
 php artisan serve
 ```
 
 ---
 
-## Demo Accounts (Seed Data)
+## Demo Accounts
 
-รันด้วย `php artisan migrate:fresh --seed` เพื่อสร้างข้อมูลจำลองทั้งระบบ (ลานจอด, ช่องจอด, รถ, การจอง, payment, ฯลฯ) — ทุกบัญชี password: **`password`**
+`php artisan migrate:fresh --seed` จะสร้างข้อมูลจำลองทั้งระบบ — ทุกบัญชีรหัสผ่าน **`password`**
 
-| Email | Role | สถานะ |
+| Email | Role | หมายเหตุ |
 |---|---|---|
 | `admin@demo.com` | admin | — |
-| `owner@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
-| `owner2@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
-| `owner3@demo.com` | owner | approved (มีลานจอดของตัวเอง) |
+| `owner@demo.com`, `owner2@demo.com`, `owner3@demo.com` | owner | อนุมัติแล้ว มีลานจอดของตัวเอง |
 | `user@demo.com` | user | ผู้ใช้ทั่วไป |
-| `pending.owner@demo.com` | user | ส่งคำขอเป็น Owner แล้ว — รอ admin อนุมัติ |
-| `rejected.owner@demo.com` | user | คำขอเป็น Owner ถูกปฏิเสธแล้ว (มี rejection_reason) |
+| `pending.owner@demo.com` | user | ยื่นคำขอเป็น Owner รออนุมัติ |
+| `rejected.owner@demo.com` | user | คำขอถูกปฏิเสธ (มีเหตุผล) |
 
-นอกจากนี้ยังมี user ทั่วไปอีก ~22 คน (อีเมล `@example.com`) พร้อมรถและประวัติการจอง/เช็คอิน-เช็คเอาท์แบบสุ่มให้ทดสอบ dashboard/report ต่างๆ ได้ทันที (รหัสผ่านเดียวกันคือ `password`)
+มีผู้ใช้ทั่วไปอีก ~22 บัญชี (`testuser{n}@example.com`) พร้อมการจอง/ประวัติจอด/Payment แบบสุ่ม
+บัญชีระบบ `Walkin User` ใช้ผูกกับ Walk-in — เข้าสู่ระบบไม่ได้และไม่แสดงในหน้าจัดการผู้ใช้
 
 ---
 
 ## Dev Commands
 
-> **Legend:**
-> - `[SETUP]` — รันครั้งเดียวตอน clone/setup project ใหม่
-> - `[DAILY]` — รันทุกครั้งที่เปิด dev session
-> - `[KEEP RUNNING]` — รันทิ้งไว้ตลอด ห้ามปิด terminal
-> - `[AS NEEDED]` — รันเมื่อต้องการเท่านั้น
-
----
-
-### Setup ครั้งแรก (รันตามลำดับ)
-
 ```bash
-composer install              # [SETUP] ติดตั้ง PHP dependencies
-npm install                   # [SETUP] ติดตั้ง Node dependencies
-cp .env.example .env          # [SETUP] สร้างไฟล์ config (แก้ไขค่าใน .env ก่อน)
-php artisan key:generate      # [SETUP] สร้าง APP_KEY
-php artisan storage:link      # [SETUP] สร้าง symlink สำหรับ file upload
-php artisan migrate           # [SETUP] สร้างตาราง database ทั้งหมด
-npm run build                 # [SETUP] build frontend assets ครั้งแรก
-```
+php artisan serve              # [KEEP RUNNING] web server
+npm run dev                    # [KEEP RUNNING] frontend hot reload
+php artisan schedule:work      # [KEEP RUNNING] หมดอายุการจองอัตโนมัติ
 
----
-
-### เปิด Dev Server ทุกวัน (เปิด 3 terminal)
-
-```bash
-# Terminal 1 — [KEEP RUNNING] Web server
-php artisan serve
-# → http://127.0.0.1:8000
-```
-
-```bash
-# Terminal 2 — [KEEP RUNNING] Frontend hot reload
-npm run dev
-# → ใช้แทน npm run build ตอน dev (CSS/JS อัปเดตอัตโนมัติ)
-```
-
-```bash
-# Terminal 3 — [KEEP RUNNING] Scheduler (auto-expire reservations)
-php artisan schedule:work
-# → จำเป็นสำหรับ auto-expire reservation
-# → ถ้าไม่ได้ทดสอบฟีเจอร์การจอง ไม่ต้องเปิดก็ได้
-```
-
----
-
-### Database
-
-```bash
-php artisan migrate                  # [AS NEEDED] รัน migration ใหม่
-php artisan migrate:rollback         # [AS NEEDED] ย้อน migration ล่าสุด 1 ขั้น
-php artisan migrate:fresh            # [AS NEEDED] ⚠️ ลบทุกตารางแล้วสร้างใหม่
-php artisan migrate:fresh --seed     # [AS NEEDED] ⚠️ สร้างใหม่ + seed data
-```
-
----
-
-### Cache
-
-```bash
-php artisan config:cache    # [AS NEEDED] cache config (รันหลังแก้ .env)
-php artisan config:clear    # [AS NEEDED] ล้าง config cache
-php artisan cache:clear     # [AS NEEDED] ล้าง application cache
-php artisan route:clear     # [AS NEEDED] ล้าง route cache
-php artisan view:clear      # [AS NEEDED] ล้าง compiled view cache
-```
-
----
-
-### Build
-
-```bash
-npm run build    # [AS NEEDED] build สำหรับ production
-npm run dev      # [KEEP RUNNING] hot reload ตอน dev
-```
-
----
-
-### Tinker / Debug
-
-```bash
-php artisan tinker    # [AS NEEDED] REPL สำหรับรัน PHP code ทดสอบ
-
-# ตัวอย่าง: ทดสอบ auto-expire reservations
-php artisan reservations:expire --dry-run
-php artisan reservations:expire
-```
-
----
-
-### E2E Testing (Playwright)
-
-```bash
-# [SETUP] รันครั้งแรก หรือหลังเปลี่ยน password ของ test user
-npm run test:e2e:setup
-
-# ต้องรัน php artisan serve ก่อนเสมอ
-
-npm run test:e2e             # [AS NEEDED] รัน test ทุก browser
-npm run test:e2e:ui          # [AS NEEDED] รันพร้อม UI (เลือก test ได้)
-npm run test:e2e:headed      # [AS NEEDED] รันแบบเห็น browser จริง
-npm run test:e2e:debug       # [AS NEEDED] debug ทีละ step
-npm run test:e2e:chromium    # [AS NEEDED] รันเฉพาะ Chrome
-npm run test:e2e:firefox     # [AS NEEDED] รันเฉพาะ Firefox
-npm run test:e2e:webkit      # [AS NEEDED] รันเฉพาะ Safari
-npm run test:e2e:mobile      # [AS NEEDED] รันเฉพาะ mobile viewport
-npm run test:e2e:report      # [AS NEEDED] เปิด HTML report ล่าสุด
+php artisan migrate:fresh --seed   # [AS NEEDED] ล้างและ seed ข้อมูลใหม่
+php artisan reservations:expire --dry-run   # [AS NEEDED] ดูว่ามีการจองไหนจะหมดอายุ
+php artisan test                   # [AS NEEDED] PHPUnit
+npm run test:e2e                   # [AS NEEDED] Playwright (เปิด server + seed ให้เอง)
 ```
 
 ---
 
 ## Roles & Permissions
 
-| Role | สิทธิ์ |
-|---|---|
-| **admin** | จัดการทุกอย่าง: ลานจอด, ช่องจอด, ผู้ใช้, การจอง, check-in/out, payments, AI scan, owner applications, บัญชีดำ |
-| **owner** | จัดการลานจอดของตัวเอง, ยืนยันการจอง, ดูรายได้, แสดงใน Marketplace, ส่งคำร้องลาออกกลับเป็น User ได้ |
-| **user** | จองล่วงหน้า (สูงสุด 24 ชม.) โดยกรอกทะเบียนโดยตรง, ดูประวัติ, AI scan, สมัครเป็น Owner ได้ |
-
-**Role Management Rules:**
-- Admin ไม่สามารถเปลี่ยน role ตัวเองออกจาก admin ได้ (ป้องกัน lock-out)
-- Admin ปลด Owner → User ต้องระบุเหตุผล (บันทึกใน Audit Log)
-- Owner ยื่นคำร้องลาออก (ต้องระบุเหตุผล) ที่ `POST /owner/resignation` — มีผลเมื่อ Admin อนุมัติที่ `/admin/owner-resignations` (ยกเลิกการจองค้าง, เช็คเอาท์รถที่จอดอยู่, ลบลานของ Owner แล้วกลับเป็น User)
-
-สำหรับรายละเอียดทั้งหมดว่าแต่ละ role ทำอะไรได้บ้าง ดูที่ [docs/project-plan.md](docs/project-plan.md)
+- ควบคุมสิทธิ์ด้วย middleware `role:user` / `role:owner` / `role:admin` (+ `owner.approved` สำหรับเครื่องมือจัดการของ Owner)
+- ต้องยืนยันอีเมลก่อนใช้งานระบบหลัก · Force Password Reset ใช้กับทุก Role รวม Admin
+- **Ownership แยกจากสิทธิ์ระบบ:** Owner จัดการเฉพาะลานของตัวเอง · Admin จัดการเฉพาะลานของ Admin (`owner_id = NULL`) แต่ *ดู* ข้อมูลระดับระบบได้
+- การเป็น Owner ต้องผ่านคำขอสมัครเท่านั้น — Admin ตั้งผู้ใช้เป็น Owner โดยตรงไม่ได้
+- Admin ปลด Owner ต้องระบุเหตุผล และระบบจะปิดลานของ Owner แบบเดียวกับการอนุมัติคำร้องลาออก
+- Admin เปลี่ยน Role ตัวเองออกจาก admin หรือลบบัญชีตัวเองไม่ได้
 
 ---
 
 ## Business Logic
 
-### เจตนาหลักของระบบ (Core System Intent)
-
-> Smart Parking System คือ**ระบบจองและจัดการลานจอดรถอัจฉริยะ** โดยใช้**การสแกนป้ายทะเบียนรถ**เป็นกลไกหลักในการเช็คอิน/เช็คเอาท์ หลักการด้านล่างนี้เป็น**เจตนาหลักที่ยึดถือ** — ฟีเจอร์ใหม่หรือการแก้ไขใดๆ ควรตรวจสอบว่ายังสอดคล้องกับหลักการนี้อยู่
-
-**Auto Check-in:**
-- ถ้ามีการจองไว้: ป้ายทะเบียน**รวมจังหวัด**ต้องตรงกับที่จอง (**บังคับ**, นับเป็นเงื่อนไขเดียว) และต้องมี **สี หรือ ยี่ห้อ** ตรงกับที่แจ้งไว้ตอนจองอย่างน้อย 1 อย่าง ถึงจะเช็คอินอัตโนมัติได้
-- ถ้าไม่มีการจอง (Walk-in): บันทึกชื่อผู้ใช้เป็น "Walk-in" พร้อมบันทึกข้อมูลรถทั้งหมดที่สแกนได้ (ทะเบียน/สี/ยี่ห้อ)
-- ทุกครั้งที่เช็คอิน (ทั้งกรณีมีจองและ Walk-in) ต้องตรวจสอบกับฐานข้อมูลรถต้องสงสัย (Blacklist) — **ถ้าเข้าข่ายยังคงปล่อยให้เช็คอิน/จอดได้ตามปกติ แต่ต้องแจ้งเตือนไปยัง Owner (ของลานนั้น) และ Admin ทุกคน** พร้อมรายละเอียดรถที่เข้าข่าย, ลานจอดที่พบ, และเวลาที่พบ (**ไม่บล็อก**การเช็คอิน)
-
-**Check-in / Check-out:** ไม่มีหน้าแยกต่างหากอีกต่อไป — รวมเข้ากับหน้า **"การจอง"** (Admin/Owner) โดยตรง:
-- การจองที่ `confirmed` และถึงเวลาเช็คอินแล้ว จะมีปุ่ม **เช็คอิน** ในแถวนั้นเลย
-- การจองที่ `checked_in` จะมีปุ่ม **เช็คเอาท์** ที่กดแล้ว**ต้องเด้ง popup ยืนยัน**ก่อนเสมอ — popup โชว์ทะเบียน/**จอดมาแล้วกี่ชั่วโมง**/ค่าจอดโดยประมาณ ให้ตรวจสอบก่อนค่อยกดยืนยันจริง (ไม่ใช่กดปุ่มเดียวจบเหมือน check-in)
-- ตัวเลข "จอดมาแล้วกี่ชั่วโมง" **แสดงเฉพาะใน popup ยืนยันเท่านั้น** ไม่แสดงแทรกอยู่ในตารางเพราะทำให้แถวรกเกินไป
-- รถ **Walk-in** (ไม่มีการจอง) ไม่มีแถวในหน้า "การจอง" ให้กด จึงเช็คเอาท์ผ่านหน้า **"ประวัติการจอด"** แทน (ปุ่มเช็คเอาท์ + popup ยืนยันแบบเดียวกัน แสดงเฉพาะแถว Walk-in ที่ยังไม่เช็คเอาท์)
-
-**การชำระเงิน (Payment):** เป็นการยืนยันจากเจ้าของลาน (รับเงินสดแล้วกดยืนยัน ไม่มี payment gateway จริง) — รวมค่ามัดจำ (ตอนจอง) และค่าจอดหลัง Check-Out ไว้ใน**หน้าเดียว**คือหน้า "ชำระเงิน" โดยแสดง**ค่ามัดจำและค่าจอดเป็นช่องแยกกัน** (ไม่ใช่ยอดสุทธิรวมอย่างเดียว) คำนวณจาก: ระยะเวลาจอด (ชม.) × อัตรา − ค่ามัดจำ (ถ้ามี) ส่วน Walk-in คิดตามเรทเต็ม ไม่มีการหักค่ามัดจำ (เพราะไม่มีค่ามัดจำมาก่อน)
-
-**ผล Audit ล่าสุด (2026-08-02)** เทียบเจตนาข้างต้นกับโค้ดปัจจุบัน:
-
-| # | จุด | สถานะ | รายละเอียด |
-|---|---|---|---|
-| 1 | ทะเบียน+จังหวัด (บังคับ) + สี/ยี่ห้ออย่างน้อย 1 | ✅ ตรง | `CarScanService::matchScanAgainstReservation()` |
-| 2 | Payment คำนวณ ชม.×เรท−มัดจำ, walk-in ไม่มีมัดจำ | ✅ ตรง | `CheckOutService::checkOut()` |
-| 3 | Payment เป็นการยืนยันรับเงินสดจาก Owner/Admin | ✅ ตรง | `PaymentController::markPaid()` |
-| 4 | Check-in/out รวมเข้ากับหน้า "การจอง" พร้อม popup ยืนยันก่อน check-out | ✅ แก้แล้ว | ยุบหน้า Check-In/Check-Out แยกทิ้ง — ดูหัวข้อ Check-in/Check-out ด้านบน |
-| 5 | Blacklist check ระหว่าง auto check-in ที่**มีการจอง** | ✅ แก้แล้ว | `CarScanController::store()` เช็ค `is_suspicious` ทั้งกิ่งจับคู่ reservation และกิ่ง walk-in (ไม่บล็อก แค่แจ้งเตือน) |
-| 6 | แจ้งเตือน Owner+Admin เมื่อพบรถต้องสงสัย (พร้อมรถ/ลาน/เวลา) | ✅ แก้แล้ว | `CarScanController::notifySuspiciousVehicle()` — แจ้ง owner ของลาน (ถ้ามี) + admin ทุกคน |
-| 7 | Walk-in "ระบุชื่อผู้ใช้เป็น Walk-in" | ✅ แก้แล้ว | เพิ่มคอลัมน์ "ผู้ใช้" ในหน้า check-out list, parking-logs, payments — แสดงชื่อผู้จอง หรือ "Walk-in" ถ้าไม่มี reservation ผูกอยู่ |
-| 8 | หน้า Payment แสดงค่ามัดจำ+ค่าจอดแยกช่องกัน | ✅ แก้แล้ว | เพิ่มคอลัมน์ "ค่าจอด" (`parking_fee`) และ "มัดจำ" (`reservation_discount`) แยกจาก "ยอดรวม" (`total_amount`) |
-
----
-
 ### Reservation Lifecycle
 
-```
-[User สร้าง]
-     ↓
-  pending ──[Admin ยืนยัน]──→ confirmed
-     │                            │
-     │                    [รถ check-in ภายใน grace period]
-     │                            ↓
-     │                        checked_in  ← checked_in_at set
-     │                            │
-     │                    [รถ check-out]
-     │                            ↓
-     │                        completed   ← completed_at set
-     │
-     ├──[admin/user ยกเลิก]──→ cancelled
-     │
-     └──[scheduler, เกิน grace period]──→ expired
+```text
+pending ──[Mark as Paid เงินมัดจำ]──→ confirmed ──[Check-in]──→ checked_in ──[Check-out]──→ completed
+   │                                      │
+   └──────── cancelled / expired ─────────┘
 ```
 
-**สถานะทั้งหมด:**
-
-| สถานะ | ความหมาย | trigger |
-|---|---|---|
-| `pending` | รอ admin ยืนยัน | user สร้างการจอง |
-| `confirmed` | ยืนยันแล้ว รอรถมา | admin กด confirm |
-| `checked_in` | รถเข้าจอดแล้ว | check-in อัตโนมัติเมื่อรถมาถึง |
-| `completed` | เสร็จสมบูรณ์ | check-out อัตโนมัติ |
-| `expired` | หมดอายุ ไม่มา | scheduler (เกิน grace period) |
-| `cancelled` | ยกเลิก | admin หรือ user |
-
-**Slot Status Lifecycle (parking_slots.status):**
-
-```
-[Reservation created — pending]
-  slot status: unchanged (available)
-
-[Admin/Owner confirms — confirmed]
-  available → reserved      ← slot held for this reservation
-
-[Vehicle checks in — checked_in]
-  reserved → occupied       ← slot actively in use
-
-[Vehicle checks out — completed]
-  occupied → available      ← slot freed
-
-Cancellation paths:
-  cancelled  (pending/confirmed → cancelled)   reserved → available
-  expired    (scheduler)                       reserved → available
-```
-
-| ช่วงเวลา | `parking_slots.status` |
+| สถานะ | ความหมาย |
 |---|---|
-| ก่อน confirm (pending) | `available` |
-| หลัง confirm | `reserved` |
-| หลัง check-in | `occupied` |
-| หลัง check-out | `available` |
-| ยกเลิก / หมดอายุ | `available` |
+| `pending` | จองแล้ว รอเจ้าหน้าที่ยืนยันรับเงินมัดจำ (ยังไม่ถือครองช่องจอด) |
+| `confirmed` | ยืนยันรับเงินมัดจำแล้ว ระบบ Lock ช่องจอดให้ |
+| `checked_in` | รถเข้าจอดแล้ว ช่องจอดเป็น `occupied` |
+| `completed` | เช็คเอาท์แล้ว |
+| `cancelled` / `expired` | ยกเลิก / ไม่มาภายในเวลาที่กำหนด — คืนช่องจอด |
 
----
+**กฎเวลา:** จองได้เฉพาะเวลาในอนาคต ไม่เกิน 1 วันล่วงหน้า · เช็คอินได้ตั้งแต่เวลาจองจนถึง +60 นาที (ค่าคงที่ใน `config/parking.php`) · เกินจากนั้น scheduler เปลี่ยนเป็น `expired`
 
-### Check-In Logic
+### เงินมัดจำและค่าจอด
 
-เมื่อ admin กด Check-In สำหรับรถ:
+- **มัดจำ** = `hourly_rate × 1` สร้างเป็น Payment ตั้งแต่ตอนจอง (จำลองการชำระ — เจ้าหน้าที่กด **Mark as Paid** เมื่อรับเงินจริง)
+- มัดจำที่ยังไม่ชำระเมื่อยกเลิก/หมดอายุ → `void` · ที่ชำระแล้วไม่คืน
+- ถ้าตอนกด Mark as Paid ลานเต็ม → ยกเลิกการจอง, มัดจำเป็น `void`, แจ้งผู้จอง
+- **ค่าจอด** = ปัดขึ้นรายชั่วโมง ขั้นต่ำ 1 ชม. × อัตรา ณ เวลาเช็คอิน แล้วหักมัดจำที่ชำระแล้ว ตามด้วยส่วนลด `reservation_fee` — ยอดสุทธิไม่ติดลบ และถ้าเป็น 0 ระบบยืนยันชำระให้เอง
+- **Walk-in** ไม่มีมัดจำและไม่มีส่วนลด
 
-1. ตรวจสอบว่ารถยังไม่ได้อยู่ในระบบ (ไม่มี `parking_log` ที่ยังไม่ได้ check-out)
-2. ค้นหา `confirmed` reservation สำหรับรถนี้ที่อยู่ในช่วง grace period:
-   - `reserve_start ≤ now + 5 นาที` (รองรับ early check-in 5 นาที)
-   - `reserve_start ≥ now - GRACE_PERIOD` (ยังไม่เลย grace period)
-3. **ถ้าพบ reservation:**
-   - ใช้ lot ที่ reserve ไว้ (override lot ที่ admin เลือก)
-   - ถ้า reserve specific slot → ลอง slot นั้นก่อน (`reserved` หรือ `available`)
-   - ถ้า slot ถูกใช้ไปแล้ว หรือ reserve แค่ lot → หา slot ว่างใน lot นั้น
-   - สร้าง `parking_log` พร้อม `reservation_id`
-   - อัปเดต reservation → `checked_in` + บันทึก `checked_in_at`
-   - บันทึก `ReservationLog` (auto check-in)
-4. **ถ้าไม่พบ reservation (walk-in):**
-   - หา slot ว่าง (`available`) ใน lot ที่ admin เลือก
-   - สร้าง `parking_log` โดยไม่มี `reservation_id`
-5. อัปเดต slot status → `occupied` (`reserved`/`available` → `occupied`)
+### ช่องจอด
 
----
+ระบบเป็นผู้จัดช่องจอดเสมอ (ผู้ใช้เลือกได้แค่ลาน) · Lock ด้วย `FOR UPDATE SKIP LOCKED` กันการจองซ้ำ
+`available → reserved` เมื่อยืนยันมัดจำ · `→ occupied` เมื่อเช็คอิน · `→ available` เมื่อเช็คเอาท์/ยกเลิก/หมดอายุ
+ลบช่องจอดที่ `reserved` หรือ `occupied` ไม่ได้ · ลบลานที่ยังมีการจองค้างไม่ได้
 
-### Check-Out & Fee Calculation
+### AI Scan → Auto Check-in / Check-out
 
-เมื่อ admin กด Check-Out:
+1. อัปโหลดรูปรถ (จำลองกล้องที่ลาน) → Claude Vision อ่าน ทะเบียน / จังหวัด / ยี่ห้อ / สี / ความมั่นใจ
+2. ความแม่นยำต้อง **มากกว่า 85%** จึงจะใช้เช็คอิน/เช็คเอาท์อัตโนมัติ ไม่ผ่านเกณฑ์หรืออ่านไม่ได้ → บันทึกผลและแจ้ง Owner + Admin
+3. ถ้ารถคันนั้นจอดอยู่ในลานนี้ → **เช็คเอาท์อัตโนมัติ** พร้อมคำนวณค่าจอด
+4. ถ้าไม่ได้จอดอยู่ → หาการจอง `confirmed` ของ ทะเบียน + จังหวัด ในลานนี้
+   - ถึงเวลาจองแล้ว → เช็คอินด้วยการจองนั้น (ยี่ห้อและสีไม่ตรงทั้งคู่ ยังเช็คอินแต่แจ้งผู้ดูแลลาน)
+   - มาก่อนเวลาจอง → ไม่เช็คอินอัตโนมัติ แจ้งผู้ดูแลลานให้ Manual Check-in
+   - ไม่มีการจองใช้ได้ → **Walk-in** (ลานเต็มจะแจ้ง "ลานเต็ม" และไม่บันทึกผลสแกน)
+5. ทะเบียนที่อยู่ในบัญชีดำ **ไม่ถูกบล็อก** แต่แจ้งเตือน Owner + Admin และบันทึกเหตุการณ์
 
-1. ตรวจสอบว่ายังไม่ได้ check-out และไม่มี payment ซ้ำ
-2. คำนวณค่าจอด:
-   ```
-   minutes     = check_out_time - check_in_time
-   hours       = max(1, ceil(minutes / 60))   ← ปัดขึ้นเสมอ, ขั้นต่ำ 1 ชม.
-   parking_fee = hours × hourly_rate
-   deposit     = min(reservation.reservation_fee, parking_fee)   ← ค่ามัดจำที่จ่ายตอนจอง
-   total_amount = parking_fee - deposit   ← เงินที่ต้องชำระเพิ่ม
-   ```
-3. สร้าง `Payment`:
-   - `reservation_discount` = deposit (ค่ามัดจำที่หักออก)
-   - `total_amount` = ค่าจอดจริงหลังหักมัดจำ
-   - `payment_status` = `paid` ถ้า total_amount = 0, ไม่งั้น `unpaid`
-4. คืน slot → `available`
-5. **ถ้า parking_log มี reservation_id:**
-   - อัปเดต reservation → `completed` + บันทึก `completed_at`
-   - บันทึก `ReservationLog` (auto completed)
-6. Expire reservations ของรถนี้ที่ยังค้างอยู่และเลย grace period แล้ว
+### การแจ้งเตือน
 
-**ตัวอย่างคำนวณ (rate = 40 บ./ชม., มัดจำ = 40 บาท):**
+ผู้จองได้รับแจ้งทุกเหตุการณ์ของการจองตัวเอง (ยืนยัน, ยกเลิก, หมดอายุ, เช็คอิน, เช็คเอาท์)
+ผู้ดูแลลานได้รับแจ้งเฉพาะเรื่องผิดปกติ: รถต้องสงสัย, AI อ่านไม่ได้/ความแม่นยำต่ำ, รถมาก่อนเวลาจอง, ยี่ห้อ-สีไม่ตรง, เช็คเอาท์อัตโนมัติไม่สำเร็จ
 
-| check-in | check-out | ชม. | ค่าจอด | มัดจำ | คงเหลือ |
-|---|---|---|---|---|---|
-| 10:00 | 10:30 | 1 | 40 บาท | 40 บาท | **0 บาท** (ชำระแล้ว) |
-| 10:00 | 12:00 | 2 | 80 บาท | 40 บาท | **40 บาท** |
-| 10:00 | 14:00 | 4 | 160 บาท | 40 บาท | **120 บาท** |
+### Audit Log
 
----
-
-### Duplicate Guards
-
-**ฝั่ง User (ตรวจสอบตอนสร้างการจอง):**
-
-| เงื่อนไข | ข้อความ error |
-|---|---|
-| รถคันนี้มี `pending`/`confirmed`/`checked_in` อยู่แล้ว | รถคันนี้มีการจองที่ยังดำเนินการอยู่ |
-| User นี้มีการจองในช่วงเวลาเดียวกัน (ต่างรถ) | คุณมีการจองอื่นในช่วงเวลานี้อยู่แล้ว |
-| รถคันนี้กำลังจอดอยู่ในระบบ | รถคันนี้กำลังจอดอยู่แล้ว |
-| ช่องจอดนี้ถูกจองในช่วงเวลาเดียวกัน | ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว |
-| ช่องจอดไม่ได้อยู่ใน lot ที่เลือก | ช่องจอดนี้ไม่ได้อยู่ในลานที่เลือก |
-
-**ฝั่ง Admin (ตรวจสอบตอนสร้าง/แก้ไขการจอง):**
-- ตรวจ slot conflict เช่นเดียวกัน (slot + ช่วงเวลาทับซ้อน)
-- ใช้ `reserve_start` window = `[reserve_start, reserve_start + 1 ชม.]`
-
-**ฝั่ง Check-In:**
-- ตรวจสอบว่ารถยังไม่ได้จอดอยู่ (`parking_log` ที่ยังไม่ check-out)
-- `DB::lockForUpdate()` ป้องกัน race condition ตอนจอง slot
-
----
-
-### User Reservation Management
-
-User จองโดยกรอกทะเบียนรถโดยตรง — ไม่ต้องบันทึกรถในระบบก่อน
-
-| Action | Route | เงื่อนไข |
-|---|---|---|
-| สร้างการจอง | `POST /user/reservations` | กรอก license_plate, เลือกลาน/ช่อง/เวลา, ล่วงหน้า ≤ 24 ชม. |
-| ดูรายการจอง | `GET /user/reservations` | เฉพาะของตัวเอง |
-| แก้ไขทะเบียน | `PATCH /user/reservations/{id}/plate` | เฉพาะ pending/confirmed, ยังไม่ check-in |
-| ยกเลิกการจอง | `POST /user/reservations/{id}/cancel` | เฉพาะ pending/confirmed |
-
-**Duplicate Guards (ตรวจก่อน create):**
-
-| เงื่อนไข | Error |
-|---|---|
-| ทะเบียนนี้มี active reservation อยู่แล้ว | รถคันนี้มีการจองที่ยังดำเนินการอยู่ |
-| ทะเบียนนี้กำลังจอดอยู่ในระบบ | รถคันนี้กำลังจอดอยู่แล้ว |
-| User นี้มีการจองในช่วงเวลาเดียวกัน | คุณมีการจองอื่นในช่วงเวลานี้ |
-| ช่องจอดนี้ถูกจองในช่วงเวลาเดียวกัน | ช่องจอดนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว |
-
-**Business Rules — Cancel:**
-
-- เฉพาะเจ้าของ reservation (403 ถ้าไม่ใช่)
-- ยกเลิกได้เฉพาะ `pending` และ `confirmed`
-- ช่องจอดที่ `reserved` → คืนเป็น `available` อัตโนมัติ
-- บันทึก `ReservationLog` + ส่ง notification
-
----
-
-### Suspicious Vehicle Management
-
-Admin สามารถจัดการบัญชีดำทะเบียนรถ (Blacklist) ได้ผ่าน `/admin/suspicious-vehicles`:
-
-| Action | Route | หมายเหตุ |
-|---|---|---|
-| ดูรายการทั้งหมด | `GET /admin/suspicious-vehicles` | ค้นหาด้วยทะเบียน/เหตุผล, paginate 15 |
-| เพิ่มทะเบียน | `POST /admin/suspicious-vehicles` | license_plate unique |
-| แก้ไขทะเบียน | `PATCH /admin/suspicious-vehicles/{id}` | unique ignore self |
-| เปิด/ปิดใช้งาน | `POST /admin/suspicious-vehicles/{id}/toggle` | flip `is_active` |
-| ลบ | `DELETE /admin/suspicious-vehicles/{id}` | hard delete |
-
-**Business Rules:**
-
-- `license_plate` ต้องไม่ซ้ำกันในระบบ
-- `level` มี 3 ระดับ: `low`, `medium`, `high`
-- `is_active = false` หมายความว่าระงับชั่วคราว — ยังอยู่ในระบบแต่ AI scan จะไม่ flag
-- `added_by` บันทึก admin ที่เพิ่มอัตโนมัติ
-- ทุก action บันทึกใน Admin Actions Log ผ่าน `admin_audit()`
-- Dashboard KPI แสดงจำนวนบัญชีดำที่ใช้งานอยู่ (`is_active = true`)
-- AI scan เชื่อมกับตารางนี้ผ่าน `license_plate` JOIN
-
----
-
-### Grace Period & Auto-Expire
-
-**Grace Period** = ช่วงเวลาหลัง `reserve_start` ที่รถยังมาเช็คอินได้
-
-- Default: **30 นาที**
-- ตั้งค่าได้ใน `.env`: `RESERVATION_GRACE_PERIOD=30`
-- ตั้งค่าใน `config/parking.php`
-
-**Scheduler** (`reservations:expire`) รันทุก 1 นาที — ใน DB transaction เดียว:
-1. หาการจองที่ `pending` หรือ `confirmed` และ `reserve_start + grace_period ≤ now()`
-2. อัปเดต → `expired` + บันทึก `ReservationLog`
-3. **คืน slot อัตโนมัติ:** ช่องจอดที่มีสถานะ `reserved` → `available`
-4. ส่ง notification แจ้ง user ทุกคนที่ถูก expire
-- **ข้ามสถานะ `checked_in`** — รถเข้าแล้ว ไม่ expire ไม่คืน slot
-
-```bash
-# ทดสอบ scheduler แบบไม่แก้ข้อมูล
-php artisan reservations:expire --dry-run
-
-# รันจริง
-php artisan reservations:expire
-```
-
----
-
-### Dashboard Analytics Charts
-
-Charts are rendered client-side using **Chart.js 4** (CDN, loaded once via `@once`). All data is aggregated server-side with a single query per chart — no N+1 queries.
-
-**Reusable component:** `resources/views/components/dashboard-chart.blade.php`
-
-| Prop | Type | คำอธิบาย |
-|---|---|---|
-| `type` | string | `pie`, `doughnut`, `bar`, `line`, `horizontalBar` |
-| `title` | string | หัวข้อแสดงเหนือ chart |
-| `labels` | array | ป้ายกำกับแกน X / Pie slices |
-| `datasets` | array | Chart.js datasets array |
-| `height` | string? | CSS height (default: `280px` pie, `240px` bar/line) |
-
-**Admin Dashboard charts:**
-
-| Chart | Type | Data Source |
-|---|---|---|
-| สถานะการจอง | Pie | `reservations GROUP BY status` (all-time) |
-| สถานะช่องจอด | Bar | `parking_slots COUNT by status` (current) |
-| ลานจอดยอดนิยม | Horizontal Bar | `reservations JOIN parking_lots`, top 5 by count |
-
-**Owner Dashboard charts:**
-
-| Chart | Type | Data Source |
-|---|---|---|
-| รายได้ 12 เดือน | Line | `payments paid WHERE lot IN owner_lots`, grouped by `YYYY-MM` |
-| สถานะการจอง | Pie | `reservations WHERE parking_lot_id IN owner_lots` |
-| สถานะช่องจอด | Bar | `parking_slots WHERE parking_lot_id IN owner_lots` |
-
-Revenue trend fills all 12 months with `0` if no data — ensuring the x-axis always shows a complete 12-month window.
-
----
-
-### AI Car Scan + Reservation Matching + Auto Check-In
-
-**ขั้นตอน:**
-
-1. อัปโหลดรูปรถ (jpg/jpeg/png, max **5 MB**)
-2. ส่งไปยัง **Claude Vision API** → ได้ทะเบียน/สี/ยี่ห้อ
-3. ค้นหา `Vehicle` ที่ตรงกับทะเบียนในระบบ
-4. **Reservation Matching:** หาการจองสถานะ `confirmed` หรือ `checked_in` ของรถนี้
-5. **Auto Check-In:**
-   - ถ้าพบการจอง `confirmed` + อยู่ในช่วง check-in (± grace period) → `CheckInService.checkIn()` อัตโนมัติ
-   - ส่ง notification แจ้ง user เมื่อสำเร็จ
-   - ถ้าอยู่นอกช่วงเวลา → แสดงข้อความ "อยู่นอกช่วงเวลาเช็คอิน"
-6. แสดงผลบนหน้า scan: ทะเบียน, ยี่ห้อ, สี, รายละเอียดการจอง, ผลการ check-in
-7. บันทึกลง `license_plate_scans` (source: `manual_upload`)
-
-| Field | ตัวอย่าง |
-|---|---|
-| `license_plate` | `5กก 6285` |
-| `color` | `เงิน` |
-| `brand` | `Honda` |
-| `confidence` | `95` |
-
-**Models ที่รองรับ:**
-
-| Model | ราคา Input/1M | ราคา Output/1M | หมายเหตุ |
-|---|---|---|---|
-| `claude-opus-4-8` | $5.00 | $25.00 | แม่นสุด (default) |
-| `claude-haiku-4-5` | $1.00 | $5.00 | เร็วสุด ถูกสุด |
-| `claude-sonnet-4-6` | $3.00 | $15.00 | สมดุลระหว่างราคาและความแม่น |
-
-เปลี่ยน model ได้ใน `.env`: `CARSCAN_MODEL=claude-haiku-4-5`
-
----
-
-### Notification System
-
-ระบบส่ง in-app notification อัตโนมัติผ่าน `notify_user(int $userId, string $title, string $message)` helper ทุก event สำคัญ:
-
-| Event | ผู้รับ | หัวข้อ |
-|---|---|---|
-| Admin/Owner ยืนยันการจอง | User | การจองได้รับการยืนยัน |
-| Admin ยกเลิกการจอง | User | การจองถูกยกเลิก |
-| Scheduler expire การจอง | User | การจองหมดอายุ |
-| Auto check-in สำเร็จ (OCR) | User | เช็คอินสำเร็จ |
-| Check-out สำเร็จ | เจ้าของรถ | เช็คเอาท์เรียบร้อย |
-| Admin อนุมัติคำขอ Owner | ผู้สมัคร | คำขอเจ้าของลานจอดได้รับการอนุมัติ! 🎉 |
-| Admin ปฏิเสธคำขอ Owner | ผู้สมัคร | คำขอเจ้าของลานจอดไม่ได้รับการอนุมัติ (พร้อมเหตุผล) |
-
-Notifications ดูได้ที่ `/notifications` (รองรับทุก role)
-
----
-
-### Owner Application Workflow
-
-1. User ธรรมดาสมัครที่ `/owner/apply` (กรอก ชื่อธุรกิจ, ที่อยู่, เบอร์โทร, เหตุผล)
-2. Admin ตรวจสอบที่ `/admin/owner-applications`
-3. Admin กด **Approve** → role เปลี่ยนเป็น `owner` อัตโนมัติ
-4. Owner เข้า `/owner/dashboard` สร้างลานจอดและช่องจอด
-5. ลานจอดปรากฎใน Marketplace เมื่อ active
-
----
-
-### Payment System
-
-- Payment สร้างอัตโนมัติเมื่อ check-out
-- สถานะ: `unpaid` → `paid`
-- Admin กด "Mark Paid" เพื่อยืนยันการรับเงิน
-- `reservation_fee` (บน `reservations`) = ค่ามัดจำ 1 ชม. ตาม `hourly_rate` ของลานนั้น — เก็บตอน user สร้างการจอง
-- `reservation_discount` (บน `payments`) = ค่ามัดจำที่นำมาหักเมื่อ check-out — ไม่เกิน `parking_fee`
-- `total_amount` = `parking_fee - reservation_discount` — ถ้า = 0 ระบบ auto-mark `paid`
-
----
-
-### Force Password Reset
-
-Admin สามารถกำหนดรหัสผ่านชั่วคราวให้ user และบังคับเปลี่ยนรหัสผ่านก่อนเข้าใช้งาน:
-
-1. Admin → Users → แก้ไข user → กำหนดรหัสผ่านชั่วคราว
-2. User login ครั้งต่อไป → ถูก redirect ไปหน้า Profile ทันที
-3. User เปลี่ยนรหัสผ่านแล้วจึงเข้า Dashboard ได้
+ทุกการกระทำสำคัญของ user / owner / admin และของระบบเอง บันทึกลง `admin_actions` (`auth.*`, `reservation.*`, `payment.*`, `ai_scan.*`, `parking_lot.*`, `parking_slot.*`, `user.*`, `suspicious_vehicle.*`, `owner_application.*`, `owner_resignation.*`, `profile.*`) — Admin ดูและ Export ได้ทั้งระบบ
 
 ---
 
 ## Database Schema
 
-```
-users
-├── id, name, email, password
-├── role (admin|owner|user)
-├── owner_status (pending|approved|rejected|null) ← ใช้เฉพาะ role=owner
-├── force_password_reset (boolean)
-└── timestamps
+| ตาราง | ใจความสำคัญ |
+|---|---|
+| `users` | `role` (user/owner/admin), `owner_status`, `force_password_reset`, `is_system` (บัญชี Walk-in) |
+| `parking_lots` | `owner_id` (NULL = ลานของ Admin), `hourly_rate`, `reservations_enabled` |
+| `parking_slots` | `slot_number` ไม่ซ้ำในลานเดียวกัน, `status` available/reserved/occupied |
+| `reservations` | ทะเบียน + จังหวัด + ยี่ห้อ + สี, `reserve_start`, `deposit_amount`, `reservation_fee`, `is_walk_in`, `status` |
+| `parking_logs` | เวลาเข้า-ออกจริง, `hourly_rate` ณ เวลาเช็คอิน, ผูก 1:1 กับ reservation |
+| `payments` | `type` deposit/checkout, `payment_status` unpaid/paid/void, `paid_by`, `paid_at`, ยอดและส่วนหัก |
+| `reservation_logs` | ประวัติการเปลี่ยนสถานะการจอง (`changed_by` ว่าง = ระบบ) |
+| `license_plate_scans` | ผล AI: ทะเบียน/จังหวัด/สี/ยี่ห้อ/ความมั่นใจ, `result` passed/low_accuracy/unreadable, `is_suspicious` |
+| `suspicious_vehicles` | บัญชีดำตาม ทะเบียน + จังหวัด, ระดับความเสี่ยง, เปิด/ปิดได้ |
+| `notifications` | การแจ้งเตือนรายบุคคล + สถานะอ่าน |
+| `admin_actions` | Audit Log (`actor_role` user/owner/admin/system) |
+| `owner_applications` | คำขอเป็นเจ้าของลาน + เอกสารแนบ (ไฟล์ส่วนตัว) |
+| `owner_resignations` | คำร้องลาออกของ Owner (รอพิจารณาได้ครั้งละ 1 รายการ) |
 
-vehicles ← ใช้สำหรับ Admin check-in เท่านั้น (User ไม่ต้องบันทึกรถก่อนจอง)
-├── id, user_id → users
-├── license_plate, brand, color
-└── timestamps
+ข้อมูลที่ผูกกับลานจะถูกลบตามเมื่อลบลาน และลานของ Owner จะถูกลบตามเมื่อลบบัญชี Owner
 
-parking_lots
-├── id, name, location (nullable)
-├── address, district, province, landmark (nullable) ← ที่อยู่ละเอียดสำหรับค้นหา
-├── total_slots, hourly_rate (decimal)
-├── is_active (boolean), reservations_enabled (boolean)
-├── owner_id → users (nullable)
-└── timestamps
+---
 
-parking_slots
-├── id, parking_lot_id → parking_lots
-├── slot_number, status (available|occupied|reserved)
-└── timestamps
+## Routes
 
-reservations ← LIFECYCLE: pending → confirmed → checked_in → completed / expired / cancelled
-├── id, user_id → users
-├── license_plate (string) ← ทะเบียนรถที่จะมาจอด (กรอกตอนจอง)
-├── vehicle_id → vehicles (nullable) ← legacy / admin check-in
-├── parking_lot_id → parking_lots, parking_slot_id → parking_slots (nullable)
-├── reserve_start (timestamp)
-├── checked_in_at (nullable) ← set เมื่อ check-in
-├── completed_at  (nullable) ← set เมื่อ check-out
-├── reservation_fee (decimal), status
-└── timestamps
-
-reservation_logs ← Audit trail ทุก status change
-├── id, reservation_id → reservations
-├── old_status (nullable), new_status
-├── changed_by → users (nullable = auto/scheduler)
-├── note
-└── timestamps
-
-parking_logs ← Check-in/out records
-├── id, vehicle_id → vehicles
-├── parking_lot_id → parking_lots, parking_slot_id → parking_slots (nullable)
-├── reservation_id → reservations (nullable)
-├── check_in_time, check_out_time (nullable)
-└── timestamps
-
-payments
-├── id, parking_log_id → parking_logs
-├── reservation_id → reservations (nullable)
-├── total_hours, hourly_rate, parking_fee
-├── reservation_discount (decimal, default 0)
-├── total_amount, payment_status (unpaid|paid)
-└── timestamps
-
-license_plate_scans ← AI scan results
-├── id, user_id → users (nullable)
-├── vehicle_id → vehicles (nullable)
-├── license_plate, color, brand, confidence
-├── source (manual_upload)
-├── scan_time
-└── timestamps
-
-suspicious_vehicles ← Blacklist
-├── id, license_plate (unique), reason (nullable), level (low|medium|high)
-├── is_active (boolean, default true)
-├── added_by → users (nullable)
-└── timestamps
-
-owner_applications
-├── id, user_id → users
-├── business_name, contact_name, phone, email
-├── parking_lot_name, address, estimated_slots
-├── status (pending|approved|rejected), rejection_reason (nullable)
-├── reviewed_by → users (nullable), reviewed_at (nullable)
-└── timestamps
-
-admin_actions ← Admin audit log
-├── id, admin_id → users (nullable)
-├── action (string, dot notation เช่น 'reservation.confirm')
-├── subject_type, subject_id (nullable) ← polymorphic reference
-├── meta (json, nullable), ip_address, user_agent
-└── timestamps
-
-notifications
-├── id, user_id → users
-├── title, message
-├── is_read (boolean, default false)
-└── timestamps
-```
-
-### Route Structure
-
-```
-/                           → Welcome (สาธารณะ)
-/marketplace                → แสดงลานจอดทั้งหมด (สาธารณะ)
-/login, /register           → Authentication
-/dashboard                  → Redirect ตาม Role อัตโนมัติ
-
-/admin/...                  → Admin Panel (role: admin)
-  dashboard                 → KPI + Charts
-  check-in/create           → บันทึกรถเข้า
-  check-out                 → รายการรถที่จอดอยู่ (Check-Out)
-  payments                  → การชำระเงิน (Mark Paid)
-  reservations              → CRUD การจองทั้งระบบ + ยืนยัน
-  reservation-logs          → Audit log + Export CSV
-  admin-actions             → Admin Audit Log + Export CSV
-  parking-lots              → CRUD ลานจอด (พร้อมที่อยู่ละเอียด)
-  parking-slots             → CRUD ช่องจอด + Bulk Create
-  vehicles                  → CRUD รถในระบบ
-  users                     → จัดการผู้ใช้ + Force Reset + เปลี่ยน role
-  scan                      → AI Scan (อัปโหลดรูป → ทะเบียน)
-  suspicious-vehicles       → บัญชีดำ CRUD + toggle
-  owner-applications        → อนุมัติ/ปฏิเสธคำขอ Owner
-  owner-resignations        → อนุมัติ/ปฏิเสธคำร้องลาออกของ Owner
-
-/owner/...                  → Owner Portal (role: owner)
-  dashboard                 → ภาพรวม + Analytics
-  application               → ดูสถานะคำขอ
-  parking-lots              → จัดการลานของตน
-  parking-slots             → จัดการช่องจอดของตน
-  reservations              → การจองในลานของตน
-  revenue                   → รายงานรายได้
-  resignation               → POST ยื่นคำร้องลาออก (รอ Admin อนุมัติ)
-
-/user/...                   → User Panel (role: user)
-  dashboard                 → ภาพรวม
-  reservations              → การจองของฉัน (สร้าง/ดู/แก้ไขทะเบียน/ยกเลิก)
-  parking-logs              → ประวัติการจอดของฉัน
-  scan                      → AI Scan
-
-/owner/apply                → สมัครเป็น Owner (user ทุกคนเข้าได้)
+```text
+/                           → หน้าแรก
+/marketplace                → รายชื่อลานจอด (สาธารณะ)
+/dashboard                  → ส่งต่อไป dashboard ตาม role
 /notifications              → การแจ้งเตือน (ทุก role)
-/profile                    → แก้ไข Profile (ทุก role)
+/profile                    → โปรไฟล์ (ทุก role)
+
+/admin/...                  → role: admin
+  dashboard                 → ภาพรวมทั้งระบบ + Analytics
+  parking-lots · parking-slots → จัดการลานของ Admin (+ bulk create ช่องจอด)
+  users                     → จัดการผู้ใช้ + Force reset + ลบบัญชี
+  reservations              → ดู/ยกเลิก/Manual Check-in/Check-out
+  payments                  → ยืนยันรับเงิน (มัดจำ + ค่าจอด)
+  parking-logs · reservation-logs · admin-actions → ประวัติและ Audit Log (+ CSV)
+  exports                   → Export CSV (การจอง / ประวัติจอด / รายได้)
+  scan · scan/history       → AI Scan + ประวัติการสแกน
+  suspicious-vehicles       → บัญชีดำ
+  owner-applications        → อนุมัติ/ปฏิเสธคำขอเป็น Owner
+  owner-resignations        → อนุมัติ/ปฏิเสธคำร้องลาออก
+
+/owner/...                  → role: owner
+  dashboard · resignation   → ภาพรวม + ยื่นคำร้องลาออก
+  parking-lots · parking-slots · reservations · reservation-logs
+  payments · parking-logs · revenue · scan · scan/history
+
+/owner/apply · /owner/application → สมัคร/ดูสถานะคำขอเป็น Owner (ผู้ใช้ทั่วไป)
+
+/user/...                   → role: user
+  dashboard · reservations (สร้าง/แก้ทะเบียน/ยกเลิก) · parking-logs · scan
 ```
 
 ---
 
-## E2E Testing (Playwright)
+## Testing
 
-### Test Users (ต้องมีในฐานข้อมูลก่อนรัน)
-
-| Role | Email | Password |
-|---|---|---|
-| admin | admin@tester.com | Admin1234! |
-| user | user@tester.com | User1234! |
-
-### Test Suite Coverage
-
-| Test | คำอธิบาย |
-|---|---|
-| Auth Setup | Login ทั้ง 2 roles + save session state |
-| Crawl Dashboard | Crawl links จาก admin dashboard (max 60 หน้า) |
-| All Admin Routes | ตรวจ 22 routes — HTTP status, JS errors, broken images |
-| Guest Routes | ตรวจ 4 routes (/, /login, /register, /forgot-password) |
-| Coverage Report | visitRoutes() ครบ 22 admin routes + สร้าง coverage-report.md |
-| Responsive Layout | ตรวจ 5 key pages ที่ 375/768/1280px |
-| Form Inventory | ตรวจ 5 create pages — มี form + submit button |
-| Nav Integrity | ตรวจ nav links จาก dashboard |
-| Loading Speed | ตรวจ 12 routes ต้องโหลด < 5 วินาที |
-
-Reports สร้างที่ `e2e/reports/`:
-- `bug-report.md` — issues found
-- `coverage-report.md` — route coverage
-- `e2e/logs/error-log.json` — console/network errors
-
-### ผล E2E ล่าสุด
-
-> รายงานจากการรัน `npm run qa:audit` ครั้งล่าสุดที่มีอยู่ (**generated 2026-06-09** — รันก่อนการย้ายระบบ AI scan มาเป็น Claude Vision รันใหม่ด้วย `npm run qa:audit` เพื่ออัปเดตตัวเลข)
-
-```
-✓ Playwright E2E tests: 105 (Chromium)
-✓ Routes tested: 30
-✓ Bugs found: 0 (critical: 0)
-✓ Auth checks: 8 (failures: 0)
-✓ Responsive checks: 16 (failures: 0)
+```bash
+php artisan test        # PHPUnit — 272 passed
+npm run test:e2e        # Playwright — 2 flows ตาม project-plan §25.2
 ```
 
-Reports เต็มอยู่ที่ `e2e/reports/` — `bug-report.md`, `coverage-report.md`, `security-report.md`, `performance-report.md`, `responsive-report.md`, `authorization-report.md`, `css-report.md`
-
-### PHPUnit Tests
-
-รันด้วย `php artisan test` (ต้องมี DB `smart_parking_test` แยกจาก dev — ดูค่าใน `phpunit.xml`)
-
-```
-Tests: 126 total — 119 passing, 7 failing (327 assertions)
-```
-
-**Test files (23):**
-```
-tests/Feature/AdminSuspiciousVehicleTest.php      tests/Feature/OcrCheckInTest.php
-tests/Feature/Auth/*.php (5 files)                tests/Feature/ProfileTest.php
-tests/Feature/CheckInTest.php                     tests/Feature/ReservationCheckInIntegrationTest.php
-tests/Feature/CheckOutTest.php                     tests/Feature/ReservationDepositTest.php
-tests/Feature/DashboardChartDataTest.php           tests/Feature/ReservationNotificationsTest.php
-tests/Feature/ExampleTest.php                      tests/Feature/ReservationTest.php
-tests/Feature/ExpireReservationsTest.php           tests/Feature/SlotReservationLifecycleTest.php
-tests/Feature/LotReservationsEnabledTest.php       tests/Feature/SuspiciousVehicleBlacklistTest.php
-                                                    tests/Feature/UserCancelReservationTest.php
-tests/Unit/ExampleTest.php
-```
-
-⚠️ **Known failing (7)** — ทั้งหมดอยู่ใน `ReservationTest.php`, `ReservationDepositTest.php`, `LotReservationsEnabledTest.php`: test payload ยังส่งแค่ `vehicle_id` แบบเก่า แต่ `User\ReservationController::store()` ปัจจุบันบังคับ `license_plate` เป็น required field แล้ว (ตาม flow "จองด้วยทะเบียนโดยตรง") — ต้องอัปเดต test payload ให้ตรงกับ validation ปัจจุบัน
+- PHPUnit ใช้ฐานข้อมูล `smart_parking_test` (ตั้งใน `phpunit.xml`) และอ่าน `DB_PASSWORD` จาก `.env` / `.env.testing` — **ไม่มีรหัสผ่านใน repository**
+- E2E เปิด PHP server เอง, `migrate:fresh --seed` ฐานทดสอบ และใช้ AI โหมดจำลอง (`CARSCAN_FAKE`) โดยอ่านผลจากชื่อไฟล์รูป `ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy.png`
+- CI: `.github/workflows/tests.yml` รัน PHPUnit บน `main` และทุก Pull Request (PHP 8.4 + PostgreSQL)
+- ตาราง Requirement ↔ Test: `docs/TEST_COVERAGE.md` · รายการทดสอบด้วยมือ: `docs/UAT_CHECKLIST.md`
 
 ---
 
 ## Project Structure
 
-```
+```text
 app/
-├── Console/Commands/
-│   └── ExpireReservations.php     ← scheduler: auto-expire + slot release + notifications
+├── Console/Commands/ExpireReservations.php   ← หมดอายุการจอง (scheduler ทุกนาที)
 ├── Http/
-│   ├── Controllers/
-│   │   ├── Admin/
-│   │   │   ├── CheckInController.php        ← delegates to CheckInService
-│   │   │   ├── CheckOutController.php       ← checkout + fee + notification
-│   │   │   ├── OwnerApplicationController.php ← approve/reject owner applications
-│   │   │   ├── ParkingLotController.php
-│   │   │   ├── ParkingSlotController.php    ← single + bulk create
-│   │   │   ├── ReservationController.php    ← CRUD + confirm + notification
-│   │   │   ├── ReservationLogController.php ← audit log + CSV export
-│   │   │   ├── AdminActionController.php    ← admin audit + CSV export
-│   │   │   ├── PaymentController.php
-│   │   │   ├── SuspiciousVehicleController.php ← blacklist CRUD + toggle
-│   │   │   ├── UserController.php           ← user management + force reset
-│   │   │   └── VehicleController.php
-│   │   ├── Owner/
-│   │   │   ├── ApplicationController.php    ← apply / edit / view status
-│   │   │   ├── DashboardController.php
-│   │   │   ├── ParkingLotController.php
-│   │   │   ├── ParkingSlotController.php
-│   │   │   ├── ReservationController.php    ← confirm + notification
-│   │   │   └── RevenueController.php
-│   │   ├── User/
-│   │   │   ├── ReservationController.php    ← create + duplicate guards + 24h limit
-│   │   │   ├── VehicleController.php
-│   │   │   └── ParkingLogController.php
-│   │   ├── CarScanController.php            ← OCR + reservation match + auto check-in
-│   │   ├── DashboardController.php          ← admin + user dashboards
-│   │   └── NotificationController.php
-│   └── Middleware/
-│       ├── AdminMiddleware.php
-│       ├── RoleMiddleware.php
-│       └── ForcePasswordReset.php
-├── Models/
-│   ├── Reservation.php    ← ACTIVE_STATUSES, gracePeriodMinutes(), scopeCheckable()
-│   ├── ParkingLog.php     ← reservation() relation
-│   └── ...
+│   ├── Controllers/{Admin,Owner,User}/       ← แยกตาม Role
+│   ├── Controllers/CarScanController.php     ← AI Scan → ScanGateService
+│   └── Middleware/{RoleMiddleware,EnsureOwnerApproved,ForcePasswordReset,EnsureNotSystemUser}.php
+├── Models/                                   ← Reservation, ParkingLot, ParkingSlot, ParkingLog,
+│                                                Payment, LicensePlateScan, SuspiciousVehicle,
+│                                                OwnerApplication, OwnerResignation, AdminAction, ...
+├── Queries/                                  ← ReservationLogQuery, RevenueQuery, AdminExportQuery
 ├── Services/
-│   ├── CarScanService.php      ← Claude Vision API + findMatchingReservation()
-│   └── CheckInService.php      ← reusable check-in transaction (lockForUpdate)
-└── Support/
-    ├── notify_user.php         ← global helper: notify_user(userId, title, message)
-    └── admin_audit.php         ← global helper: admin_audit(action, subject?, meta?)
+│   ├── ReservationService.php                ← สร้าง/ยืนยัน/ยกเลิก/หมดอายุ
+│   ├── SlotAllocator.php                     ← จัดและ Lock ช่องจอด
+│   ├── CheckInService.php · CheckOutService.php
+│   ├── ScanGateService.php · AutoCheckInService.php · CarScanService.php
+│   ├── OwnerResignationService.php · OwnerLotClosureService.php · UserAccountService.php
+└── Support/{audit_log.php,notify_user.php}   ← global helpers
 
-config/
-├── parking.php    ← grace_period (RESERVATION_GRACE_PERIOD)
-└── carscan.php    ← Anthropic API key + model
-
-e2e/
-├── auth.setup.js          ← save auth sessions
-├── ai-test.test.js        ← full test suite
-├── utils/
-│   ├── routes.js          ← all routes list
-│   ├── crawler.js         ← link crawler
-│   ├── errorMonitor.js    ← console/network error listener
-│   ├── screenshot.js      ← screenshot helpers
-│   ├── uiDetector.js      ← overflow/invisible text/broken images
-│   ├── functional.js      ← form/button/nav collectors
-│   └── reporter.js        ← generate bug/coverage reports
-└── reports/               ← generated reports (gitignored)
+config/{parking.php,carscan.php,page_titles.php,thai_provinces.php,car_colors.php}
+database/{migrations,factories,seeders}
+resources/views/{admin,owner,user,scan,notifications,profile,auth,layouts,components,partials}
+e2e/                                          ← Playwright (reservation-flow, walk-in-flow)
+tests/Feature/                                ← PHPUnit
+docs/                                         ← project-plan.md (Source of Truth), TEST_COVERAGE, UAT_CHECKLIST
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | คำอธิบาย |
+| Variable | ค่าแนะนำ | คำอธิบาย |
 |---|---|---|
-| `DB_CONNECTION` | `pgsql` | Database driver |
-| `DB_HOST` | `127.0.0.1` | |
-| `DB_PORT` | `5432` | |
-| `DB_DATABASE` | `smart-parking-system` | |
-| `DB_USERNAME` | `postgres` | |
-| `DB_PASSWORD` | — | |
-| `ANTHROPIC_API_KEY` | — | **จำเป็น** — [console.anthropic.com](https://console.anthropic.com) |
-| `CARSCAN_MODEL` | `claude-opus-4-8` | Claude model (`claude-haiku-4-5` ถ้าต้องการประหยัด) |
-| `RESERVATION_GRACE_PERIOD` | `30` | Grace period (นาที) สำหรับ late check-in |
-| `APP_KEY` | — | สร้างด้วย `php artisan key:generate` |
+| `APP_ENV` | `local` | `local` / `testing` เท่านั้นที่เปิดโหมดจำลอง AI ได้ |
+| `DB_CONNECTION` | `pgsql` | ระบบใช้ PostgreSQL (partial index / CHECK constraint) |
+| `DB_DATABASE` | `smart-parking-system` | ฐานข้อมูลหลัก (ฐานทดสอบคือ `smart_parking_test`) |
+| `DB_USERNAME` / `DB_PASSWORD` | — | บัญชี PostgreSQL ของเครื่อง |
+| `MAIL_*` | SMTP | ใช้ส่งอีเมลยืนยันตัวตนและรีเซ็ตรหัสผ่าน |
+| `ANTHROPIC_API_KEY` | — | API Key ของ Claude ([console.anthropic.com](https://console.anthropic.com)) |
+| `CARSCAN_MODEL` | `claude-opus-4-8` | โมเดลที่ใช้อ่านภาพ |
+| `CARSCAN_VERIFY_SSL` | `true` | ปิดได้เฉพาะเครื่อง dev ที่ยังไม่ได้ตั้ง CA bundle |
+| `CARSCAN_FAKE` | `false` | `true` = จำลองผล AI จากชื่อไฟล์ (ใช้กับ E2E/เดโม) |
+| `E2E_DB_DATABASE` | `smart_parking_test` | ฐานข้อมูลที่ E2E ล้างและ seed (ชื่อต้องมีคำว่า `test`) |
 
----
-
-## Developer
-
-Developed by [tpp72](https://github.com/tpp72)
-
-## License
-
-MIT License
+> Grace period ของการเช็คอินเป็นค่าคงที่ 60 นาทีใน `config/parking.php` (ไม่ตั้งผ่าน `.env`)

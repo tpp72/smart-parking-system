@@ -7,7 +7,9 @@ use App\Models\ParkingLot;
 use App\Models\ParkingLog;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
+use App\Services\CheckOutService;
 use App\Services\ReservationService;
+use App\Support\StatusCatalog;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,23 +19,42 @@ class ReservationController extends Controller
 {
     public function __construct(private ReservationService $reservations) {}
 
-    /** รายการการจองของ user ที่ login อยู่ */
-    public function index()
+    /** รายการการจองของ user — แท็บ "กำลังดำเนินการ" (รอยืนยัน/ยืนยันแล้ว/กำลังจอด) และ "จบแล้ว" (เสร็จสิ้น/ยกเลิก/หมดอายุ) */
+    public function index(Request $request, CheckOutService $checkOut)
     {
-        $reservations = Reservation::with(['parkingLot:id,name', 'parkingSlot:id,slot_number', 'depositPayment'])
-            ->where('user_id', Auth::id())
-            ->orderByDesc('reserve_start')
-            ->paginate(10);
+        $tab = $request->query('tab') === 'done' ? 'done' : 'active';
+        $mine = fn () => Reservation::where('user_id', Auth::id());
 
-        return view('user.reservations.index', compact('reservations'));
+        $reservations = $mine()
+            ->with(['parkingLot:id,name,hourly_rate', 'parkingSlot:id,slot_number', 'depositPayment', 'parkingLog.payment'])
+            ->when($tab === 'active',
+                fn ($q) => $q->whereIn('status', Reservation::ACTIVE_STATUSES)->orderBy('reserve_start'),
+                fn ($q) => $q->whereNotIn('status', Reservation::ACTIVE_STATUSES)->orderByDesc('reserve_start'))
+            ->paginate(10)
+            ->withQueryString();
+
+        $counts = [
+            'active' => $mine()->whereIn('status', Reservation::ACTIVE_STATUSES)->count(),
+            'done'   => $mine()->whereNotIn('status', Reservation::ACTIVE_STATUSES)->count(),
+        ];
+
+        // รถที่จอดอยู่: ประมาณค่าจอด ณ ตอนนี้ (ยอดจริงคิดตอน Check-out)
+        $estimates = $reservations->getCollection()
+            ->filter(fn (Reservation $r) => $r->status === 'checked_in' && $r->parkingLog && ! $r->parkingLog->check_out_time)
+            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->calculate($r, $r->parkingLog, now())]);
+
+        return view('user.reservations.index', compact('reservations', 'tab', 'counts', 'estimates'));
     }
 
     /** ฟอร์มสร้างการจอง — User เลือกได้เฉพาะลาน (ลานที่เปิดรับจองและยังมีช่องว่าง) */
-    public function create()
+    public function create(Request $request)
     {
         $lots = ParkingLot::reservable()->withAvailableSlot()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
 
-        return view('user.reservations.create', compact('lots'));
+        // เลือกลานมาจากการ์ด "ลานที่ว่างแนะนำ" (?lot_id=) — ใช้ได้เฉพาะลานที่อยู่ในรายการที่จองได้
+        $selectedLotId = $lots->firstWhere('id', (int) $request->query('lot_id'))?->id;
+
+        return view('user.reservations.create', compact('lots', 'selectedLotId'));
     }
 
     /** บันทึกการจอง + สร้าง Deposit Payment — ช่องจอดถูกจัดสรรโดยระบบเมื่อยืนยันรับเงินมัดจำ */
@@ -131,7 +152,7 @@ class ReservationController extends Controller
 
         if (!in_array($reservation->status, ['pending', 'confirmed'], true)) {
             return redirect()->route('user.reservations.index')
-                ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
+                ->withErrors(['error' => 'แก้ไขข้อมูลรถได้เฉพาะก่อน Check-in — การจองนี้' . StatusCatalog::label('reservation', $reservation->status, 'user')]);
         }
 
         $plateNumber   = $reservation->license_plate;
@@ -147,7 +168,7 @@ class ReservationController extends Controller
 
         if (!in_array($reservation->status, ['pending', 'confirmed'], true)) {
             return redirect()->route('user.reservations.index')
-                ->withErrors(['error' => 'ไม่สามารถแก้ไขการจองที่มีสถานะ "' . $reservation->status . '" ได้']);
+                ->withErrors(['error' => 'แก้ไขข้อมูลรถได้เฉพาะก่อน Check-in — การจองนี้' . StatusCatalog::label('reservation', $reservation->status, 'user')]);
         }
 
         $data = $request->validate([
@@ -213,7 +234,7 @@ class ReservationController extends Controller
             'old_status'     => $reservation->status,
             'new_status'     => $reservation->status,
             'changed_by'     => Auth::id(),
-            'note'           => "User แก้ไขข้อมูลรถเป็น {$plate} {$province}" . ($brand ? " ยี่ห้อ {$brand}" : '') . ($color ? " สี {$color}" : ''),
+            'note'           => "ผู้ใช้แก้ไขข้อมูลรถเป็น {$plate} {$province}" . ($brand ? " ยี่ห้อ {$brand}" : '') . ($color ? " สี {$color}" : ''),
         ]);
 
         audit_log('reservation.update_vehicle', $reservation, [
@@ -232,7 +253,7 @@ class ReservationController extends Controller
     {
         abort_unless($reservation->user_id === Auth::id(), 403);
 
-        $result = $this->reservations->cancel($reservation, Auth::user(), 'User ยกเลิกการจอง');
+        $result = $this->reservations->cancel($reservation, Auth::user(), 'ผู้ใช้ยกเลิกการจอง');
 
         if (!$result['success']) {
             return redirect()->route('user.reservations.index')

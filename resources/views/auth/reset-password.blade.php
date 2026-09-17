@@ -1,34 +1,22 @@
-<x-guest-layout>
-    <form method="POST" action="{{ route('password.store') }}">
+<x-guest-layout title="ตั้งรหัสผ่านใหม่" description="ตั้งรหัสผ่านใหม่แล้วเข้าสู่ระบบด้วยรหัสผ่านนั้น">
+    <form method="POST" action="{{ route('password.store') }}" class="flex flex-col gap-5">
         @csrf
 
         <input type="hidden" name="token" value="{{ $request->route('token') }}">
 
-        <div>
-            <x-input-label for="email" :value="__('อีเมล')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email"
-                :value="old('email', $request->email)" required autofocus
-                autocomplete="username" placeholder="your@email.com" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+        <x-ui.field label="อีเมล" for="email" required>
+            <x-ui.input id="email" type="email" name="email" :value="old('email', $request->email)" required
+                autocomplete="username" inputmode="email" />
+        </x-ui.field>
 
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('รหัสผ่านใหม่')" />
-            <x-password-input id="password" name="password" autocomplete="new-password" required />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+        <x-ui.field label="รหัสผ่านใหม่" for="password" required hint="อย่างน้อย 8 ตัวอักษร">
+            <x-password-input id="password" name="password" autocomplete="new-password" required autofocus />
+        </x-ui.field>
 
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('ยืนยันรหัสผ่านใหม่')" />
-            <x-password-input id="password_confirmation" name="password_confirmation"
-                autocomplete="new-password" required />
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
+        <x-ui.field label="ยืนยันรหัสผ่านใหม่" for="password_confirmation" required>
+            <x-password-input id="password_confirmation" name="password_confirmation" autocomplete="new-password" required />
+        </x-ui.field>
 
-        <div class="mt-6">
-            <x-primary-button class="w-full justify-center">
-                รีเซ็ตรหัสผ่าน
-            </x-primary-button>
-        </div>
+        <x-ui.button type="submit" class="w-full">บันทึกรหัสผ่านใหม่</x-ui.button>
     </form>
 </x-guest-layout>
