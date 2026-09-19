@@ -1,5 +1,5 @@
 ---
-name: Smart Parking System
+name: Smart Parking
 description: One car, one parking ticket — a Thai parking operations app for users, lot owners and admins.
 colors:
   thermal-page: "#E9EBE7"
@@ -136,10 +136,10 @@ components:
     textColor: "{colors.stamp-indigo}"
     rounded: "{rounded.card}"
     padding: "0 12px"
-    height: "40px"
+    height: "44px"
 ---
 
-# Design System: Smart Parking System
+# Design System: Smart Parking
 
 ## Overview
 
@@ -155,7 +155,7 @@ The system rejects the glowing dark KPI-card dashboard it replaced. There are no
 - Square forms: 2px on controls and stamps, 6px on buttons and cards, never rounder.
 - Tabular monospace numerals for money, time, slot codes and counts.
 - Every number says its scope and unit ("12 คัน · รวมทุกลาน (8 ลาน)", "มัดจำ 1 · ฿40.00").
-- Every interactive target is at least 44px tall. The one exception is desktop sidebar rows (40px, pointer only).
+- Every interactive target is at least 44px tall, on every surface including the desktop sidebar.
 
 ## Colors
 
@@ -292,7 +292,7 @@ One unfinished reservation is shown as a single ticket:
 - **Left stub:** plate, car and booking number, split from the body by a dashed perforation.
 - **Body:** lot, slot, times, deposit line, the check-in rail, and one next action.
 
-It stacks vertically on phones.
+It stacks vertically on phones and always shows the whole ticket. A collapsed stub that expands on tap was considered and rejected: an unfinished booking is exactly what the page exists to show, so it never hides behind a tap.
 
 ### Check-in Rail (signature)
 A fixed-length bar covers the 60-minute check-in window, with a single indigo "now" marker that updates every 30 seconds. The phase text ("เหลือเวลาเช็คอิน 42 นาที") sits under it. Time-bound states always use this rail, never a countdown badge.

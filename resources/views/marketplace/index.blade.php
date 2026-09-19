@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="ค้นหาลานจอดรถที่มีช่องว่าง เทียบค่าจอดรายชั่วโมง แล้วจองผ่าน Smart Parking System">
-    <title>ตลาดที่จอดรถ — Smart Parking System</title>
+    <meta name="description" content="ค้นหาลานจอดรถที่มีช่องว่าง เทียบค่าจอดรายชั่วโมง แล้วจองผ่าน Smart Parking">
+    <title>ตลาดที่จอดรถ — Smart Parking</title>
 
     @include('partials.theme-init')
 
@@ -129,7 +129,7 @@
 
     <footer class="border-t border-line">
         <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-label text-fg-3 sm:px-6">
-            <p>© {{ date('Y') }} Smart Parking System</p>
+            <p>© {{ date('Y') }} Smart Parking</p>
             <p>โครงงานวิทยาการคอมพิวเตอร์</p>
         </div>
     </footer>

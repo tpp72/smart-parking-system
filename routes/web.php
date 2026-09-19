@@ -97,7 +97,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.p
     Route::post('payments/{payment}/mark-paid', [PaymentController::class, 'markPaid'])->name('payments.mark-paid');
     // AI Car Scan
     Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
-    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
+    // จำกัดจำนวนครั้งที่เรียก AI ต่อผู้ใช้ (ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย)
+    Route::post('scan', [CarScanController::class, 'store'])->middleware('throttle:30,1')->name('scan.store');
     Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
     // Suspicious Vehicles (Blacklist)
     Route::post('suspicious-vehicles/{suspiciousVehicle}/toggle', [SuspiciousVehicleController::class, 'toggle'])->name('suspicious-vehicles.toggle');
@@ -157,7 +158,8 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.p
 
     // AI Car Scan
     Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
-    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
+    // จำกัดจำนวนครั้งที่เรียก AI ต่อผู้ใช้ (ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย)
+    Route::post('scan', [CarScanController::class, 'store'])->middleware('throttle:30,1')->name('scan.store');
     Route::get('scan/history', [CarScanController::class, 'history'])->name('scan.history');
 });
 
@@ -186,7 +188,8 @@ Route::prefix('user')->name('user.')->middleware(['auth', 'verified', 'force.pas
     Route::get('parking-logs', [UserParkingLogController::class, 'index'])->name('parking-logs.index');
     // AI Car Scan (user)
     Route::get('scan', [CarScanController::class, 'create'])->name('scan.create');
-    Route::post('scan', [CarScanController::class, 'store'])->name('scan.store');
+    // จำกัดจำนวนครั้งที่เรียก AI ต่อผู้ใช้ (ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย)
+    Route::post('scan', [CarScanController::class, 'store'])->middleware('throttle:30,1')->name('scan.store');
 });
 
 // ===== Notifications (ทุก role) =====

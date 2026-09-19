@@ -24,8 +24,7 @@
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="5432"/>
         <env name="DB_DATABASE" value="smart_parking_test"/>
-        <env name="DB_USERNAME" value="postgres"/>
-        <!-- DB_PASSWORD ไม่เก็บในไฟล์นี้ — อ่านจาก .env / .env.testing (ไม่ commit) หรือ Environment ของ CI -->
+        <!-- DB_USERNAME / DB_PASSWORD อ่านจาก .env (บัญชีเฉพาะโปรเจกต์) หรือ Environment ของ CI -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

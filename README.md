@@ -1,11 +1,11 @@
-# Smart Parking System
+# Smart Parking
 
 ระบบจัดการลานจอดรถอัจฉริยะ พัฒนาด้วย **Laravel 12** + **Claude Vision AI**
 
 ![Laravel](https://img.shields.io/badge/Laravel-12-red)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 ![Claude](https://img.shields.io/badge/AI-Claude%20Vision-blueviolet)
-![Tests](https://img.shields.io/badge/tests-272%20passed-green)
+![Tests](https://img.shields.io/badge/tests-326%20passed-green)
 ![License](https://img.shields.io/badge/License-MIT-gray)
 
 > **Requirement ฉบับเต็มอยู่ที่ `docs/project-plan.md`** (Source of Truth) — README นี้สรุปเฉพาะสิ่งที่ระบบทำได้จริงในโค้ดปัจจุบัน
@@ -238,7 +238,7 @@ pending ──[Mark as Paid เงินมัดจำ]──→ confirmed ─�
 ## Testing
 
 ```bash
-php artisan test        # PHPUnit — 272 passed
+php artisan test        # PHPUnit — 326 passed
 npm run test:e2e        # Playwright — 2 flows ตาม project-plan §25.2
 ```
 
@@ -287,7 +287,7 @@ docs/                                         ← project-plan.md (Source of Tru
 | `APP_ENV` | `local` | `local` / `testing` เท่านั้นที่เปิดโหมดจำลอง AI ได้ |
 | `DB_CONNECTION` | `pgsql` | ระบบใช้ PostgreSQL (partial index / CHECK constraint) |
 | `DB_DATABASE` | `smart-parking-system` | ฐานข้อมูลหลัก (ฐานทดสอบคือ `smart_parking_test`) |
-| `DB_USERNAME` / `DB_PASSWORD` | — | บัญชี PostgreSQL ของเครื่อง |
+| `DB_USERNAME` / `DB_PASSWORD` | — | บัญชี PostgreSQL ของโปรเจกต์ (แนะนำบัญชีเฉพาะที่มีสิทธิ์ CREATEDB ไม่ใช่ superuser `postgres`) |
 | `MAIL_*` | SMTP | ใช้ส่งอีเมลยืนยันตัวตนและรีเซ็ตรหัสผ่าน |
 | `ANTHROPIC_API_KEY` | — | API Key ของ Claude ([console.anthropic.com](https://console.anthropic.com)) |
 | `CARSCAN_MODEL` | `claude-opus-4-8` | โมเดลที่ใช้อ่านภาพ |

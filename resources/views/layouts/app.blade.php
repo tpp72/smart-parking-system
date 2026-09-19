@@ -8,13 +8,14 @@
 
     @php
         $routeName = request()->route()?->getName();
-        $pageTitle = $routeName ? config("page_titles.$routeName") : null;
+        // คีย์ใน config/page_titles.php เป็นชื่อ route ที่มีจุด (admin.dashboard) — ต้องอ่านทั้งอาเรย์ ไม่ใช่ config('page_titles.admin.dashboard') ที่ Laravel จะตีความจุดเป็นระดับชั้น
+        $pageTitle = $routeName ? (config('page_titles')[$routeName] ?? null) : null;
         // เมนูตามบทบาท (App\Support\Navigation) — Admin/Owner: sidebar · User: แถบบน + แท็บล่าง
         $nav = auth()->check() ? \App\Support\Navigation::for(auth()->user()) : null;
     @endphp
 
     {{-- ชื่อระบบบนแท็บใช้ชื่อเดียวกับตราบนแถบเมนู (APP_NAME ใน .env เป็นชื่อสำหรับระบบภายใน) --}}
-    <title>{{ $pageTitle ? $pageTitle.' | Smart Parking System' : 'Smart Parking System' }}</title>
+    <title>{{ $pageTitle ? $pageTitle.' | Smart Parking' : 'Smart Parking' }}</title>
 
     @include('partials.theme-init')
 

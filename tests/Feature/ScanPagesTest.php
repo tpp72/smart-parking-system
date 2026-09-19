@@ -108,4 +108,20 @@ class ScanPagesTest extends TestCase
         $ownerView = $this->actingAs($owner)->get(route('owner.scan.history'))->assertOk()->assertViewIs('scan.history')->assertSee('ลานของคุณ');
         $this->assertSame([$mine->id], $ownerView->viewData('scans')->pluck('id')->all());
     }
+
+    /** กันเรียก Claude API รัว ๆ: สแกนได้ 30 ครั้งต่อนาทีต่อผู้ใช้ */
+    public function test_scan_upload_is_rate_limited_per_user(): void
+    {
+        $user = $this->makeUser('user');
+        $lot = ParkingLot::factory()->create();
+
+        // ส่งฟอร์มที่ไม่มีไฟล์ — ถูกนับโดย throttle ก่อนถึง validation
+        for ($i = 0; $i < 30; $i++) {
+            $this->actingAs($user)->post(route('user.scan.store'), ['parking_lot_id' => $lot->id])
+                ->assertStatus(302);
+        }
+
+        $this->actingAs($user)->post(route('user.scan.store'), ['parking_lot_id' => $lot->id])
+            ->assertStatus(429);
+    }
 }

@@ -25,7 +25,7 @@
                                 x-on:focus="tip = @js($item['label']); tipTop = $el.getBoundingClientRect().top + $el.offsetHeight / 2"
                                 x-on:mouseleave="tip = ''" x-on:blur="tip = ''"
                                 @class([
-                                    'relative flex min-h-10 items-center justify-center gap-3 rounded-card px-3 text-label transition-colors duration-fast xl:justify-start',
+                                    'relative flex min-h-touch items-center justify-center gap-3 rounded-card px-3 text-label transition-colors duration-fast xl:justify-start',
                                     'bg-primary/10 font-semibold text-primary-ink' => $item['active'],
                                     'text-fg-2 hover:bg-surface-2 hover:text-fg' => ! $item['active'],
                                 ])>
