@@ -44,7 +44,7 @@
 
         <div class="mt-10 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             {{-- ── ลานที่จองได้ตอนนี้ ───────────────────────────────────── --}}
-            <section aria-labelledby="lots-title">
+            <section aria-labelledby="lots-title" class="min-w-0">
                 <div class="flex items-baseline justify-between gap-3">
                     <h2 id="lots-title" class="text-h2 text-fg">ลานที่จองได้ตอนนี้</h2>
                     <a href="{{ route('user.reservations.create') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">เลือกจากทุกลาน</a>
@@ -60,7 +60,7 @@
                                 <a href="{{ route('user.reservations.create', ['lot_id' => $lot->id]) }}"
                                     class="group flex min-h-touch items-center gap-4 px-4 py-3 transition-colors duration-fast hover:bg-surface-2 sm:px-5">
                                     <div class="min-w-0 flex-1">
-                                        <p class="font-semibold text-fg">{{ $lot->name }}</p>
+                                        <p class="truncate font-semibold text-fg">{{ $lot->name }}</p>
                                         <p class="text-label text-fg-2">
                                             <span class="num">{{ Format::baht($lot->hourly_rate) }}</span> / ชม.
                                         </p>
@@ -78,7 +78,7 @@
             </section>
 
             {{-- ── ประวัติล่าสุด ───────────────────────────────────────── --}}
-            <section aria-labelledby="history-title">
+            <section aria-labelledby="history-title" class="min-w-0">
                 <div class="flex items-baseline justify-between gap-3">
                     <h2 id="history-title" class="text-h2 text-fg">จอดล่าสุด</h2>
                     <a href="{{ route('user.parking-logs.index') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">ประวัติทั้งหมด</a>

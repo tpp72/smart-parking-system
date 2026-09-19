@@ -779,7 +779,8 @@ class DatabaseSeeder extends Seeder
                 'result' => LicensePlateScan::classify($plate, $province, $confidence),
                 'is_suspicious' => $isSuspicious,
                 'source' => 'manual_upload',
-                'image_path' => 'car-scans/' . $scanTime->format('Ymd_His') . '_' . random_int(1000, 9999) . '.jpg',
+                // ข้อมูลตัวอย่างไม่มีไฟล์ภาพจริง จึงไม่ใส่ path (ถ้าใส่ หน้าประวัติสแกนจะโหลดภาพไม่ได้ = 403)
+                'image_path' => null,
                 'scan_time' => $scanTime,
                 'created_at' => $scanTime,
                 'updated_at' => $scanTime,
