@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Smart Parking System — ระบบจัดการลานจอดรถ ตั้งแต่จองล่วงหน้า ยืนยันมัดจำ อ่านป้ายทะเบียนด้วย AI จนถึงเช็คเอาท์และคิดค่าจอด">
-    <title>Smart Parking System</title>
+    <meta name="description" content="Smart Parking — ระบบจัดการลานจอดรถ ตั้งแต่จองล่วงหน้า ยืนยันมัดจำ อ่านป้ายทะเบียนด้วย AI จนถึงเช็คเอาท์และคิดค่าจอด">
+    <title>Smart Parking</title>
 
     @include('partials.theme-init')
 
@@ -64,8 +64,8 @@
         {{-- ── Hero: ชื่อระบบ + บัตรจอดรถตัวอย่าง ───────────────────────── --}}
         <section class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-24">
             <div>
-                <h1 class="text-[2.5rem] font-bold leading-[1.15] text-fg sm:text-[3.25rem]">Smart Parking System</h1>
-                <p class="mt-5 max-w-xl text-[1.125rem] leading-relaxed text-fg-2">
+                <h1 class="text-hero text-fg">Smart Parking</h1>
+                <p class="mt-5 max-w-xl text-lead text-fg-2">
                     ระบบจัดการลานจอดรถในที่เดียว ตั้งแต่จองล่วงหน้า ยืนยันมัดจำ อ่านป้ายทะเบียนด้วย AI
                     Check-in และ Check-out อัตโนมัติ จนถึงคิดค่าจอดและบันทึกการรับเงิน
                 </p>
@@ -201,7 +201,7 @@
 
     <footer class="border-t border-line">
         <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-label text-fg-3 sm:px-6">
-            <p>© {{ date('Y') }} Smart Parking System</p>
+            <p>© {{ date('Y') }} Smart Parking</p>
             <p>โครงงานวิทยาการคอมพิวเตอร์</p>
         </div>
     </footer>

@@ -9,7 +9,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <span class="inline-flex min-w-[8.5rem] flex-col items-center rounded-control border-2 border-fg px-3 py-1 text-center">
                 <span class="text-h3 font-bold leading-tight text-fg" x-text="checkout?.plate"></span>
-                <span class="text-[0.6875rem] leading-tight text-fg-2" x-text="checkout?.province"></span>
+                <span class="text-mini leading-tight text-fg-2" x-text="checkout?.province"></span>
             </span>
             <div class="text-label">
                 <p class="font-semibold text-fg" x-text="checkout?.place"></p>

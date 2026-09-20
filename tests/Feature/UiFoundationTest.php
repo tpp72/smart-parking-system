@@ -108,6 +108,27 @@ class UiFoundationTest extends TestCase
         $this->view('dev.ui-foundation')
             ->assertSee('Foundation')
             ->assertSee('รอเจ้าหน้าที่ยืนยันรับเงิน')
-            ->assertSee('role="tablist"', false);
+            ->assertSee('data-status-type="reservation"', false);
+    }
+
+    /** ธีมมืดต้องได้ทั้งตอนมี JavaScript (data-theme) และตอนปิด JavaScript (prefers-color-scheme) ด้วยค่าชุดเดียวกัน */
+    public function test_dark_tokens_are_identical_for_attribute_and_system_preference(): void
+    {
+        $css = file_get_contents(resource_path('css/tokens.css'));
+
+        $declarations = function (string $selector) use ($css): array {
+            $start = strpos($css, $selector);
+            $this->assertNotFalse($start, "ไม่พบ selector: $selector");
+            $body = substr($css, $start, strpos($css, '}', $start) - $start);
+            preg_match_all('/(--[a-z0-9-]+|color-scheme)s*:s*([^;]+);/i', $body, $m, PREG_SET_ORDER);
+
+            return collect($m)->mapWithKeys(fn ($d) => [trim($d[1]) => trim($d[2])])->all();
+        };
+
+        $byAttribute = $declarations(':root[data-theme="dark"]');
+        $byPreference = $declarations(':root:not([data-theme])');
+
+        $this->assertNotEmpty($byAttribute);
+        $this->assertSame($byAttribute, $byPreference);
     }
 }

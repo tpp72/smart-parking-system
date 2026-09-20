@@ -41,7 +41,7 @@
 {{ $salutation }}
 @else
 @lang('Regards,')<br>
-Smart Parking System
+{{ config('brand.name') }}
 @endif
 
 {{-- Subcopy --}}
