@@ -6,9 +6,9 @@
 
 @php
     [$box, $number, $prov] = match ($size) {
-        'sm' => ['min-w-[6.5rem] px-2 py-0.5 border', 'text-body', 'text-[0.625rem]'],
-        'lg' => ['min-w-[11rem] px-4 py-1.5 border-2', 'text-[1.75rem]', 'text-caption'],
-        default => ['min-w-[8.5rem] px-3 py-1 border-2', 'text-h3', 'text-[0.6875rem]'],
+        'sm' => ['min-w-[6.5rem] px-2 py-0.5 border', 'text-body', 'text-micro'],
+        'lg' => ['min-w-[11rem] px-4 py-1.5 border-2', 'text-h1', 'text-caption'],
+        default => ['min-w-[8.5rem] px-3 py-1 border-2', 'text-h3', 'text-mini'],
     };
 @endphp
 

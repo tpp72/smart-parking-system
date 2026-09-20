@@ -84,3 +84,39 @@
   --shadow-1: none;
   --shadow-overlay: 0 8px 20px -8px rgb(0 0 0 / 0.6);
 }
+
+/*
+ * ปิด JavaScript → partials/theme-init ตั้ง data-theme ไม่ได้ จึงใช้ค่าจากระบบปฏิบัติการแทน
+ * ค่าทั้งหมดต้องเหมือนบล็อก :root[data-theme="dark"] ด้านบนเสมอ — UiFoundationTest คุมไว้
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --color-page: 15 17 19;             /* #0F1113 */
+    --color-surface: 23 26 29;          /* #171A1D */
+    --color-surface-2: 30 34 38;        /* #1E2226 */
+    --color-line: 42 47 52;             /* #2A2F34 */
+    --color-field: 114 121 128;         /* #727980 */
+
+    --color-fg: 236 237 234;            /* #ECEDEA */
+    --color-fg-2: 196 200 195;          /* #C4C8C3 */
+    --color-fg-3: 149 155 151;          /* #959B97 */
+
+    --color-primary: 79 84 217;         /* #4F54D9 */
+    --color-primary-hover: 94 99 232;   /* #5E63E8 */
+    --color-primary-ink: 154 158 255;   /* #9A9EFF */
+    --color-on-primary: 255 255 255;
+
+    --color-success: 95 207 146;        /* #5FCF92 */
+    --color-warning: 237 180 83;        /* #EDB453 */
+    --color-danger: 255 129 117;        /* #FF8175 */
+    --color-on-danger: 21 23 26;
+
+    --color-scrim: 0 0 0;
+
+    /* Dark ไม่ใช้เงาเป็นลำดับชั้นหลัก — ใช้เส้นขอบ; เงาเหลือเฉพาะ overlay เพื่อแยกชั้น */
+    --shadow-1: none;
+    --shadow-overlay: 0 8px 20px -8px rgb(0 0 0 / 0.6);
+  }
+}
