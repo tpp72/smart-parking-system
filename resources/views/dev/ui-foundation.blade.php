@@ -108,11 +108,9 @@
                 @endforeach
                 <div class="flex flex-wrap items-center gap-3 border-t border-line pt-4">
                     <x-ui.button variant="secondary" href="#s-forms">ลิงก์แบบปุ่ม</x-ui.button>
-                    <x-ui.tooltip text="แสดงการแจ้งเตือน">
-                        <x-ui.button variant="ghost" icon-only label="การแจ้งเตือน">
-                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8a5 5 0 0 1 10 0c0 5 2 6 2 6H3s2-1 2-6M8.5 17a1.75 1.75 0 0 0 3 0" /></svg>
-                        </x-ui.button>
-                    </x-ui.tooltip>
+                    <x-ui.button variant="ghost" icon-only label="การแจ้งเตือน">
+                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8a5 5 0 0 1 10 0c0 5 2 6 2 6H3s2-1 2-6M8.5 17a1.75 1.75 0 0 0 3 0" /></svg>
+                    </x-ui.button>
                 </div>
             </div>
         </section>
@@ -213,20 +211,10 @@
                 </x-ui.dropdown>
             </div>
 
-            <div class="rounded-card border border-line bg-surface px-4 shadow-1">
-                <x-ui.tabs :tabs="['bookings' => 'การจอง', 'payments' => 'การชำระเงิน', 'empty' => 'ว่าง', 'loading' => 'กำลังโหลด', 'error' => 'ผิดพลาด']" label="ตัวอย่างแท็บ">
-                    <x-ui.tab-panel name="bookings"><p class="text-fg-2">รายการการจองของลานนี้</p></x-ui.tab-panel>
-                    <x-ui.tab-panel name="payments"><x-ui.loading-state variant="skeleton" /></x-ui.tab-panel>
-                    <x-ui.tab-panel name="empty">
-                        <x-ui.empty-state title="ยังไม่มีการจอง" description="เมื่อมีผู้จองลานนี้ รายการจะแสดงที่นี่">
-                            <x-ui.button variant="secondary" size="sm">ดูลานอื่น</x-ui.button>
-                        </x-ui.empty-state>
-                    </x-ui.tab-panel>
-                    <x-ui.tab-panel name="loading"><x-ui.loading-state /></x-ui.tab-panel>
-                    <x-ui.tab-panel name="error">
-                        <x-ui.error-state><x-ui.button variant="secondary" size="sm">ลองใหม่</x-ui.button></x-ui.error-state>
-                    </x-ui.tab-panel>
-                </x-ui.tabs>
+            <div class="rounded-card border border-line bg-surface p-4 shadow-1">
+                <x-ui.empty-state title="ยังไม่มีการจอง" description="เมื่อมีผู้จองลานนี้ รายการจะแสดงที่นี่">
+                    <x-ui.button variant="secondary" size="sm">ดูลานอื่น</x-ui.button>
+                </x-ui.empty-state>
             </div>
 
             <div class="rounded-card border border-line bg-surface p-4 shadow-1">

@@ -76,10 +76,10 @@
                                     class="row-span-2 block overflow-hidden rounded-control border border-line md:row-span-1"
                                     aria-label="เปิดภาพสแกน #{{ $scan->id }} ในแท็บใหม่">
                                     <img src="{{ Storage::url($scan->image_path) }}" alt="" loading="lazy" class="aspect-[4/3] w-full object-cover" onerror="this.classList.add('hidden'); this.nextElementSibling.classList.replace('hidden', 'flex')">
-                                    <span class="hidden aspect-[4/3] items-center justify-center px-1 text-center text-[0.6875rem] leading-tight text-fg-3">ไม่พบไฟล์ภาพ</span>
+                                    <span class="hidden aspect-[4/3] items-center justify-center px-1 text-center text-mini leading-tight text-fg-3">ไม่พบไฟล์ภาพ</span>
                                 </a>
                             @else
-                                <span class="row-span-2 flex aspect-[4/3] items-center justify-center rounded-control border border-dashed border-field px-1 text-center text-[0.6875rem] leading-tight text-fg-3 md:row-span-1">ไม่มีภาพ</span>
+                                <span class="row-span-2 flex aspect-[4/3] items-center justify-center rounded-control border border-dashed border-field px-1 text-center text-mini leading-tight text-fg-3 md:row-span-1">ไม่มีภาพ</span>
                             @endif
 
                             {{-- ทะเบียน + ที่ไหน เมื่อไร --}}

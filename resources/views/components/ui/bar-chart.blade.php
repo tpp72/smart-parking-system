@@ -24,7 +24,7 @@
     </div>
     <div class="mt-1.5 flex gap-1.5 sm:gap-2" aria-hidden="true">
         @foreach ($data as $i => $point)
-            <span @class(['min-w-0 flex-1 truncate text-center text-[0.625rem] leading-tight sm:text-caption', 'font-semibold text-fg' => $i === $lastIndex, 'text-fg-3' => $i !== $lastIndex])>{{ $point['label'] }}</span>
+            <span @class(['min-w-0 flex-1 truncate text-center text-micro leading-tight sm:text-caption', 'font-semibold text-fg' => $i === $lastIndex, 'text-fg-3' => $i !== $lastIndex])>{{ $point['label'] }}</span>
         @endforeach
     </div>
     <table class="sr-only">

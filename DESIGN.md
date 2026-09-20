@@ -207,8 +207,14 @@ The palette is a locked ink set: thermal paper and graphite, black print, one in
 - **Label** (600, 0.8125rem/1.25rem): field labels, nav items, secondary lines in rows, buttons at `sm` size.
 - **Caption** (400, 0.75rem/1.125rem): metadata, scope notes, timestamps.
 - **Receipt Figure** (Martian Mono 600, 2rem/2.5rem, tabular): KPI numbers. Smaller figures use the `.num` utility at the surrounding size.
+- **Mini** (400, 0.6875rem/1rem): the province line on a plate, the count on a nav badge, a raw code shown beside its Thai label.
+- **Micro** (400, 0.625rem/0.875rem): labels inside charts and bars, where nothing smaller than the bar itself fits.
+- **Lead** (400, 1.125rem/1.75): the opening paragraph of a public page.
+- **Hero** (700, clamp(2.5rem, 6vw, 3.25rem)/1.15): the home page headline, the one place type is allowed above Display.
 
 ### Named Rules
+**The Named Size Rule.** Type sizes come from this scale only (`text-h1`…`text-micro`). An arbitrary `text-[13.5px]` means the scale is missing a step: add the step instead.
+
 **The No Tracking Rule.** Letter-spacing is always `normal`. Tailwind `tracking-*` utilities are neutralized in the config because spacing breaks Thai clusters.
 
 **The Figures Are Mono Rule.** Money, times, counts, slot codes and IDs use `.num` (Martian Mono + tabular + slashed zero) or `.tabular`, so columns of receipt lines align.
@@ -238,6 +244,10 @@ The system is almost flat and reads like paper on a counter. In light mode, card
 
 ### Named Rules
 **The Flat Counter Rule.** Nothing at rest glows or lifts. No colored halos, no hover lift. Hover changes the surface tone (`bg-surface-2`) only.
+
+**The Reduced-Motion Rule.** With `prefers-reduced-motion`, movement stops but state still reads: transforms and animations are cut, while color, border, shadow and opacity keep their 120ms transition.
+
+**The No-Script Theme Rule.** Dark mode is set from `data-theme` before paint, and the same token values repeat under `prefers-color-scheme: dark` for `:root:not([data-theme])`, so the theme still follows the OS with JavaScript off. The two blocks must stay identical; a test compares them.
 
 ## Shapes
 
