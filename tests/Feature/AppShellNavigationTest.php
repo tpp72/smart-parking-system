@@ -159,6 +159,23 @@ class AppShellNavigationTest extends TestCase
         ]);
     }
 
+    /** ชื่อบนแท็บเบราว์เซอร์: ชื่อหน้าไทยจาก config/page_titles.php + ชื่อระบบ (คีย์มีจุด ต้องอ่านทั้งอาเรย์) */
+    public function test_browser_tab_shows_thai_page_title_with_product_name(): void
+    {
+        $admin = $this->makeUser('admin');
+
+        $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk()
+            ->assertSee('<title>ภาพรวมระบบ | Smart Parking</title>', false);
+
+        $this->actingAs($admin)->get(route('admin.users.index'))->assertOk()
+            ->assertSee('<title>ผู้ใช้ | Smart Parking</title>', false);
+
+        // ทุกหน้าที่มีเมนูต้องมีชื่อหน้าของตัวเอง ไม่ใช่ชื่อระบบเปล่า ๆ
+        $this->actingAs($this->makeUser())->get(route('user.dashboard'))->assertOk()
+            ->assertSee('<title>หน้าหลัก | Smart Parking</title>', false)
+            ->assertDontSee('Smart-Parking');
+    }
+
     private function unpaidCheckout(ParkingLot $lot): void
     {
         $slot = ParkingSlot::factory()->create(['parking_lot_id' => $lot->id]);

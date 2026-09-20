@@ -47,6 +47,10 @@ export default {
                 label: ['0.8125rem', { lineHeight: '1.25rem', fontWeight: '600' }], // 13px
                 caption: ['0.75rem', { lineHeight: '1.125rem' }],                   // 12px
                 kpi: ['2rem', { lineHeight: '2.5rem', fontWeight: '600' }],        // 32px
+                mini: ['0.6875rem', { lineHeight: '1rem' }],                       // 11px — จังหวัดบนป้ายทะเบียน, ตัวเลขบนตรา, รหัสเล็ก
+                micro: ['0.625rem', { lineHeight: '0.875rem' }],                   // 10px — ป้ายกำกับในกราฟ/แถบที่พื้นที่จำกัด
+                lead: ['1.125rem', { lineHeight: '1.75' }],                        // 18px — ย่อหน้านำของหน้าสาธารณะ
+                hero: ['clamp(2.5rem, 6vw, 3.25rem)', { lineHeight: '1.15', fontWeight: '700' }], // หัวข้อหน้าแรก
             },
 
             // มุม: control/badge/stamp 2px · ปุ่ม/การ์ด 6px (rounded-lg ขึ้นไปถูกจำกัดที่ 6px ตามโลกบัตรจอดรถ)

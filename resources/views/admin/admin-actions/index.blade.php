@@ -102,7 +102,7 @@
                                             {{ AuditCatalog::subject($r->subject_type) }}@if ($r->subject_id) <span class="tabular">#{{ $r->subject_id }}</span>@endif
                                         </span>
                                     @endif
-                                    <code class="font-mono text-[0.6875rem] text-fg-3">{{ $r->action }}</code>
+                                    <code class="font-mono text-mini text-fg-3">{{ $r->action }}</code>
                                 </p>
 
                                 <p class="mt-0.5 text-label text-fg-2">

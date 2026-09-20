@@ -10,7 +10,7 @@ class WelcomePageTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Smart Parking System')
+            ->assertSee('Smart Parking')
             ->assertSee(route('login'))
             ->assertSee(route('register'));
     }
