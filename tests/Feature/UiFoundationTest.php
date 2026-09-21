@@ -131,4 +131,37 @@ class UiFoundationTest extends TestCase
         $this->assertNotEmpty($byAttribute);
         $this->assertSame($byAttribute, $byPreference);
     }
+
+    /** หน้าแจ้งข้อผิดพลาดต้องเป็นภาษาไทยเหมือนหน้าอื่น ไม่ใช่หน้ามาตรฐานภาษาอังกฤษของ Laravel */
+    public function test_error_pages_are_thai(): void
+    {
+        $pages = [
+            '401' => 'ต้องเข้าสู่ระบบก่อน',
+            '403' => 'ไม่มีสิทธิ์เข้าถึง',
+            '404' => 'ไม่พบหน้าที่ต้องการ',
+            '419' => 'หน้านี้หมดอายุแล้ว',
+            '429' => 'ส่งคำขอถี่เกินไป',
+            '500' => 'ระบบขัดข้อง',
+            '503' => 'ปิดปรับปรุงชั่วคราว',
+        ];
+
+        foreach ($pages as $code => $heading) {
+            $html = view("errors.{$code}")->render();
+
+            $this->assertStringContainsString($heading, $html, "หน้า {$code} ต้องมีหัวข้อภาษาไทย");
+            $this->assertStringContainsString('lang="th"', $html);
+            $this->assertStringContainsString('กลับหน้าแรก', $html);
+            $this->assertStringNotContainsString('Not Found', $html);
+            $this->assertStringNotContainsString('Server Error', $html);
+        }
+    }
+
+    /** ผู้ใช้ที่ยังไม่เข้าสู่ระบบต้องเห็นหน้า 404 ภาษาไทย ไม่ใช่หน้ามาตรฐานของ framework */
+    public function test_missing_page_renders_the_thai_404(): void
+    {
+        $this->get('/ไม่มีหน้านี้')
+            ->assertNotFound()
+            ->assertSee('ไม่พบหน้าที่ต้องการ')
+            ->assertDontSee('Not Found');
+    }
 }

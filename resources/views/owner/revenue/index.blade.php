@@ -118,7 +118,9 @@
                 @if ($revenueByDay->isEmpty())
                     <p class="mt-4 text-fg-2">ยังไม่มีรายการรับเงินในช่วงนี้</p>
                 @else
-                    <div class="mt-3 max-h-80 overflow-y-auto">
+                    {{-- กล่องเลื่อนต้องโฟกัสได้ ไม่งั้นคีย์บอร์ดเลื่อนดูรายการที่เกินความสูงไม่ได้ (WCAG 2.1.1) --}}
+                    <div class="mt-3 max-h-80 overflow-y-auto rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink"
+                        tabindex="0" role="region" aria-labelledby="byday-title">
                         <table class="w-full text-label">
                             <thead class="sticky top-0 bg-surface">
                                 <tr class="border-b border-line text-caption text-fg-3">
