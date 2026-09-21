@@ -5,7 +5,7 @@
 ![Laravel](https://img.shields.io/badge/Laravel-12-red)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 ![Claude](https://img.shields.io/badge/AI-Claude%20Vision-blueviolet)
-![Tests](https://img.shields.io/badge/tests-326%20passed-green)
+![Tests](https://img.shields.io/badge/tests-330%20passed-green)
 ![License](https://img.shields.io/badge/License-MIT-gray)
 
 > **Requirement ฉบับเต็มอยู่ที่ `docs/project-plan.md`** (Source of Truth) — README นี้สรุปเฉพาะสิ่งที่ระบบทำได้จริงในโค้ดปัจจุบัน
@@ -238,7 +238,7 @@ pending ──[Mark as Paid เงินมัดจำ]──→ confirmed ─�
 ## Testing
 
 ```bash
-php artisan test        # PHPUnit — 326 passed
+php artisan test        # PHPUnit — 330 passed
 npm run test:e2e        # Playwright — 2 flows ตาม project-plan §25.2
 ```
 
