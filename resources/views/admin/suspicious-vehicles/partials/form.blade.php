@@ -48,7 +48,7 @@
                 <div class="mt-2 grid gap-2 sm:grid-cols-3">
                     @foreach ($levels as $key => [$label, $hint])
                         <label class="flex min-h-touch cursor-pointer items-start gap-3 rounded-card border border-line px-4 py-3 transition-colors duration-fast hover:bg-surface-2 has-[:checked]:border-primary-ink has-[:checked]:bg-primary/5">
-                            <input type="radio" name="level" value="{{ $key }}" required class="mt-1 h-4 w-4 border-field text-primary focus:ring-primary-ink" @checked($level === $key)>
+                            <input type="radio" name="level" value="{{ $key }}" required class="mt-0.5 h-5 w-5 border-field text-primary focus:ring-primary-ink" @checked($level === $key)>
                             <span>
                                 <span class="block font-semibold text-fg">{{ $label }}</span>
                                 <span class="block text-caption text-fg-3">{{ $hint }}</span>
