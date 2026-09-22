@@ -315,6 +315,9 @@ A fixed-length bar covers the 60-minute check-in window, with a single indigo "n
 - **Bar List:** labeled horizontal bars with the value printed at the end of each row. Current rows get an indigo wash.
 - Neither uses a charting library.
 
+### Help Popover
+Long-form explanation that a confident operator does not need — gate rules, scoring thresholds — hides behind a 44px `(i)` button in the panel header and opens as a floating card (`bg-surface`, `border-line`, `shadow-overlay`) anchored under the button. The mechanism is `<details>`/`<summary>`, so it still opens with JavaScript off; Alpine only adds close-on-outside-click and Escape. Help never occupies a column of its own: the page composes as if the explanation were not there.
+
 ### Confirm Dialog
 Every irreversible or money-moving form declares `data-confirm` (title, message, confirm label, tone, cancel label). A single shared alert dialog asks before submitting. The message names the car, the amount and the consequence. Inside an open modal, confirmation is a second step within that modal instead of a stacked dialog.
 

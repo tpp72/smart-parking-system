@@ -102,6 +102,7 @@
                         <h2 id="parked-title" class="text-h2 text-fg">รถที่จอดอยู่</h2>
                         <a href="{{ route('owner.reservations.index', ['status' => 'checked_in']) }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">ดูทั้งหมด</a>
                     </div>
+                    <p class="mt-1 text-label text-fg-3">เรียงจากเข้าลานล่าสุด แสดงไม่เกิน 8 คัน</p>
                     @if ($parked->isEmpty())
                         <p class="mt-4 rounded-card border border-line bg-surface px-4 py-6 text-center text-fg-2">ไม่มีรถจอดอยู่ในลานของคุณ</p>
                     @else

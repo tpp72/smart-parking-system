@@ -1,6 +1,8 @@
 @import '@fontsource-variable/anuphan';
 @import '@fontsource-variable/martian-mono';
 @import './tokens.css';
+/* CSS ตัวจริงของ flatpickr ต้องมาก่อนไฟล์ override เสมอ (เดิม import ไว้ใน JS จึงโหลดทีหลังและทับสีธีมมืด) */
+@import 'flatpickr/dist/flatpickr.css';
 @import './vendor/flatpickr.css';
 
 @tailwind base;

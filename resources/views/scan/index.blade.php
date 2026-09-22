@@ -1,6 +1,7 @@
 {{--
     AI สแกน — จำลองกล้องหน้าลาน: เลือกลาน (ตำแหน่งกล้อง) + อัปโหลดภาพรถ
     ระบบตรวจทิศทางเอง: รถจอดอยู่ในลานนี้ → Check-out · ไม่ได้จอด → จับคู่การจอง / Walk-in (ใช้ร่วมกันทุกบทบาท)
+    ยังไม่มีผล = การ์ดกล้องอยู่กลางหน้า · มีผลแล้ว = กล้องซ้าย ผลขวา
 --}}
 @php
     $role = auth()->user()->role;
@@ -24,10 +25,48 @@
             @endif
         </div>
 
-        <div class="grid items-start gap-6 lg:grid-cols-[22rem_1fr]">
+        <div @class([
+            'grid items-start gap-6',
+            'lg:grid-cols-[22rem_1fr]' => $hasResult,
+            'mx-auto max-w-md' => ! $hasResult,
+        ])>
             {{-- ── กล้อง (ฟอร์ม) ────────────────────────────────────── --}}
-            <section aria-labelledby="camera-title" @class(['rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6', 'order-2 lg:order-1' => $hasResult])>
-                <h2 id="camera-title" class="text-h3 text-fg">{{ $hasResult ? 'สแกนคันถัดไป' : 'กล้องหน้าลาน' }}</h2>
+            <section aria-labelledby="camera-title" @class(['order-2 rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6', 'lg:order-1' => $hasResult])>
+                <div class="flex items-center justify-between gap-2">
+                    <h2 id="camera-title" class="text-h3 text-fg">{{ $hasResult ? 'สแกนคันถัดไป' : 'กล้องหน้าลาน' }}</h2>
+
+                    {{-- กติกาที่ประตูลาน — ปุ่ม (i) เปิดแผ่นลอย ใช้ <details> จึงกดดูได้แม้ปิด JavaScript (Alpine เพิ่มปิดเมื่อคลิกนอกกรอบ/Escape) --}}
+                    <details class="group relative -me-1.5" x-data
+                        x-on:click.outside="$el.open = false"
+                        x-on:keydown.escape="$el.open = false">
+                        <summary
+                            class="flex min-h-touch min-w-touch cursor-pointer list-none items-center justify-center rounded-control text-fg-3 transition-colors duration-fast hover:text-fg group-open:text-primary-ink [&::-webkit-details-marker]:hidden">
+                            <x-ui.icon name="info" class="h-5 w-5" />
+                            <span class="sr-only">ดูกติกาที่ประตูลาน</span>
+                        </summary>
+
+                        <div
+                            class="absolute end-0 z-dropdown mt-1 w-[min(20rem,calc(100vw-3rem))] rounded-card border border-line bg-surface p-4 text-start shadow-overlay">
+                            <h3 class="text-label text-fg">ระบบตัดสินใจที่ประตูลานอย่างไร</h3>
+                            <ol class="mt-3 flex flex-col gap-3">
+                                @foreach ([
+                                    ['AI อ่านภาพ', "อ่านป้ายทะเบียน จังหวัด ยี่ห้อ สี และความแม่นยำ — ต้องแม่นยำเกิน {$threshold}% ถ้าไม่ผ่านจะบันทึกผลและแจ้งเจ้าหน้าที่ แต่ไม่ Check-in / Check-out ให้"],
+                                    ['ตรวจทิศทาง', 'ถ้ารถคันนี้กำลังจอดอยู่ในลานที่เลือก ระบบ Check-out และคิดค่าจอดทันที'],
+                                    ['จับคู่การจอง', 'ทะเบียนและจังหวัดตรง พร้อมยี่ห้อหรือสีตรง และอยู่ภายใน 60 นาทีหลังเวลาเริ่มจอง → Check-in ด้วยการจองนั้น'],
+                                    ['Walk-in', 'ไม่มีการจองที่ใช้ได้ → เข้าแบบ Walk-in ถ้าลานเต็มจะแจ้ง "ลานเต็ม" และไม่บันทึกผล · รถในบัญชีดำแจ้งเตือนแต่ยังให้เข้า'],
+                                ] as [$title, $text])
+                                    <li class="grid grid-cols-[1.5rem_1fr] gap-2.5">
+                                        <span class="num flex h-6 w-6 items-center justify-center rounded-control border border-line text-mini text-fg-2">{{ $loop->iteration }}</span>
+                                        <div>
+                                            <p class="text-label text-fg">{{ $title }}</p>
+                                            <p class="mt-0.5 text-caption text-fg-2">{{ $text }}</p>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+                    </details>
+                </div>
 
                 @if ($lots->isEmpty())
                     <p class="mt-3 text-fg-2">ยังไม่มีลานจอดในระบบ</p>
@@ -79,36 +118,18 @@
                 @endif
             </section>
 
-            {{-- ── ผลล่าสุด / วิธีทำงาน ─────────────────────────────── --}}
-            <div @class(['flex flex-col gap-4', 'order-1 lg:order-2' => $hasResult])>
-                @if ($errors->any())
-                    <x-ui.alert tone="danger" title="สแกนไม่สำเร็จ">{{ $errors->first() }}</x-ui.alert>
-                @endif
+            {{-- ── ผลล่าสุด ─────────────────────────────────────────── --}}
+            @if ($hasResult || $errors->any())
+                <div @class(['order-1 flex flex-col gap-4', 'lg:order-2' => $hasResult])>
+                    @if ($errors->any())
+                        <x-ui.alert tone="danger" title="สแกนไม่สำเร็จ">{{ $errors->first() }}</x-ui.alert>
+                    @endif
 
-                @if ($hasResult)
-                    @include('scan.partials.result')
-                @else
-                    <section aria-labelledby="how-title" class="rounded-card border border-line bg-surface p-5 shadow-1 sm:p-6">
-                        <h2 id="how-title" class="text-h3 text-fg">ระบบตัดสินใจที่ประตูลานอย่างไร</h2>
-                        <ol class="mt-4 flex flex-col gap-4">
-                            @foreach ([
-                                ['AI อ่านภาพ', "อ่านป้ายทะเบียน จังหวัด ยี่ห้อ สี และความแม่นยำ — ต้องแม่นยำเกิน {$threshold}% ถ้าไม่ผ่านจะบันทึกผลและแจ้งเจ้าหน้าที่ แต่ไม่ Check-in / Check-out ให้"],
-                                ['ตรวจทิศทาง', 'ถ้ารถคันนี้กำลังจอดอยู่ในลานที่เลือก ระบบ Check-out และคิดค่าจอดทันที'],
-                                ['จับคู่การจอง', 'ทะเบียนและจังหวัดตรง พร้อมยี่ห้อหรือสีตรง และอยู่ภายใน 60 นาทีหลังเวลาเริ่มจอง → Check-in ด้วยการจองนั้น'],
-                                ['Walk-in', 'ไม่มีการจองที่ใช้ได้ → เข้าแบบ Walk-in ถ้าลานเต็มจะแจ้ง "ลานเต็ม" และไม่บันทึกผล · รถในบัญชีดำแจ้งเตือนแต่ยังให้เข้า'],
-                            ] as [$title, $text])
-                                <li class="grid grid-cols-[2rem_1fr] gap-3">
-                                    <span class="num flex h-8 w-8 items-center justify-center rounded-control border border-line text-label text-fg-2">{{ $loop->iteration }}</span>
-                                    <div>
-                                        <p class="font-semibold text-fg">{{ $title }}</p>
-                                        <p class="mt-0.5 text-label text-fg-2">{{ $text }}</p>
-                                    </div>
-                                </li>
-                            @endforeach
-                        </ol>
-                    </section>
-                @endif
-            </div>
+                    @if ($hasResult)
+                        @include('scan.partials.result')
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
 </x-app-layout>

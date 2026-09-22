@@ -1,5 +1,4 @@
 import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.css';
 import { Thai } from 'flatpickr/dist/l10n/th.js';
 
 // ภาษาไทยของ flatpickr ไม่มีชื่อช่องสำหรับ screen reader (ค่าเริ่มต้นเป็นอังกฤษ "Year", "Hour") จึงเติมเอง

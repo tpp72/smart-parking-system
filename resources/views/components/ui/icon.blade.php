@@ -29,6 +29,7 @@
         'store'           => '<path d="M4 8.5v8h12v-8M2.75 8.5h14.5L15.5 3.5h-11z"/><path d="M8 16.5v-4h4v4"/>',
         'logout'          => '<path d="M8 3.5H4v13h4"/><path d="M8.5 10H17M14 7l3 3-3 3"/>',
         'menu'            => '<path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"/>',
+        'info'            => '<circle cx="10" cy="10" r="7.25"/><path d="M10 9.25v4.25M10 6.6v.01"/>',
         'chevron-down'    => '<path d="m6 8 4 4 4-4"/>',
         'chevron-right'   => '<path d="m8 6 4 4-4 4"/>',
     ];

@@ -25,6 +25,10 @@
 
     $unpaidCount = $stats['unpaid_deposits']['count'] + $stats['unpaid_checkouts']['count'];
     $newReservations = $reservationStatus->sum();
+
+    // ช่องตัวเลขเป็นสถานะไว้อ่าน ไม่ใช่ปุ่ม — ช่องที่มีหน้าจัดการต่อ ใส่ลิงก์ไว้ท้ายคำอธิบายแบบเดียวกันทุกช่อง
+    // (หน้าชำระเงินครอบคลุมเฉพาะลานของผู้ดูแลระบบ จึงไม่ส่งต่อลานที่เลือก)
+    $unpaidLink = route('admin.payments.index', ['status' => 'unpaid']);
 @endphp
 
 <x-app-layout>
@@ -136,7 +140,8 @@
                     <dd class="flex items-baseline gap-1.5"><span class="num text-kpi leading-none text-fg">{{ $unpaidCount }}</span><span class="text-label text-fg-2">รายการ</span></dd>
                     <dd class="text-caption text-fg-3">
                         มัดจำ <span class="tabular">{{ $stats['unpaid_deposits']['count'] }}</span> · <span class="tabular">{{ Format::baht($stats['unpaid_deposits']['amount']) }}</span><br>
-                        ค่าจอด <span class="tabular">{{ $stats['unpaid_checkouts']['count'] }}</span> · <span class="tabular">{{ Format::baht($stats['unpaid_checkouts']['amount']) }}</span>
+                        ค่าจอด <span class="tabular">{{ $stats['unpaid_checkouts']['count'] }}</span> · <span class="tabular">{{ Format::baht($stats['unpaid_checkouts']['amount']) }}</span> ·
+                        <a href="{{ $unpaidLink }}" class="font-semibold text-primary-ink underline-offset-4 hover:underline">ยืนยันรับเงิน</a>
                     </dd>
                 </div>
                 <div class="flex flex-col gap-1 bg-surface px-5 py-4">
