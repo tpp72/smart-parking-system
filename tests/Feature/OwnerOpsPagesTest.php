@@ -113,7 +113,7 @@ class OwnerOpsPagesTest extends TestCase
 
         $this->actingAs($user)->post(route('owner.application.store'), [
             'applicant_type' => 'individual', 'contact_name' => 'ผู้สมัคร', 'phone' => '0800000000', 'email' => 'apply@example.com',
-            'parking_lot_name' => 'ลานใหม่', 'district' => 'บางรัก', 'province' => 'กรุงเทพมหานคร', 'estimated_slots' => 20,
+            'parking_lot_name' => 'ลานใหม่', 'district' => 'บางรัก', 'subdistrict' => 'สีลม', 'province' => 'กรุงเทพมหานคร', 'estimated_slots' => 20,
         ])->assertRedirect(route('owner.application.show'));
 
         $this->actingAs($user)->get(route('owner.application.show'))->assertOk()
@@ -137,7 +137,7 @@ class OwnerOpsPagesTest extends TestCase
 
         $this->actingAs($user)->put(route('owner.application.update'), [
             'applicant_type' => 'company', 'business_name' => 'บริษัท ก จำกัด', 'contact_name' => 'ผู้สมัคร', 'phone' => '0800000000',
-            'email' => 'apply@example.com', 'parking_lot_name' => 'ลานเก่า', 'district' => 'บางรัก', 'province' => 'กรุงเทพมหานคร', 'estimated_slots' => 25,
+            'email' => 'apply@example.com', 'parking_lot_name' => 'ลานเก่า', 'district' => 'บางรัก', 'subdistrict' => 'สีลม', 'province' => 'กรุงเทพมหานคร', 'estimated_slots' => 25,
         ])->assertSessionHasNoErrors()->assertRedirect(route('owner.application.show'));
 
         $this->assertSame('pending', OwnerApplication::where('user_id', $user->id)->value('status'));

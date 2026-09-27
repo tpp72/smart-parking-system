@@ -6,12 +6,15 @@ import { registerToasts } from './ui/toast';
 import { registerConfirm } from './ui/confirm';
 import { registerComponents } from './ui/components';
 import { initNavigationFeedback } from './ui/navigation';
+import { initPlateInputs } from './ui/plate-input';
+import { addressSelect } from './ui/address-select';
 
 window.Alpine = Alpine;
 
 initTheme();
 
 Alpine.data('spThemeSwitch', themeSwitch);
+Alpine.data('spAddressSelect', addressSelect);
 registerToasts(Alpine);
 registerConfirm(Alpine);      // ดัก submit ของฟอร์ม data-confirm ก่อน (capture phase)
 registerComponents(Alpine);
@@ -19,3 +22,4 @@ registerComponents(Alpine);
 Alpine.start();
 
 initNavigationFeedback();     // แถบโหลดบาง ๆ ตอนเปลี่ยนหน้า + ปุ่ม submit กำลังดำเนินการ
+initPlateInputs();            // ช่องกรอกทะเบียนแสดงรูปแบบเดียวกับที่ระบบจะเก็บจริง

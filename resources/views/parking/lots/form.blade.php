@@ -41,16 +41,7 @@
                     <x-ui.field label="ที่อยู่ (เลขที่ / ถนน)" for="address" class="sm:col-span-2">
                         <x-ui.input id="address" name="address" :value="$value('address')" maxlength="500" placeholder="เช่น 123/4 ถ.สุขุมวิท" />
                     </x-ui.field>
-                    <x-ui.field label="แขวง / ตำบล / เขต" for="district">
-                        <x-ui.input id="district" name="district" :value="$value('district')" maxlength="255" />
-                    </x-ui.field>
-                    <x-ui.field label="จังหวัด" for="province">
-                        <x-ui.select id="province" name="province" placeholder="ไม่ระบุ">
-                            @foreach ($provinces as $province)
-                                <option value="{{ $province }}" @selected($currentProvince === $province)>{{ $province }}</option>
-                            @endforeach
-                        </x-ui.select>
-                    </x-ui.field>
+                    @include('partials.address-fields', ['value' => $value, 'required' => false])
                     <x-ui.field label="จุดสังเกต / ใกล้กับ" for="landmark" class="sm:col-span-2">
                         <x-ui.input id="landmark" name="landmark" :value="$value('landmark')" maxlength="500" placeholder="เช่น ใกล้ BTS อโศก" />
                     </x-ui.field>

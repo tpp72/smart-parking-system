@@ -60,7 +60,7 @@
                         'อีเมล' => $application->email,
                         'ชื่อลานจอด' => $application->parking_lot_name,
                         'จำนวนช่องจอดโดยประมาณ' => number_format($application->estimated_slots).' ช่อง',
-                        'ที่อยู่' => collect([$application->address, $application->district, $application->province])->filter()->implode(' '),
+                        'ที่อยู่' => collect([$application->address, $application->subdistrict, $application->district, $application->province, $application->postal_code])->filter()->implode(' '),
                     ] as $label => $val)
                         @continue(blank($val))
                         <div>
