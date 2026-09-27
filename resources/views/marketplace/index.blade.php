@@ -7,6 +7,8 @@
     <meta name="description" content="ค้นหาลานจอดรถที่มีช่องว่าง เทียบค่าจอดรายชั่วโมง แล้วจองผ่าน Smart Parking">
     <title>ตลาดที่จอดรถ — Smart Parking</title>
 
+    @include('partials.favicon')
+
     @include('partials.theme-init')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -43,9 +45,18 @@
         </div>
     </header>
 
-    <main id="main-content" tabindex="-1" class="mx-auto max-w-6xl px-4 py-8 focus:outline-none sm:px-6 lg:py-12">
-        <h1 class="text-h1 text-fg">ตลาดที่จอดรถ</h1>
-        <p class="mt-1 text-fg-2">ค้นหาลานจอดที่มีช่องว่าง เทียบค่าจอดรายชั่วโมง แล้วจองล่วงหน้า</p>
+    <main id="main-content" tabindex="-1" class="focus:outline-none">
+        {{-- แถบหัวหน้า: ลายน้ำโลโก้แบบเดียวกับ Hero หน้าแรก --}}
+        <div class="relative isolate overflow-hidden">
+            @include('partials.hero-watermark', ['height' => 'sm'])
+
+            <div class="mx-auto max-w-6xl px-4 pb-2 pt-8 sm:px-6 lg:pt-12">
+                <h1 class="text-h1 text-fg">ตลาดที่จอดรถ</h1>
+                <p class="mt-1 text-fg-2">ค้นหาลานจอดที่มีช่องว่าง เทียบค่าจอดรายชั่วโมง แล้วจองล่วงหน้า</p>
+            </div>
+        </div>
+
+        <div class="mx-auto max-w-6xl px-4 pb-8 sm:px-6 lg:pb-12">
 
         <form method="GET" role="search" class="mt-6 flex flex-wrap items-end gap-3 rounded-card border border-line bg-surface p-4 shadow-1 sm:p-5">
             <input type="hidden" name="sort" value="{{ $sort }}">
@@ -80,7 +91,7 @@
             <ul class="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 @foreach ($lots as $lot)
                     @php
-                        $address = collect([$lot->address, $lot->district, $lot->province])->filter()->implode(' ');
+                        $address = collect([$lot->address, $lot->subdistrict, $lot->district, $lot->province, $lot->postal_code])->filter()->implode(' ');
                         $available = (int) $lot->available;
                         $occupied = (int) $lot->occupied;
                         $reserved = max(0, (int) $lot->slot_count - $available - $occupied);
@@ -125,6 +136,7 @@
 
             <x-ui.pagination :paginator="$lots" class="mt-6" />
         @endif
+        </div>
     </main>
 
     <footer class="border-t border-line">

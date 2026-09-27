@@ -57,16 +57,7 @@
             <x-ui.field label="ที่อยู่ (เลขที่ / ถนน / อาคาร)" for="address" class="sm:col-span-2">
                 <x-ui.input id="address" name="address" :value="$value('address')" maxlength="500" autocomplete="street-address" />
             </x-ui.field>
-            <x-ui.field label="แขวง / ตำบล / เขต / อำเภอ" for="district" required>
-                <x-ui.input id="district" name="district" :value="$value('district')" required maxlength="100" />
-            </x-ui.field>
-            <x-ui.field label="จังหวัด" for="province" required>
-                <x-ui.select id="province" name="province" required placeholder="เลือกจังหวัด">
-                    @foreach (config('thai_provinces') as $province)
-                        <option value="{{ $province }}" @selected($value('province') === $province)>{{ $province }}</option>
-                    @endforeach
-                </x-ui.select>
-            </x-ui.field>
+            @include('partials.address-fields', ['value' => $value, 'required' => true])
             <x-ui.field label="จำนวนช่องจอดโดยประมาณ" for="estimated_slots" required>
                 <x-ui.input id="estimated_slots" name="estimated_slots" type="number" :value="$value('estimated_slots')" required min="1" max="10000" inputmode="numeric" numeric />
             </x-ui.field>

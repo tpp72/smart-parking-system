@@ -8,7 +8,9 @@ use App\Models\ParkingLog;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
 use App\Services\CheckOutService;
+use App\Rules\PlausibleLicensePlate;
 use App\Services\ReservationService;
+use App\Support\LicensePlateNormalizer;
 use App\Support\StatusCatalog;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -61,19 +63,19 @@ class ReservationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'plate_number'    => ['required', 'string', 'max:15'],
+            'plate_number'    => ['required', 'string', 'max:20', new PlausibleLicensePlate],
             'plate_province'  => ['required', 'string', Rule::in(config('thai_provinces'))],
-            'brand'           => ['required', 'string', 'max:60'],
+            'brand'           => ['required', 'string', Rule::in(config('car_brands'))],
             'color'           => ['required', 'string', Rule::in(config('car_colors'))],
             'parking_lot_id'  => ['required', 'exists:parking_lots,id'],
             'reserve_start'   => ['required', 'date', 'after:now', 'before:' . now()->addDay()->toDateTimeString()],
         ], [
             'plate_number.required'    => 'กรุณากรอกเลขทะเบียนรถ',
-            'plate_number.max'         => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
+            'plate_number.max'         => 'เลขทะเบียนต้องไม่เกิน 20 ตัวอักษร',
             'plate_province.required'  => 'กรุณาเลือกจังหวัด',
             'plate_province.in'        => 'กรุณาเลือกจังหวัดจากรายการ',
             'brand.required'           => 'กรุณากรอกยี่ห้อรถ',
-            'brand.max'                => 'ยี่ห้อรถต้องไม่เกิน 60 ตัวอักษร',
+            'brand.in'                 => 'กรุณาเลือกยี่ห้อจากรายการ',
             'color.required'           => 'กรุณาเลือกสีรถ',
             'color.in'                 => 'กรุณาเลือกสีจากรายการ',
             'parking_lot_id.required'  => 'กรุณาเลือกลานจอด',
@@ -84,11 +86,12 @@ class ReservationController extends Controller
             'reserve_start.before'     => 'จองล่วงหน้าได้ไม่เกิน 1 วัน (24 ชั่วโมง)',
         ]);
 
-        $plate    = strtoupper(trim($data['plate_number']));
+        // ค่าที่เก็บลงฐานข้อมูลผ่านตัวจัดรูปแบบกลางเสมอ ไม่เชื่อรูปแบบที่ส่งมาจากเบราว์เซอร์
+        $plate    = LicensePlateNormalizer::normalize($data['plate_number']);
         $province = $data['plate_province'];
 
         // ป้องกัน: ทะเบียน + จังหวัดนี้มีการจองที่ยัง active อยู่แล้ว
-        if (Reservation::where('license_plate', $plate)
+        if (Reservation::wherePlateMatches($plate)
             ->where('plate_province', $province)
             ->whereIn('status', Reservation::ACTIVE_STATUSES)
             ->exists()
@@ -100,7 +103,7 @@ class ReservationController extends Controller
 
         // ป้องกัน: รถคันนี้กำลังจอดอยู่ในระบบ
         $isParked = ParkingLog::whereNull('check_out_time')
-            ->where('license_plate', $plate)
+            ->wherePlateMatches($plate)
             ->where('plate_province', $province)
             ->exists();
 
@@ -172,22 +175,22 @@ class ReservationController extends Controller
         }
 
         $data = $request->validate([
-            'plate_number'   => ['required', 'string', 'max:15'],
+            'plate_number'   => ['required', 'string', 'max:20', new PlausibleLicensePlate],
             'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
-            'brand'          => ['required', 'string', 'max:60'],
+            'brand'          => ['required', 'string', Rule::in(config('car_brands'))],
             'color'          => ['required', 'string', Rule::in(config('car_colors'))],
         ], [
             'plate_number.required'   => 'กรุณากรอกเลขทะเบียนรถ',
-            'plate_number.max'        => 'เลขทะเบียนต้องไม่เกิน 15 ตัวอักษร',
+            'plate_number.max'        => 'เลขทะเบียนต้องไม่เกิน 20 ตัวอักษร',
             'plate_province.required' => 'กรุณาเลือกจังหวัด',
             'plate_province.in'       => 'กรุณาเลือกจังหวัดจากรายการ',
             'brand.required'          => 'กรุณากรอกยี่ห้อรถ',
-            'brand.max'               => 'ยี่ห้อรถต้องไม่เกิน 60 ตัวอักษร',
+            'brand.in'                => 'กรุณาเลือกยี่ห้อจากรายการ',
             'color.required'          => 'กรุณาเลือกสีรถ',
             'color.in'                => 'กรุณาเลือกสีจากรายการ',
         ]);
 
-        $plate    = strtoupper(trim($data['plate_number']));
+        $plate    = LicensePlateNormalizer::normalize($data['plate_number']);
         $province = $data['plate_province'];
         $brand    = $data['brand'];
         $color    = $data['color'];
@@ -209,7 +212,7 @@ class ReservationController extends Controller
 
         // ตรวจสอบว่าทะเบียน + จังหวัดใหม่ไม่มีการจอง active อื่น (เฉพาะกรณีเปลี่ยนทะเบียน)
         if ($plateChanged
-            && Reservation::where('license_plate', $plate)
+            && Reservation::wherePlateMatches($plate)
                 ->where('plate_province', $province)
                 ->where('id', '!=', $reservation->id)
                 ->whereIn('status', Reservation::ACTIVE_STATUSES)

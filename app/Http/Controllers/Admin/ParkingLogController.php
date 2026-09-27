@@ -25,7 +25,7 @@ class ParkingLogController extends Controller
             ])
             ->whereHas('parkingLot', fn($q) => $q->whereNull('owner_id'))
             ->when($q !== '', fn($query) =>
-                $query->where('license_plate', 'ilike', "%{$q}%")
+                $query->wherePlateLike($q)
             )
             ->when($from, fn($query) =>
                 $query->whereDate('check_in_time', '>=', $from)

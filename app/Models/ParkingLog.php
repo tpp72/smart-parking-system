@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MatchesLicensePlate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ParkingLog extends Model
 {
     use HasFactory;
+    use MatchesLicensePlate;
 
     protected $guarded = [];
 

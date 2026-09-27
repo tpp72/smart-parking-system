@@ -56,7 +56,7 @@ class ReservationController extends Controller
             ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
-                    $qq->where('license_plate', 'like', "%{$q}%")
+                    $qq->wherePlateLike($q)
                         ->orWhereHas('user', fn($x) => $x->where('name', 'like', "%{$q}%"))
                         ->orWhereHas('user', fn($x) => $x->where('email', 'like', "%{$q}%"));
                 });

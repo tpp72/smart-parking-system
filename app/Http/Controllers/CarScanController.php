@@ -157,7 +157,7 @@ class CarScanController extends Controller
             ->where('source', 'manual_upload')
             ->whereIn('parking_lot_id', $lotIds)
             ->when($q !== '', fn($query) =>
-                $query->where('license_plate', 'like', "%{$q}%")
+                $query->wherePlateLike($q)
             )
             ->when(in_array($result, [LicensePlateScan::RESULT_PASSED, LicensePlateScan::RESULT_LOW_ACCURACY, LicensePlateScan::RESULT_UNREADABLE], true),
                 fn($query) => $query->where('result', $result)
