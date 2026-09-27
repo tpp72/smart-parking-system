@@ -44,7 +44,7 @@ class AutoCheckInService
         $booking = Reservation::booking()
             ->with('parkingLot:id,name')
             ->whereIn('status', ['pending', 'confirmed'])
-            ->where('license_plate', $scan->license_plate)
+            ->wherePlateMatches($scan->license_plate)
             ->where('plate_province', $scan->plate_province)
             ->first();
 

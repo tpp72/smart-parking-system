@@ -205,6 +205,7 @@ class AuthorizationTest extends TestCase
             'email'            => 'somchai@example.com',
             'parking_lot_name' => 'ลานสมชาย',
             'district'         => 'บางรัก',
+            'subdistrict'      => 'สีลม',
             'province'         => 'กรุงเทพมหานคร',
             'estimated_slots'  => 10,
             'document'         => UploadedFile::fake()->create('document.pdf', 100, 'application/pdf'),

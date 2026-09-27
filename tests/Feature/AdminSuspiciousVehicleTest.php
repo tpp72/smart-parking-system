@@ -175,10 +175,12 @@ class AdminSuspiciousVehicleTest extends TestCase
                 'level'          => 'medium',
             ]);
 
+        // บันทึกเป็นรูปแบบมาตรฐานของระบบ (ตัวคั่นเป็นช่องว่าง) ไม่ใช่ข้อความดิบที่กรอกมา
         $this->assertDatabaseHas('suspicious_vehicles', [
-            'license_plate' => 'XY-5678',
+            'license_plate' => 'XY 5678',
             'added_by'      => $admin->id,
         ]);
+        $this->assertDatabaseMissing('suspicious_vehicles', ['license_plate' => 'XY-5678']);
     }
 
     // ─── [9] duplicate license plate + province is rejected ──────────────────

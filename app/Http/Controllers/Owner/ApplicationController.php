@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
+use App\Support\ThaiGeography;
+use App\Rules\ExistingThaiAddress;
 use App\Models\OwnerApplication;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -64,8 +67,9 @@ class ApplicationController extends Controller
             'email'            => ['required', 'email', 'max:255'],
             'parking_lot_name' => ['required', 'string', 'max:255'],
             'address'          => ['nullable', 'string', 'max:500'],
+            'province'         => ['required', 'string', Rule::in(ThaiGeography::provinces())],
             'district'         => ['required', 'string', 'max:100'],
-            'province'         => ['required', 'string', 'max:100'],
+            'subdistrict'      => ['required', 'string', 'max:100', new ExistingThaiAddress($request->input('province'), $request->input('district'))],
             'description'      => ['nullable', 'string'],
             'estimated_slots'  => ['required', 'integer', 'min:1', 'max:10000'],
             'document'         => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -88,7 +92,10 @@ class ApplicationController extends Controller
                 'parking_lot_name' => $data['parking_lot_name'],
                 'address'          => $data['address'] ?? null,
                 'district'         => $data['district'],
+                'subdistrict'      => $data['subdistrict'],
                 'province'         => $data['province'],
+                // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+                'postal_code'      => ThaiGeography::postalCode($data['province'], $data['district'], $data['subdistrict']),
                 'description'      => $data['description'] ?? null,
                 'estimated_slots'  => $data['estimated_slots'],
                 'document_path'    => $documentPath,
@@ -165,8 +172,9 @@ class ApplicationController extends Controller
             'email'            => ['required', 'email', 'max:255'],
             'parking_lot_name' => ['required', 'string', 'max:255'],
             'address'          => ['nullable', 'string', 'max:500'],
+            'province'         => ['required', 'string', Rule::in(ThaiGeography::provinces())],
             'district'         => ['required', 'string', 'max:100'],
-            'province'         => ['required', 'string', 'max:100'],
+            'subdistrict'      => ['required', 'string', 'max:100', new ExistingThaiAddress($request->input('province'), $request->input('district'))],
             'description'      => ['nullable', 'string'],
             'estimated_slots'  => ['required', 'integer', 'min:1', 'max:10000'],
             'document'         => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -190,7 +198,10 @@ class ApplicationController extends Controller
                 'parking_lot_name' => $data['parking_lot_name'],
                 'address'          => $data['address'] ?? null,
                 'district'         => $data['district'],
+                'subdistrict'      => $data['subdistrict'],
                 'province'         => $data['province'],
+                // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+                'postal_code'      => ThaiGeography::postalCode($data['province'], $data['district'], $data['subdistrict']),
                 'description'      => $data['description'] ?? null,
                 'estimated_slots'  => $data['estimated_slots'],
                 'document_path'    => $documentPath,

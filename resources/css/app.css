@@ -1,6 +1,8 @@
 @import '@fontsource-variable/anuphan';
 @import '@fontsource-variable/martian-mono';
 @import './tokens.css';
+/* CSS ตัวจริงของ flatpickr ต้องมาก่อนไฟล์ override เสมอ (เดิม import ไว้ใน JS จึงโหลดทีหลังและทับสีธีมมืด) */
+@import 'flatpickr/dist/flatpickr.css';
 @import './vendor/flatpickr.css';
 
 @tailwind base;
@@ -57,15 +59,17 @@
   }
   :is(input, textarea)::placeholder { color: rgb(var(--color-fg-3)); opacity: 1; }
 
-  /* ลูกศร select: ปลั๊กอิน forms ฝังสีใน SVG (ใช้ CSS variable ไม่ได้) จึงกำหนดสี fg-3 ของแต่ละธีมตรง ๆ */
-  select:not([multiple]) {
+  /* ลูกศร select: ปลั๊กอิน forms ฝังสีใน SVG (ใช้ CSS variable ไม่ได้) จึงกำหนดสี fg-3 ของแต่ละธีมตรง ๆ
+     ยกเว้นช่องเลือกเดือนของปฏิทิน flatpickr — ตัวนั้นใช้ลูกศรของระบบ (appearance: menulist) และไม่ได้เว้นที่ไว้
+     ภาพลูกศรจึงไปทับชื่อเดือน */
+  select:not([multiple]):not(.flatpickr-monthDropdown-months) {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235C636A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25em 1.25em;
     padding-right: 2.5rem;
   }
-  [data-theme="dark"] select:not([multiple]) {
+  [data-theme="dark"] select:not([multiple]):not(.flatpickr-monthDropdown-months) {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23959B97' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   }
   [type='checkbox'], [type='radio'] { color: rgb(var(--color-primary)); border-color: rgb(var(--color-field)); background-color: rgb(var(--color-surface)); }

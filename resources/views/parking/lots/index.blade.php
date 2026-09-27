@@ -49,7 +49,7 @@
                 <ol class="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-1">
                     @foreach ($lots as $lot)
                         @php
-                            $address = collect([$lot->address, $lot->district, $lot->province])->filter()->implode(' ');
+                            $address = collect([$lot->address, $lot->subdistrict, $lot->district, $lot->province, $lot->postal_code])->filter()->implode(' ');
                             $blocked = $lot->active_reservations_count > 0;
                         @endphp
                         <li class="grid gap-4 px-4 py-5 sm:px-5 lg:grid-cols-[minmax(0,1fr)_17rem_16rem] lg:items-center lg:gap-6">

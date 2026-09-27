@@ -7,6 +7,8 @@
     <meta name="description" content="Smart Parking — ระบบจัดการลานจอดรถ ตั้งแต่จองล่วงหน้า ยืนยันมัดจำ อ่านป้ายทะเบียนด้วย AI จนถึงเช็คเอาท์และคิดค่าจอด">
     <title>Smart Parking</title>
 
+    @include('partials.favicon')
+
     @include('partials.theme-init')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -62,7 +64,10 @@
 
     <main id="main-content" tabindex="-1" class="focus:outline-none">
         {{-- ── Hero: ชื่อระบบ + บัตรจอดรถตัวอย่าง ───────────────────────── --}}
-        <section class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-24">
+        <div class="relative isolate overflow-hidden">
+            @include('partials.hero-watermark')
+
+            <section class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-24">
             <div>
                 <h1 class="text-hero text-fg">Smart Parking</h1>
                 <p class="mt-5 max-w-xl text-lead text-fg-2">
@@ -146,7 +151,8 @@
                 </div>
                 <figcaption class="mt-3 text-center text-caption text-fg-3 lg:text-start">รถ 1 คันคือการจอง 1 รายการ ติดตามได้ทุกขั้นจนจบ</figcaption>
             </figure>
-        </section>
+            </section>
+        </div>
 
         {{-- ── เส้นทางของรถ 1 คัน ───────────────────────────────────────── --}}
         <section aria-labelledby="flow-title" class="border-y border-line bg-surface">

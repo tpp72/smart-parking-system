@@ -8,6 +8,8 @@
 
     <title>{{ $title ? $title.' | Smart Parking' : 'Smart Parking' }}</title>
 
+    @include('partials.favicon')
+
     @include('partials.theme-init')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -30,7 +32,11 @@
             </div>
         </header>
 
-        <main id="main-content" tabindex="-1" class="flex flex-1 justify-center px-4 py-10 focus:outline-none sm:items-center sm:py-16">
+        <main id="main-content" tabindex="-1"
+            class="relative isolate flex flex-1 justify-center overflow-hidden px-4 py-10 focus:outline-none sm:items-center sm:py-16">
+            {{-- หน้ากลุ่มนี้มีแค่ฟอร์มใบเดียว พื้นที่ว่างเกิน 60% ของจอ — ลายน้ำเดียวกับ Hero หน้าแรก --}}
+            @include('partials.hero-watermark')
+
             <div class="w-full max-w-md">
                 @if ($title)
                     <div class="mb-6">

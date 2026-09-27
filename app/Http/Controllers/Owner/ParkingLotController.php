@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
+use App\Support\ThaiGeography;
+use App\Rules\ExistingThaiAddress;
 use App\Models\ParkingLot;
 use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ParkingLotController extends Controller
 {
@@ -28,6 +31,8 @@ class ParkingLotController extends Controller
                     ->orWhere('location', 'like', "%{$q}%")
                     ->orWhere('address', 'like', "%{$q}%")
                     ->orWhere('district', 'like', "%{$q}%")
+                    ->orWhere('subdistrict', 'like', "%{$q}%")
+                    ->orWhere('postal_code', 'like', "%{$q}%")
                     ->orWhere('province', 'like', "%{$q}%")
                     ->orWhere('landmark', 'like', "%{$q}%");
             }))
@@ -56,8 +61,9 @@ class ParkingLotController extends Controller
             'name'                 => ['required', 'string', 'max:255'],
             'location'             => ['nullable', 'string'],
             'address'              => ['nullable', 'string', 'max:500'],
-            'district'             => ['nullable', 'string', 'max:255'],
-            'province'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', Rule::in(ThaiGeography::provinces())],
+            'district'             => ['nullable', 'string', 'max:100', 'required_with:province'],
+            'subdistrict'          => ['nullable', 'string', 'max:100', 'required_with:province', new ExistingThaiAddress($request->input('province'), $request->input('district'))],
             'landmark'             => ['nullable', 'string', 'max:500'],
             'total_slots'          => ['required', 'integer', 'min:0'],
             'hourly_rate'          => ['required', 'numeric', 'min:0'],
@@ -67,6 +73,9 @@ class ParkingLotController extends Controller
         $data['owner_id']             = Auth::id();
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
+
+        // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+        $data['postal_code'] = ThaiGeography::postalCode($data['province'] ?? null, $data['district'] ?? null, $data['subdistrict'] ?? null);
         $lot = ParkingLot::create($data);
 
         audit_log('parking_lot.create', $lot, [
@@ -93,8 +102,9 @@ class ParkingLotController extends Controller
             'name'                 => ['required', 'string', 'max:255'],
             'location'             => ['nullable', 'string'],
             'address'              => ['nullable', 'string', 'max:500'],
-            'district'             => ['nullable', 'string', 'max:255'],
-            'province'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', Rule::in(ThaiGeography::provinces())],
+            'district'             => ['nullable', 'string', 'max:100', 'required_with:province'],
+            'subdistrict'          => ['nullable', 'string', 'max:100', 'required_with:province', new ExistingThaiAddress($request->input('province'), $request->input('district'))],
             'landmark'             => ['nullable', 'string', 'max:500'],
             'total_slots'          => ['required', 'integer', 'min:0'],
             'hourly_rate'          => ['required', 'numeric', 'min:0'],
@@ -104,6 +114,9 @@ class ParkingLotController extends Controller
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
         $before = $lot->only(array_keys($data));
+
+        // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+        $data['postal_code'] = ThaiGeography::postalCode($data['province'] ?? null, $data['district'] ?? null, $data['subdistrict'] ?? null);
         $lot->update($data);
 
         audit_log('parking_lot.update', $lot, ['changes' => audit_changes($before, $lot)]);

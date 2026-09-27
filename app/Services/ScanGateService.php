@@ -32,7 +32,7 @@ class ScanGateService
     {
         $log = ParkingLog::with(['reservation', 'parkingLot:id,name', 'parkingSlot:id,slot_number'])
             ->whereNull('check_out_time')
-            ->where('license_plate', $scan->license_plate)
+            ->wherePlateMatches($scan->license_plate)
             ->where('plate_province', $scan->plate_province)
             ->first();
 

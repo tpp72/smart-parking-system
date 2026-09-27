@@ -156,6 +156,60 @@ class AdminSystemTest extends TestCase
         $this->assertSame('user', $user->fresh()->role);
     }
 
+    // ─── Role: Admin ตั้งผู้ใช้คนอื่นเป็น Admin ได้ ────────────────────────────
+
+    public function test_admin_can_promote_a_user_to_admin_and_the_new_admin_can_work(): void
+    {
+        $admin = $this->makeUser('admin');
+        $user = $this->makeUser();
+
+        // หน้าจัดการผู้ใช้ต้องมีตัวเลือก "ผู้ดูแลระบบ" ให้เลือกจริง
+        $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()
+            ->assertSee('ผู้ดูแลระบบ')
+            ->assertSee('value="admin"', false);
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $user), $this->userPayload($user, ['role' => 'admin']))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $user->refresh();
+        $this->assertSame('admin', $user->role);
+        $this->assertNull($user->owner_status);
+
+        // บัญชีที่เพิ่งเลื่อนเข้าหน้าของผู้ดูแลระบบได้จริง
+        $this->actingAs($user)->get(route('admin.dashboard'))->assertOk();
+        $this->actingAs($user)->get(route('admin.users.index'))->assertOk();
+
+        $this->assertDatabaseHas('admin_actions', ['action' => 'user.update', 'subject_id' => $user->id]);
+    }
+
+    /** §5.1.1 — Owner ตั้งเป็น Admin ตรง ๆ ไม่ได้ ต้องปลดกลับเป็น User ก่อน (ยืนยันอีกครั้ง 2026-09-22) */
+    public function test_admin_cannot_promote_an_owner_straight_to_admin(): void
+    {
+        $admin = $this->makeUser('admin');
+        $owner = $this->makeUser('owner');
+        $lot = ParkingLot::factory()->create(['owner_id' => $owner->id]);
+
+        // หน้าจัดการผู้ใช้ของ Owner ต้องไม่มีตัวเลือก "ผู้ดูแลระบบ" ให้เลือก
+        $this->actingAs($admin)->get(route('admin.users.edit', $owner))->assertOk()
+            ->assertDontSee('value="admin"', false);
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $owner), $this->userPayload($owner, ['role' => 'admin']))
+            ->assertSessionHasErrors('role');
+
+        $this->assertSame('owner', $owner->fresh()->role);
+        $this->assertDatabaseHas('parking_lots', ['id' => $lot->id, 'owner_id' => $owner->id]);
+    }
+
+    public function test_admin_cannot_remove_admin_role_from_their_own_account(): void
+    {
+        $admin = $this->makeUser('admin');
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $admin), $this->userPayload($admin, ['role' => 'user']))
+            ->assertSessionHasErrors('role');
+        $this->assertSame('admin', $admin->fresh()->role);
+    }
+
     // ─── Role: ปลด Owner = ปิดลานแบบเดียวกับลาออก ───────────────────────────────
 
     public function test_admin_demoting_an_owner_closes_their_lots(): void

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\ThaiGeography;
+use App\Rules\ExistingThaiAddress;
 use App\Models\ParkingLot;
 use App\Models\Reservation;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Admin จัดการลานของ Admin (owner_id = NULL) เท่านั้น — สร้างลานให้ Owner หรือโอนลานไม่ได้ (project-plan.md §5.1.1)
@@ -17,14 +20,15 @@ class ParkingLotController extends Controller
         abort_if($lot->owner_id !== null, 403, 'ลานจอดนี้มีเจ้าของแล้ว — เจ้าของลานเท่านั้นที่จัดการได้');
     }
 
-    private function rules(): array
+    private function rules(Request $request): array
     {
         return [
             'name'                 => ['required', 'string', 'max:255'],
             'location'             => ['nullable', 'string'],
             'address'              => ['nullable', 'string', 'max:500'],
-            'district'             => ['nullable', 'string', 'max:255'],
-            'province'             => ['nullable', 'string', 'max:255'],
+            'province'             => ['nullable', 'string', Rule::in(ThaiGeography::provinces())],
+            'district'             => ['nullable', 'string', 'max:100', 'required_with:province'],
+            'subdistrict'          => ['nullable', 'string', 'max:100', 'required_with:province', new ExistingThaiAddress($request->input('province'), $request->input('district'))],
             'landmark'             => ['nullable', 'string', 'max:500'],
             'total_slots'          => ['required', 'integer', 'min:0'],
             'hourly_rate'          => ['required', 'numeric', 'min:0'],
@@ -68,9 +72,12 @@ class ParkingLotController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($request));
 
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
+
+        // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+        $data['postal_code'] = ThaiGeography::postalCode($data['province'] ?? null, $data['district'] ?? null, $data['subdistrict'] ?? null);
         $lot = ParkingLot::create($data + ['owner_id' => null]);
 
         audit_log('parking_lot.create', $lot, [
@@ -94,10 +101,13 @@ class ParkingLotController extends Controller
     {
         $this->assertAdminLot($parking_lot);
 
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($request));
         $data['reservations_enabled'] = $request->boolean('reservations_enabled', true);
 
         $before = $parking_lot->only(array_keys($data));
+
+        // รหัสไปรษณีย์มาจากชุดข้อมูลเขตการปกครอง ไม่รับค่าที่ส่งมาจากเบราว์เซอร์
+        $data['postal_code'] = ThaiGeography::postalCode($data['province'] ?? null, $data['district'] ?? null, $data['subdistrict'] ?? null);
         $parking_lot->update($data);
 
         audit_log('parking_lot.update', $parking_lot, ['changes' => audit_changes($before, $parking_lot)]);
