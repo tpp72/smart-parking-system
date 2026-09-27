@@ -1,6 +1,5 @@
 *.log
 *.pdf
-/docs
 .DS_Store
 .env
 .env.backup
