@@ -15,9 +15,16 @@ class BrandIconTest extends TestCase
 
     public function test_icon_files_exist_and_pages_point_at_them(): void
     {
+        // ค่าต้องไม่ว่าง — .env.example ประกาศ BRAND_LOGO / BRAND_LOGO_EMAIL ไว้เป็นค่าว่าง (CI ใช้ไฟล์นี้)
+        // env() คืนสตริงว่างไม่ใช่ null ค่า default ของ env() จึงไม่ถูกใช้ ต้องถอยด้วย ?: แทน
+        // ถ้าไม่เช็คตรงนี้ public_path('') จะชี้ไปที่โฟลเดอร์ public ซึ่ง assertFileExists ผ่านไปเฉย ๆ
+        $this->assertNotSame('', config('brand.logo'), 'brand.logo ว่าง — ค่า default ไม่ถูกใช้');
+        $this->assertNotSame('', config('brand.logo_email'), 'brand.logo_email ว่าง — ค่า default ไม่ถูกใช้');
+
         $this->assertFileExists(public_path('favicon.svg'));
         $this->assertFileExists(public_path('favicon.ico'));
         $this->assertFileExists(public_path(config('brand.logo_email')));
+        $this->assertFileExists(public_path(config('brand.logo')));
 
         // ทุกหน้าที่มี <head> ของตัวเองต้องประกาศไอคอนครบ
         foreach (['/', '/marketplace', '/login'] as $url) {

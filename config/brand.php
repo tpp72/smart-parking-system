@@ -14,10 +14,12 @@ return [
 
     'name' => 'Smart Parking',
 
-    'logo' => env('BRAND_LOGO', 'favicon.svg'),
+    // ใช้ ?: ไม่ใช่ค่า default ของ env() เพราะ .env.example ประกาศ key ไว้เป็นค่าว่าง
+    // env() จะคืนสตริงว่าง ไม่ใช่ null ค่า default จึงไม่ถูกใช้ — "เว้นว่าง" ต้องหมายถึง "ใช้ค่าเริ่มต้น"
+    'logo' => env('BRAND_LOGO') ?: 'favicon.svg',
 
     // อีเมลต้องเป็น URL เต็ม ระบบจะเติม APP_URL ให้เอง · ไฟล์เป็น PNG 64px (แสดงจริง 32px)
-    'logo_email' => env('BRAND_LOGO_EMAIL', 'brand-icon-email.png'),
+    'logo_email' => env('BRAND_LOGO_EMAIL') ?: 'brand-icon-email.png',
 
     // ความสูงของไอคอนบนหน้าจอ (px) — กว้างปรับตามสัดส่วนภาพ
     'logo_height' => (int) env('BRAND_LOGO_HEIGHT', 32),
