@@ -17,6 +17,8 @@
     {{-- ชื่อระบบบนแท็บใช้ชื่อเดียวกับตราบนแถบเมนู (APP_NAME ใน .env เป็นชื่อสำหรับระบบภายใน) --}}
     <title>{{ $pageTitle ? $pageTitle.' | Smart Parking' : 'Smart Parking' }}</title>
 
+    @include('partials.favicon')
+
     @include('partials.theme-init')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Smart Parking">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#23264A"/>
+      <stop offset="1" stop-color="#11122A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6771F2" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6771F2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <g transform="translate(16 10)">
+    <circle cx="280" cy="210" r="170" fill="url(#glow)"/>
+
+    <!-- speed lines -->
+    <path d="M60 186 L168 179 L160 193 L60 193 Z" fill="#6771F2"/>
+    <path d="M84 222 L162 217 L154 231 L84 231 Z" fill="#1F8A5B"/>
+    <path d="M60 258 L156 253 L148 267 L60 267 Z" fill="#6771F2"/>
+
+    <!-- parking slot -->
+    <path d="M205 352 L178 402 H392 L419 352" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M226 372 H266 L261 382 H221 Z" fill="#1F8A5B"/>
+    <path d="M299 372 H339 L334 382 H294 Z" fill="#1F8A5B"/>
+
+    <!-- pin -->
+    <path fill="#6771F2" fill-rule="evenodd"
+      d="M280 385 L190.3 263.7 A110 110 0 1 1 369.7 263.7 Z
+         M280 126 A74 74 0 1 0 280 274 A74 74 0 1 0 280 126 Z"/>
+
+    <!-- P -->
+    <path fill="#FFFFFF" fill-rule="evenodd" transform="translate(280 200) skewX(-12) translate(-280 -200)"
+      d="M252 248 V152 H290 A32 30 0 0 1 290 212 H276 V248 Z
+         M276 172 V192 H288 A10 10 0 0 0 288 172 Z"/>
+  </g>
+</svg>
