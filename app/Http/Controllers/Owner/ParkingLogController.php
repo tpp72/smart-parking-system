@@ -29,7 +29,7 @@ class ParkingLogController extends Controller
             ])
             ->whereIn('parking_lot_id', $ownedLotIds)
             ->when($q !== '', fn($query) =>
-                $query->where('license_plate', 'ilike', "%{$q}%")
+                $query->wherePlateLike($q)
             )
             ->when($from, fn($query) =>
                 $query->whereDate('check_in_time', '>=', $from)

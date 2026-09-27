@@ -22,8 +22,8 @@
         <h2 id="vehicle-title" class="text-h3 text-fg">รถ</h2>
         <p class="mt-1 text-label text-fg-2">กล้องเทียบกับทะเบียนและจังหวัดที่ AI อ่านได้ ต้องกรอกให้ตรงกับป้ายจริง</p>
         <div class="mt-5 grid gap-5 sm:grid-cols-2">
-            <x-ui.field label="เลขทะเบียน" for="license_plate" required hint="หมวดอักษรและเลข เช่น กข 1234">
-                <x-ui.input id="license_plate" name="license_plate" :value="old('license_plate', $entry?->license_plate)" maxlength="20" autocomplete="off" required :autofocus="! $entry" />
+            <x-ui.field label="เลขทะเบียน" for="license_plate" required>
+                <x-ui.input id="license_plate" name="license_plate" :value="old('license_plate', $entry?->license_plate)" maxlength="20" autocomplete="off" required data-plate-input placeholder="กข 1234" :autofocus="! $entry" />
             </x-ui.field>
             <x-ui.field label="จังหวัดของป้ายทะเบียน" for="plate_province" required>
                 <x-ui.select id="plate_province" name="plate_province" required placeholder="เลือกจังหวัด">

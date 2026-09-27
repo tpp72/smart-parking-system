@@ -12,9 +12,9 @@
     <legend class="sr-only">ข้อมูลรถ</legend>
 
     <div class="grid gap-5 sm:grid-cols-2">
-        <x-ui.field label="เลขทะเบียน" for="plate_number" required :error="$plateErrors" hint="หมวดอักษรและเลข เช่น กข 1234">
+        <x-ui.field label="เลขทะเบียน" for="plate_number" required :error="$plateErrors">
             <x-ui.input id="plate_number" name="plate_number" :value="old('plate_number', $plateNumber)"
-                maxlength="15" autocomplete="off" required :invalid="$plateErrors !== []" />
+                maxlength="20" autocomplete="off" required data-plate-input placeholder="กข 1234" :invalid="$plateErrors !== []" />
         </x-ui.field>
 
         <x-ui.field label="จังหวัดของป้ายทะเบียน" for="plate_province" required>
@@ -26,7 +26,11 @@
         </x-ui.field>
 
         <x-ui.field label="ยี่ห้อรถ" for="brand" required>
-            <x-ui.input id="brand" name="brand" :value="old('brand', $brand)" maxlength="60" autocomplete="off" required placeholder="เช่น Toyota" />
+            <x-ui.select id="brand" name="brand" required placeholder="เลือกยี่ห้อ">
+                @foreach (config('car_brands') as $b)
+                    <option value="{{ $b }}" @selected(old('brand', $brand) === $b)>{{ $b }}</option>
+                @endforeach
+            </x-ui.select>
         </x-ui.field>
 
         <x-ui.field label="สีรถ" for="color" required>

@@ -4,19 +4,39 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SuspiciousVehicle;
+use App\Rules\PlausibleLicensePlate;
+use App\Support\LicensePlateNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class SuspiciousVehicleController extends Controller
 {
+    /**
+     * กันทะเบียนซ้ำในจังหวัดเดียวกัน โดยเทียบแบบถอดตัวคั่น
+     * ใช้แทน Rule::unique เพราะกฎนั้นเทียบข้อความดิบ — "กข 1234" กับ "กข-1234" จะหลุดเป็นคนละรายการ
+     */
+    private function notAlreadyListed(Request $request, ?int $ignoreId = null): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($request, $ignoreId) {
+            $exists = SuspiciousVehicle::wherePlateMatches((string) $value)
+                ->where('plate_province', (string) $request->input('plate_province'))
+                ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
+                ->exists();
+
+            if ($exists) {
+                $fail('ทะเบียนนี้อยู่ในบัญชีดำของจังหวัดนี้อยู่แล้ว');
+            }
+        };
+    }
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
 
         $entries = SuspiciousVehicle::with('addedBy:id,name')
             ->when($q !== '', fn ($query) => $query->where(function ($qq) use ($q) {
-                $qq->where('license_plate', 'ilike', "%{$q}%")
+                $qq->wherePlateLike($q)
                     ->orWhere('plate_province', 'ilike', "%{$q}%")
                     ->orWhere('reason', 'ilike', "%{$q}%");
             }))
@@ -34,15 +54,12 @@ class SuspiciousVehicleController extends Controller
 
     public function store(Request $request)
     {
-        $request->merge(['license_plate' => strtoupper(trim((string) $request->input('license_plate')))]);
+        // จัดรูปแบบก่อน validate เพื่อให้กฎ unique เทียบกับค่าเดียวกับที่จะบันทึกจริง
+        $request->merge(['license_plate' => LicensePlateNormalizer::normalize((string) $request->input('license_plate'))]);
 
         $data = $request->validate([
             // Blacklist ระบุรถด้วย ทะเบียน + จังหวัด
-            'license_plate'  => [
-                'required', 'string', 'max:20',
-                Rule::unique('suspicious_vehicles', 'license_plate')
-                    ->where('plate_province', (string) $request->input('plate_province')),
-            ],
+            'license_plate'  => ['required', 'string', 'max:20', new PlausibleLicensePlate, $this->notAlreadyListed($request)],
             'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
             'reason'         => ['nullable', 'string', 'max:500'],
             'level'          => ['required', Rule::in(['low', 'medium', 'high'])],
@@ -71,15 +88,10 @@ class SuspiciousVehicleController extends Controller
 
     public function update(Request $request, SuspiciousVehicle $suspiciousVehicle)
     {
-        $request->merge(['license_plate' => strtoupper(trim((string) $request->input('license_plate')))]);
+        $request->merge(['license_plate' => LicensePlateNormalizer::normalize((string) $request->input('license_plate'))]);
 
         $data = $request->validate([
-            'license_plate'  => [
-                'required', 'string', 'max:20',
-                Rule::unique('suspicious_vehicles', 'license_plate')
-                    ->where('plate_province', (string) $request->input('plate_province'))
-                    ->ignore($suspiciousVehicle->id),
-            ],
+            'license_plate'  => ['required', 'string', 'max:20', new PlausibleLicensePlate, $this->notAlreadyListed($request, $suspiciousVehicle->id)],
             'plate_province' => ['required', 'string', Rule::in(config('thai_provinces'))],
             'reason'         => ['nullable', 'string', 'max:500'],
             'level'          => ['required', Rule::in(['low', 'medium', 'high'])],

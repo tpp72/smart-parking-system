@@ -4,6 +4,7 @@ namespace App\Queries;
 
 use App\Models\ParkingLot;
 use App\Models\Payment;
+use App\Support\LicensePlateNormalizer;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -33,7 +34,9 @@ class AdminExportQuery
                 'd.payment_status as deposit_status', 'd.paid_at as deposit_paid_at',
             ])
             ->when($q !== '', fn ($query) => $query->where(function ($qq) use ($q) {
-                $qq->where('r.license_plate', 'ilike', "%{$q}%")
+                // ทะเบียนเทียบแบบถอดตัวคั่น พิมพ์ "กข1234" หรือ "กข-1234" ก็เจอ "กข 1234"
+                [$sql, $bind] = LicensePlateNormalizer::sqlLike('r.license_plate', $q) ?? ['1 = 0', []];
+                $qq->whereRaw($sql, $bind)
                     ->orWhere('u.name', 'ilike', "%{$q}%")
                     ->orWhere('u.email', 'ilike', "%{$q}%");
             }))
@@ -63,7 +66,11 @@ class AdminExportQuery
                 'p.total_hours', 'p.parking_fee', 'p.deposit_deduction', 'p.reservation_discount',
                 'p.total_amount', 'p.payment_status', 'p.paid_at',
             ])
-            ->when($q !== '', fn ($query) => $query->where('pl.license_plate', 'ilike', "%{$q}%"))
+            ->when($q !== '', function ($query) use ($q) {
+                [$sql, $bind] = LicensePlateNormalizer::sqlLike('pl.license_plate', $q) ?? ['1 = 0', []];
+
+                return $query->whereRaw($sql, $bind);
+            })
             ->when($filters['lot_id'] ?? null, fn ($query, $lotId) => $query->where('pl.parking_lot_id', $lotId))
             ->when(($filters['state'] ?? null) === 'parked', fn ($query) => $query->whereNull('pl.check_out_time'))
             ->when(($filters['state'] ?? null) === 'completed', fn ($query) => $query->whereNotNull('pl.check_out_time'))

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MatchesLicensePlate;
 use Illuminate\Database\Eloquent\Model;
 
 class LicensePlateScan extends Model
 {
+    use MatchesLicensePlate;
+
     /** อ่านทะเบียน + จังหวัดได้และ Accuracy > เกณฑ์ → เข้าสู่ Matching / Auto Check-in ได้ */
     const RESULT_PASSED = 'passed';
 

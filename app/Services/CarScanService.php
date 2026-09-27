@@ -6,6 +6,7 @@ use Anthropic\Client;
 use Anthropic\RequestOptions;
 use App\Models\LicensePlateScan;
 use App\Models\SuspiciousVehicle;
+use App\Support\LicensePlateNormalizer;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
@@ -45,6 +46,7 @@ class CarScanService
         }
 
         $provinceList = implode(', ', config('thai_provinces'));
+        $brandList    = implode(', ', config('car_brands'));
 
         $prompt = <<<PROMPT
 วิเคราะห์รูปรถยนต์นี้แล้วตอบกลับเป็น JSON เท่านั้น ไม่มีข้อความอื่น ไม่มี markdown:
@@ -53,12 +55,15 @@ class CarScanService
   "license_plate": "ป้ายทะเบียนรถ (เฉพาะเลขทะเบียน ไม่รวมจังหวัด) เช่น กข 1234 หรือ 5กก 6285 ถ้าไม่เห็นให้ใส่ค่าว่าง",
   "province": "ชื่อจังหวัดที่พิมพ์อยู่ด้านล่างของป้ายทะเบียน เลือกจากรายการจังหวัดด้านล่างเท่านั้น ถ้าไม่เห็นหรืออ่านไม่ออกให้ใส่ค่าว่าง",
   "color": "เลือกจากรายการด้านล่างเท่านั้น ห้ามตอบนอกรายการ",
-  "brand": "ยี่ห้อรถ เช่น Toyota Honda Mazda Isuzu Ford Mitsubishi Nissan Suzuki Hyundai KIA ถ้าไม่แน่ใจให้ใส่ null",
+  "brand": "ยี่ห้อรถ เลือกจากรายการด้านล่างเท่านั้น ถ้าไม่แน่ใจหรือไม่มีในรายการให้ใส่ null",
   "confidence": ตัวเลข 0-100 บอกความมั่นใจในการอ่านป้ายทะเบียน
 }
 
 รายการจังหวัดที่ใช้ได้ (เลือก 1 จังหวัดเท่านั้น ห้ามตอบนอกรายการ):
 {$provinceList}
+
+รายการยี่ห้อที่ใช้ได้ (เลือก 1 ยี่ห้อเท่านั้น ห้ามตอบนอกรายการ · ไม่แน่ใจให้ใส่ null):
+{$brandList}
 
 รายการสีที่ใช้ได้ (เลือก 1 สีเท่านั้น ห้ามตอบนอกรายการ):
 - ขาว = ขาวทุกเฉด
@@ -179,7 +184,8 @@ PROMPT;
             ? self::fakeDetect($file->getClientOriginalName())
             : $this->detect($absolutePath);
 
-        $licensePlate = trim((string) ($result['license_plate'] ?? '')) ?: null;
+        // ผลจาก AI ผ่านตัวจัดรูปแบบเดียวกับที่ผู้ใช้กรอก ไม่เช่นนั้นจะจับคู่กับการจองไม่ได้
+        $licensePlate = LicensePlateNormalizer::normalize((string) ($result['license_plate'] ?? ''));
         $province     = trim((string) ($result['province'] ?? '')) ?: null;
         $color        = $result['color']       ?? null;
         $brand        = $result['brand']       ?? null;
@@ -191,9 +197,10 @@ PROMPT;
         $scanResult = LicensePlateScan::classify($licensePlate, $province, $confidence);
 
         // 4. Check blacklist (active entries only) — ตรวจด้วย ทะเบียน + จังหวัด
+        //    เทียบด้วยกุญแจที่ถอดตัวคั่นออก เพื่อให้ข้อมูลเก่าที่รูปแบบต่างกันยังจับคู่ได้
         $isSuspicious = $licensePlate !== null && $province !== null
             && SuspiciousVehicle::active()
-                ->where('license_plate', $licensePlate)
+                ->wherePlateMatches($licensePlate)
                 ->where('plate_province', $province)
                 ->exists();
 
@@ -282,7 +289,7 @@ PROMPT;
 
         if ($scan->is_suspicious) {
             $blacklist = SuspiciousVehicle::active()
-                ->where('license_plate', $scan->license_plate)
+                ->wherePlateMatches($scan->license_plate)
                 ->where('plate_province', $scan->plate_province)
                 ->first();
 

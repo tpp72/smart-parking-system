@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MatchesLicensePlate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Reservation extends Model
 {
     use HasFactory;
+    use MatchesLicensePlate;
 
     protected $guarded = [];
 
@@ -20,10 +22,34 @@ class Reservation extends Model
         'reservation_fee' => 'decimal:2',
     ];
 
+    /**
+     * ตัวอักษรที่ใช้ในรหัสอ้างอิง — ตัด 0 O 1 I L ออก เพราะคนขับต้องอ่านจากจอแล้วพิมพ์ตามเอง
+     * เหลือ 31 ตัว × 6 หลัก ≈ 887 ล้านความเป็นไปได้
+     */
+    private const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
     const STATUSES = ['pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'expired'];
 
     /** Statuses considered "active" — not yet done or cancelled */
     const ACTIVE_STATUSES = ['pending', 'confirmed', 'checked_in'];
+
+    /**
+     * รหัสอ้างอิงสำหรับรถ Walk-in — สุ่มจนได้ค่าที่ยังไม่ถูกใช้
+     * ใช้ random_bytes (ไม่ใช่ rand) เพราะรหัสนี้ทำหน้าที่เป็นหลักฐานยืนยันตัวตนของคนขับ
+     */
+    public static function generateReferenceCode(): string
+    {
+        $length = strlen(self::CODE_ALPHABET);
+
+        do {
+            $code = '';
+            foreach (str_split(random_bytes(6)) as $byte) {
+                $code .= self::CODE_ALPHABET[ord($byte) % $length];
+            }
+        } while (static::where('reference_code', $code)->exists());
+
+        return $code;
+    }
 
     /**
      * State machine ของ Reservation (project-plan.md §7.3, §20)

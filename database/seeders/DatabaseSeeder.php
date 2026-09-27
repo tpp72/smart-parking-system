@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
     /** รถที่ใช้ไปแล้ว (ทะเบียน|จังหวัด) กันชนกัน */
     private array $usedCars = [];
 
+    /** สุ่มจากยี่ห้อที่พบบ่อยในไทย — ต้องอยู่ใน config/car_brands.php ทุกตัว ไม่งั้นแก้ข้อมูลรถผ่านฟอร์มไม่ได้ */
     private array $brands = ['Toyota', 'Honda', 'Isuzu', 'Ford', 'Mazda', 'Nissan', 'BMW', 'Mercedes-Benz', 'Mitsubishi', 'Suzuki'];
 
     private array $provinces = ['กรุงเทพมหานคร', 'เชียงใหม่', 'ชลบุรี', 'ภูเก็ต', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'ขอนแก่น', 'นครราชสีมา', 'สงขลา'];
