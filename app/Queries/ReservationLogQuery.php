@@ -2,6 +2,7 @@
 
 namespace App\Queries;
 
+use App\Support\LicensePlateNormalizer;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,9 @@ class ReservationLogQuery
             ])
             ->when($lotIds !== null, fn ($query) => $query->whereIn('r.parking_lot_id', $lotIds))
             ->when($q !== '', fn ($query) => $query->where(function ($qq) use ($q) {
-                $qq->where('r.license_plate', 'ilike', "%{$q}%")
+                // ทะเบียนเทียบแบบถอดตัวคั่น พิมพ์รูปแบบไหนก็เจอ
+                [$sql, $bind] = LicensePlateNormalizer::sqlLike('r.license_plate', $q) ?? ['1 = 0', []];
+                $qq->whereRaw($sql, $bind)
                     ->orWhere('u.name', 'ilike', "%{$q}%")
                     ->orWhere('u.email', 'ilike', "%{$q}%")
                     ->orWhere('rl.note', 'ilike', "%{$q}%")

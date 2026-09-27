@@ -23,7 +23,7 @@ test('reservation happy path: book → deposit paid → auto check-in → auto c
   await selectOptionContaining(user, '#parking_lot_id', ADMIN_LOT);
   await user.locator('#plate_number').fill(plate);
   await user.selectOption('#plate_province', PROVINCE);
-  await user.locator('#brand').fill('Toyota');
+  await user.selectOption('#brand', 'Toyota');
   await user.selectOption('#color', 'ขาว');
   await user.evaluate((value) => document.querySelector('#reserve_start')._flatpickr.setDate(value, true), bangkokDateTime(reserveStart));
   await user.locator('form[action$="/user/reservations"] button[type="submit"]').click();
