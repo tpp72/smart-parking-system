@@ -100,8 +100,8 @@ class CheckOutService
             return $this->fail('มีการบันทึก Check-out ของรายการนี้แล้ว');
         }
 
-        // Walkin User ไม่ได้รับ Notification
-        if ($result['success'] && $notifyUser && !$result['reservation']->is_walk_in) {
+        // บัญชีระบบ (Walkin User) ไม่ได้รับ Notification — แต่ถ้ารถ Walk-in คันนี้ผูกกับบัญชีจริงไว้ เจ้าของต้องได้รับ
+        if ($result['success'] && $notifyUser && ! $result['reservation']->user?->is_system) {
             notify_user(
                 $result['reservation']->user_id,
                 'เช็คเอาท์เรียบร้อย',

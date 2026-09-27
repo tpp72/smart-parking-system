@@ -178,6 +178,19 @@
                         <dt class="text-caption text-fg-3">ป้ายทะเบียน</dt>
                         <dd class="mt-0.5 font-semibold text-fg">{{ $reservation->license_plate }} {{ $reservation->plate_province }}</dd>
                     </div>
+                    @if ($reservation->reference_code)
+                        {{--
+                            รถ Walk-in ไม่มีบัญชีผู้ใช้ผูกอยู่ คนขับจึงต้องใช้รหัสนี้เช็คสถานะรถเอง
+                            ในลานจริงจอที่ทางเข้าจะแสดงเลขช่องจอดคู่กับรหัสนี้ — ที่นี่คือส่วนจำลองของจอนั้น
+                        --}}
+                        <div class="col-span-2 sm:col-span-4">
+                            <dt class="text-caption text-fg-3">รหัสอ้างอิงสำหรับคนขับ</dt>
+                            <dd class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span class="num rounded-control border-2 border-primary-ink px-3 py-1 text-h3 font-bold text-fg">{{ $reservation->reference_code }}</span>
+                                <span class="text-caption text-fg-2">แจ้งรหัสนี้ให้คนขับ — ใช้คู่กับป้ายทะเบียนเพื่อเช็คช่องจอดและค่าจอดเองที่หน้าเว็บ</span>
+                            </dd>
+                        </div>
+                    @endif
                 </dl>
 
                 @if ($scan && ! $reservation->is_walk_in)

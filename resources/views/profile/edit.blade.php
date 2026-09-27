@@ -17,6 +17,10 @@
             @endif
 
             @include('profile.partials.update-profile-information-form')
+            {{-- รถของฉันมีเฉพาะบทบาทผู้ใช้ — เจ้าของลานและผู้ดูแลระบบไม่ได้จอดรถในระบบตัวเอง --}}
+            @if ($user->role === 'user')
+                @include('profile.partials.my-vehicles')
+            @endif
             @include('profile.partials.update-password-form')
             @include('profile.partials.delete-user-form')
         </div>
