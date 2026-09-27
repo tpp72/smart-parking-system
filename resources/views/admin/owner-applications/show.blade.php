@@ -77,7 +77,7 @@
                     'ชื่อธุรกิจ' => $app->business_name,
                     'ชื่อลานจอด' => $app->parking_lot_name,
                     'จำนวนช่องจอดโดยประมาณ' => number_format($app->estimated_slots).' ช่อง',
-                    'ที่อยู่' => collect([$app->address, $app->district, $app->province])->filter()->implode(' '),
+                    'ที่อยู่' => collect([$app->address, $app->subdistrict, $app->district, $app->province, $app->postal_code])->filter()->implode(' '),
                 ] as $label => $val)
                     @continue(blank($val))
                     <div>

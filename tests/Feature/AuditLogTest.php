@@ -306,6 +306,7 @@ class AuditLogTest extends TestCase
             'email'            => 'somchai@example.com',
             'parking_lot_name' => 'ลานสมชาย',
             'district'         => 'บางรัก',
+            'subdistrict'      => 'สีลม',
             'province'         => 'กรุงเทพมหานคร',
             'estimated_slots'  => 10,
         ]);
