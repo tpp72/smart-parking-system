@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\OwnerApplicationController as AdminOwnerApplicati
 use App\Http\Controllers\Admin\OwnerResignationController as AdminOwnerResignationController;
 use App\Http\Controllers\Owner\ResignationController as OwnerResignationController;
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\PublicTrackController;
 use App\Http\Controllers\Owner\ApplicationController as OwnerApplicationController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
 use App\Http\Controllers\Owner\ParkingLogController as OwnerParkingLogController;
@@ -117,6 +118,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.p
 
 // ===== Public Marketplace =====
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
+
+// ===== เช็คสถานะรถโดยไม่ต้องล็อกอิน (ทะเบียน + จังหวัด + รหัสอ้างอิงจากจอทางเข้าลาน) =====
+// จำกัดจำนวนครั้งเพราะรหัสอ้างอิงคือหลักฐานยืนยันตัวคนขับ ต้องกันการไล่เดา
+Route::get('/track', [PublicTrackController::class, 'show'])->name('track.show');
+Route::post('/track', [PublicTrackController::class, 'find'])->middleware('throttle:10,1')->name('track.find');
+
+// ผูกทะเบียนที่เพิ่งพิสูจน์ด้วยรหัสอ้างอิงเข้ากับบัญชี — ยังไม่ล็อกอินจะถูกพาไปเข้าสู่ระบบแล้วกลับมาที่นี่
+Route::middleware(['auth', 'verified', 'force.password.reset'])->group(function () {
+    Route::get('/track/claim', [PublicTrackController::class, 'claimForm'])->name('track.claim.form');
+    Route::post('/track/claim', [PublicTrackController::class, 'claim'])->name('track.claim');
+    Route::delete('/my-vehicles/{vehicle}', [PublicTrackController::class, 'unclaim'])->name('my-vehicles.destroy');
+});
 
 // ===== Owner Routes — Dashboard + Self-demotion (role: owner) =====
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'role:owner'])->group(function () {

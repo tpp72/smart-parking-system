@@ -61,6 +61,9 @@ final class AuditCatalog
         'suspicious_vehicle.toggle'   => 'เปิดใช้ / ระงับบัญชีดำ',
         'suspicious_vehicle.delete'   => 'ลบทะเบียนออกจากบัญชีดำ',
 
+        'user_vehicle.link'           => 'ผูกทะเบียนรถกับบัญชี',
+        'user_vehicle.unlink'         => 'นำทะเบียนรถออกจากบัญชี',
+
         'ai_scan.low_accuracy'        => 'AI สแกน: ความแม่นยำต่ำ',
         'ai_scan.unreadable'          => 'AI สแกน: อ่านทะเบียนไม่ได้',
         'ai_scan.blacklist_detected'  => 'AI สแกน: พบรถในบัญชีดำ',
@@ -81,6 +84,7 @@ final class AuditCatalog
         'Payment'           => 'การชำระเงิน',
         'SuspiciousVehicle' => 'บัญชีดำ',
         'LicensePlateScan'  => 'ผลสแกน',
+        'UserVehicle'       => 'รถที่ผูกกับบัญชี',
     ];
 
     private const META_KEYS = [
