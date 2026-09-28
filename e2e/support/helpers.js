@@ -99,3 +99,37 @@ export async function paidPaymentRow(adminPage, plate, type) {
   await adminPage.goto('/admin/payments?status=paid');
   return paymentRow(adminPage, plate, type);
 }
+
+/** รหัสอ้างอิง 6 ตัวที่หน้าผลสแกนแสดงให้คนขับ Walk-in (จอทางเข้าลาน) */
+export async function readReferenceCode(page) {
+  const code = await page
+    .locator('dt', { hasText: 'รหัสอ้างอิงสำหรับคนขับ' })
+    .locator('xpath=following-sibling::dd[1]//span[1]')
+    .innerText();
+
+  return code.trim();
+}
+
+/**
+ * คนขับ Walk-in ไม่มีบัญชี: เปิดหน้าเช็คสถานะรถ → ยืนยันตัวด้วยทะเบียน + รหัส → กด Check-out → กดชำระ (§12.6)
+ * ใช้ Context ใหม่ที่ไม่ได้ล็อกอิน เหมือนคนขับที่เปิดเว็บจากมือถือของตัวเอง
+ */
+export async function driverPaysAtTrack(browser, baseURL, { plate, code }) {
+  const context = await browser.newContext({ baseURL, locale: 'th-TH', timezoneId: 'Asia/Bangkok' });
+  const page = await context.newPage();
+
+  await page.goto('/track');
+  await page.locator('#plate_number').fill(plate);
+  await page.selectOption('#plate_province', PROVINCE);
+  await page.locator('#reference_code').fill(code);
+  await page.getByRole('button', { name: 'เช็คสถานะรถ' }).click();
+  await expect(page.getByText('ค่าจอด ณ ตอนนี้', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Check-out', exact: true }).click();
+  await expect(page.getByText('ยอดที่ต้องชำระ', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: /^ชำระเงิน/ }).click();
+  await expect(page.getByText('สแกนออกได้ภายใน')).toBeVisible();
+
+  await context.close();
+}

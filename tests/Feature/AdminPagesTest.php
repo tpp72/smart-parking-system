@@ -46,7 +46,7 @@ class AdminPagesTest extends TestCase
         $this->assertSame(['count' => 1, 'amount' => 40.0], $response->viewData('stats')['unpaid_deposits']);
         $this->assertSame(1, $response->viewData('tasks')['payments']['count']);
 
-        $response->assertSee('รวมทุกลาน (10 ลาน)')
+        $response->assertSee('รวมทุกลานของผู้ดูแลระบบ (10 ลาน)')
             ->assertSee('งานที่รอผู้ดูแลระบบ')
             ->assertSee('ไม่ขึ้นกับช่วงเวลา')
             ->assertSee('ทั้งระบบ ไม่ขึ้นกับลานที่เลือก')

@@ -119,17 +119,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.p
 // ===== Public Marketplace =====
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
 
+// ===== หน้าสแกนสำหรับคนขับ Walk-in ที่ไม่มีบัญชี — หน้าเดียวกับของเจ้าหน้าที่ แค่ไม่ต้องล็อกอิน =====
+// ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย · หน้านี้เปิดสาธารณะจึงจำกัดแน่นกว่าของเจ้าหน้าที่มาก
+Route::get('/scan', [CarScanController::class, 'create'])->name('public.scan.create');
+Route::post('/scan', [CarScanController::class, 'store'])->middleware('throttle:3,1')->name('public.scan.store');
+
 // ===== เช็คสถานะรถโดยไม่ต้องล็อกอิน (ทะเบียน + จังหวัด + รหัสอ้างอิงจากจอทางเข้าลาน) =====
 // จำกัดจำนวนครั้งเพราะรหัสอ้างอิงคือหลักฐานยืนยันตัวคนขับ ต้องกันการไล่เดา
 Route::get('/track', [PublicTrackController::class, 'show'])->name('track.show');
 Route::post('/track', [PublicTrackController::class, 'find'])->middleware('throttle:10,1')->name('track.find');
-
-// ผูกทะเบียนที่เพิ่งพิสูจน์ด้วยรหัสอ้างอิงเข้ากับบัญชี — ยังไม่ล็อกอินจะถูกพาไปเข้าสู่ระบบแล้วกลับมาที่นี่
-Route::middleware(['auth', 'verified', 'force.password.reset'])->group(function () {
-    Route::get('/track/claim', [PublicTrackController::class, 'claimForm'])->name('track.claim.form');
-    Route::post('/track/claim', [PublicTrackController::class, 'claim'])->name('track.claim');
-    Route::delete('/my-vehicles/{vehicle}', [PublicTrackController::class, 'unclaim'])->name('my-vehicles.destroy');
-});
+// ชำระก่อนออก (§12.6): กด Check-out ล็อกยอด → กดชำระ → สแกนออกได้ภายใน 5 นาที · ยืนยันตัวด้วยรหัสซ้ำทุกครั้ง
+Route::post('/track/checkout', [PublicTrackController::class, 'checkout'])->middleware('throttle:10,1')->name('track.checkout');
+Route::post('/track/pay', [PublicTrackController::class, 'pay'])->middleware('throttle:10,1')->name('track.pay');
 
 // ===== Owner Routes — Dashboard + Self-demotion (role: owner) =====
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'force.password.reset', 'role:owner'])->group(function () {
@@ -197,6 +198,9 @@ Route::prefix('user')->name('user.')->middleware(['auth', 'verified', 'force.pas
     Route::get('reservations/{reservation}/edit', [UserReservationController::class, 'edit'])->name('reservations.edit');
     Route::patch('reservations/{reservation}/plate', [UserReservationController::class, 'update'])->name('reservations.update-plate');
     Route::post('reservations/{reservation}/cancel', [UserReservationController::class, 'cancel'])->name('reservations.cancel');
+    // ชำระก่อนออก (§12.6): กด Check-out ล็อกยอด → กดชำระ → สแกนออกได้ภายใน 5 นาที
+    Route::post('reservations/{reservation}/checkout-request', [UserReservationController::class, 'requestCheckout'])->name('reservations.checkout-request');
+    Route::post('reservations/{reservation}/checkout-pay', [UserReservationController::class, 'payCheckout'])->name('reservations.checkout-pay');
     // ประวัติการจอดของตัวเอง
     Route::get('parking-logs', [UserParkingLogController::class, 'index'])->name('parking-logs.index');
     // AI Car Scan (user)

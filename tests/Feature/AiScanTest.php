@@ -262,4 +262,63 @@ class AiScanTest extends TestCase
         $this->assertDatabaseCount('license_plate_scans', 0);
         $this->assertSame(0, ParkingLog::count());
     }
+
+    // ─── [11] คนขับ Walk-in สแกนเองได้โดยไม่ต้องล็อกอิน ──────────────────────
+
+    public function test_guest_can_open_the_scan_page_without_logging_in(): void
+    {
+        $this->ownerLot($this->makeUser('owner'));
+
+        $this->get(route('public.scan.create'))->assertOk()->assertSee('AI สแกน');
+    }
+
+    public function test_guest_scan_checks_the_car_in_and_records_no_uploader(): void
+    {
+        $lot = $this->ownerLot($this->makeUser('owner'));
+        $this->fakeAi();
+
+        $this->from(route('public.scan.create'))
+            ->post(route('public.scan.store'), [
+                'car_image'      => UploadedFile::fake()->image('car.jpg'),
+                'parking_lot_id' => $lot->id,
+            ])->assertSessionHasNoErrors();
+
+        // ผลที่ประตูเหมือนกับที่เจ้าหน้าที่สแกน — รถเข้าจอดแบบ Walk-in พร้อมรหัสอ้างอิง
+        $reservation = Reservation::firstOrFail();
+        $this->assertTrue((bool) $reservation->is_walk_in);
+        $this->assertSame('checked_in', $reservation->status);
+        $this->assertSame(6, strlen((string) $reservation->reference_code));
+
+        // บันทึกว่าไม่มีบัญชีผู้อัปโหลด (ประวัติสแกนฝั่งเจ้าหน้าที่แสดงเป็น "ระบบ")
+        $this->assertNull(LicensePlateScan::firstOrFail()->user_id);
+    }
+
+    /** ข้อมูลส่วนบุคคลและงานหลังบ้านไม่หลุดไปหน้าสาธารณะ */
+    public function test_guest_result_hides_the_account_name_and_the_blacklist_flag(): void
+    {
+        $booker = $this->makeUser();
+        $lot = $this->ownerLot($this->makeUser('owner'));
+
+        Reservation::factory()->confirmed()->create([
+            'user_id'         => $booker->id,
+            'parking_lot_id'  => $lot->id,
+            'license_plate'   => self::PLATE,
+            'plate_province'  => self::PROVINCE,
+            'brand'           => 'Toyota',
+            'color'           => 'ขาว',
+            'reserve_start'   => now()->subMinutes(5),
+        ]);
+        SuspiciousVehicle::factory()->create([
+            'license_plate' => self::PLATE, 'plate_province' => self::PROVINCE, 'is_active' => true,
+        ]);
+        $this->fakeAi();
+
+        $this->from(route('public.scan.create'))->followingRedirects()
+            ->post(route('public.scan.store'), [
+                'car_image'      => UploadedFile::fake()->image('car.jpg'),
+                'parking_lot_id' => $lot->id,
+            ])->assertOk()
+            ->assertDontSee($booker->name)
+            ->assertDontSee('พบรถในบัญชีดำ');
+    }
 }

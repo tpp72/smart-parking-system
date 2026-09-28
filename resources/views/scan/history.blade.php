@@ -1,5 +1,5 @@
 {{--
-    ประวัติสแกน (Admin: ลานของผู้ดูแลระบบ · Owner: ลานของตัวเอง) — ใช้ร่วมกันทั้งสองบทบาท
+    ประวัติสแกน (Admin: ทุกลาน เพราะเป็นหน้า Log · Owner: ลานของตัวเอง) — ใช้ร่วมกันทั้งสองบทบาท
     ตัวกรอง: ค้นหาทะเบียน · ผล AI (ผ่าน / ความแม่นยำต่ำ / อ่านไม่ได้) · พบรถในบัญชีดำ
 --}}
 @use('App\Support\Format')
@@ -22,7 +22,7 @@
         <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h1 class="text-h1 text-fg">ประวัติสแกน</h1>
-                <p class="mt-1 text-fg-2">ผลที่ AI อ่านได้จากกล้องหน้าลาน · {{ $role === 'owner' ? 'ลานของคุณ' : 'ลานของผู้ดูแลระบบ' }}</p>
+                <p class="mt-1 text-fg-2">ผลที่ AI อ่านได้จากกล้องหน้าลาน · {{ $role === 'owner' ? 'ลานของคุณ' : 'ทุกลาน' }}</p>
             </div>
             <x-ui.button :href="route($role.'.scan.create')">
                 <x-ui.icon name="scan" class="h-4 w-4" /> สแกนรถ

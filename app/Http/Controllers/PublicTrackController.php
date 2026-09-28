@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
-use App\Models\UserVehicle;
 use App\Rules\PlausibleLicensePlate;
 use App\Services\CheckOutService;
 use App\Support\LicensePlateNormalizer;
@@ -11,9 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * หน้าเช็คสถานะรถสำหรับคนขับที่ไม่ได้ล็อกอิน (project-plan.md §4.0.2)
+ * หน้าเช็คสถานะรถสำหรับคนขับ Walk-in ที่ไม่ได้ล็อกอิน (project-plan.md §4.0.2)
  *
  * ใช้ ทะเบียน + จังหวัด + รหัสอ้างอิงที่ได้จากจอทางเข้าลาน
+ * ใช้ได้เฉพาะรถที่เข้าแบบ Walk-in — การจองล่วงหน้าไม่ออกรหัส (§4.0.1)
  * รหัสเป็นหลักฐานว่า "คนที่ถืออยู่กับรถจริง" — ถ้าใช้แค่ทะเบียน ใครที่เห็นป้ายก็ตามดูได้ว่ารถจอดที่ไหน
  *
  * แสดงเฉพาะข้อมูลของรถคันนั้น ณ ตอนนี้ · ไม่แสดงชื่อเจ้าของ อีเมล หรือประวัติครั้งก่อน
@@ -26,6 +26,46 @@ class PublicTrackController extends Controller
     }
 
     public function find(Request $request, CheckOutService $checkOut)
+    {
+        $reservation = $this->locate($request);
+
+        return $reservation instanceof Reservation ? $this->render($reservation, $request, $checkOut) : $reservation;
+    }
+
+    /** กด Check-out — ล็อกยอด ณ ตอนนี้ ให้ชำระภายใน N นาที (§12.6) */
+    public function checkout(Request $request, CheckOutService $checkOut)
+    {
+        $reservation = $this->locate($request);
+
+        if (! $reservation instanceof Reservation) {
+            return $reservation;
+        }
+
+        $result = $checkOut->requestCheckout($reservation);
+
+        return $this->render($reservation, $request, $checkOut, $result['success'] ? null : $result['error']);
+    }
+
+    /** กดชำระ (จำลอง) — ชำระยอดที่ล็อกไว้ แล้วสแกนออกได้ภายใน N นาที (§12.6) */
+    public function pay(Request $request, CheckOutService $checkOut)
+    {
+        $reservation = $this->locate($request);
+
+        if (! $reservation instanceof Reservation) {
+            return $reservation;
+        }
+
+        $result = $checkOut->payCheckout($reservation);
+
+        return $this->render($reservation, $request, $checkOut, $result['success'] ? null : $result['error']);
+    }
+
+    /**
+     * ยืนยันตัวด้วย ทะเบียน + จังหวัด + รหัสอ้างอิง — ทุกการกระทำในหน้านี้ตรวจซ้ำทุกครั้ง ไม่จำอะไรไว้ใน session
+     *
+     * @return Reservation|\Illuminate\Http\RedirectResponse
+     */
+    private function locate(Request $request)
     {
         $data = $request->validate([
             'plate_number'   => ['required', 'string', 'max:20', new PlausibleLicensePlate],
@@ -44,98 +84,39 @@ class PublicTrackController extends Controller
             ->wherePlateMatches($data['plate_number'])
             ->where('plate_province', $data['plate_province'])
             ->where('status', 'checked_in')
+            // เฉพาะ Walk-in — การจองล่วงหน้าไม่มีรหัส และเจ้าของบัญชีดูรายการของตัวเองในหน้าหลักได้อยู่แล้ว
+            // เงื่อนไขนี้บังคับกฎไว้ในโค้ด ไม่ให้รายการเก่าที่เคยมีรหัสติดมาเปิดดูผ่านหน้านี้ได้
+            ->where('is_walk_in', true)
             ->first();
 
         // ข้อความเดียวกันทุกกรณีที่ไม่พบ — ไม่บอกว่าผิดที่ทะเบียนหรือรหัส เพื่อไม่ให้ใช้หน้านี้ไล่เดา
         if (! $reservation || ! $reservation->parkingLog || $reservation->parkingLog->check_out_time) {
-            return back()
+            return redirect()->route('track.show')
                 ->withErrors(['reference_code' => 'ไม่พบรถที่กำลังจอดอยู่ตามข้อมูลนี้ — ตรวจเลขทะเบียน จังหวัด และรหัสอ้างอิงอีกครั้ง'])
                 ->withInput($request->only('plate_number', 'plate_province'));
         }
 
-        // จำไว้ว่าผู้ใช้คนนี้พิสูจน์แล้วว่าอยู่กับรถคันนี้ — ใช้เป็นหลักฐานตอนผูกทะเบียนกับบัญชี
-        $request->session()->put('track_verified', [
-            'license_plate'  => $reservation->license_plate,
-            'plate_province' => $reservation->plate_province,
-        ]);
+        return $reservation;
+    }
+
+    private function render(Reservation $reservation, Request $request, CheckOutService $checkOut, ?string $error = null)
+    {
+        $log = $reservation->parkingLog->fresh();
 
         return view('track.index', [
             'result' => [
                 'reservation' => $reservation,
-                'log'         => $reservation->parkingLog,
-                'estimate'    => $checkOut->calculate($reservation, $reservation->parkingLog, now()),
+                'log'         => $log,
+                'exit'        => $checkOut->exitState($reservation, $log),
                 'plate'       => LicensePlateNormalizer::normalize($reservation->license_plate),
-                'claimedBy'   => UserVehicle::ownerOf($reservation->license_plate, $reservation->plate_province),
+                // ส่งกลับในฟอร์มของปุ่ม Check-out / ชำระ เพื่อยืนยันตัวซ้ำ (ไม่เก็บใน session)
+                'credentials' => [
+                    'plate_number'   => $request->input('plate_number'),
+                    'plate_province' => $request->input('plate_province'),
+                    'reference_code' => strtoupper(trim((string) $request->input('reference_code'))),
+                ],
+                'error'       => $error,
             ],
         ]);
-    }
-
-    /** หน้ายืนยันก่อนผูกทะเบียนกับบัญชี (ต้องล็อกอิน — ยังไม่ล็อกอินจะถูกพาไปหน้าเข้าสู่ระบบแล้วกลับมาที่นี่) */
-    public function claimForm(Request $request)
-    {
-        $verified = $request->session()->get('track_verified');
-
-        if (! $verified) {
-            return redirect()->route('track.show')
-                ->withErrors(['reference_code' => 'กรุณาเช็คสถานะรถด้วยรหัสอ้างอิงก่อน จึงจะผูกรถกับบัญชีได้']);
-        }
-
-        return view('track.claim', [
-            'plate'    => $verified['license_plate'],
-            'province' => $verified['plate_province'],
-            'owner'    => UserVehicle::ownerOf($verified['license_plate'], $verified['plate_province']),
-        ]);
-    }
-
-    /** ผูกทะเบียนกับบัญชี — ทำได้เฉพาะทะเบียนที่เพิ่งพิสูจน์ด้วยรหัสอ้างอิงในรอบนี้ */
-    public function claim(Request $request)
-    {
-        $verified = $request->session()->get('track_verified');
-
-        if (! $verified) {
-            return redirect()->route('track.show')
-                ->withErrors(['reference_code' => 'กรุณาเช็คสถานะรถด้วยรหัสอ้างอิงก่อน จึงจะผูกรถกับบัญชีได้']);
-        }
-
-        $user = $request->user();
-        $owner = UserVehicle::ownerOf($verified['license_plate'], $verified['plate_province']);
-
-        if ($owner && $owner->id !== $user->id) {
-            return back()->withErrors(['plate' => 'ทะเบียนนี้ถูกผูกกับบัญชีอื่นแล้ว หากเป็นรถของคุณ กรุณาติดต่อผู้ดูแลระบบ']);
-        }
-
-        if (! $owner) {
-            $vehicle = UserVehicle::create([
-                'user_id'        => $user->id,
-                'license_plate'  => $verified['license_plate'],
-                'plate_province' => $verified['plate_province'],
-            ]);
-
-            audit_log('user_vehicle.link', $vehicle, [
-                'license_plate'  => $vehicle->license_plate,
-                'plate_province' => $vehicle->plate_province,
-            ]);
-        }
-
-        // หลักฐานใช้ได้ครั้งเดียว — ต้องเช็คสถานะด้วยรหัสใหม่ถ้าจะผูกคันอื่น
-        $request->session()->forget('track_verified');
-
-        return redirect()->route('profile.edit')
-            ->with('success', "ผูกทะเบียน {$verified['license_plate']} {$verified['plate_province']} กับบัญชีของคุณแล้ว — ครั้งต่อไปที่รถเข้าลานโดยไม่ได้จอง ระบบจะแจ้งเตือนคุณและแสดงรถในหน้าหลัก");
-    }
-
-    /** ยกเลิกการผูกทะเบียน */
-    public function unclaim(Request $request, UserVehicle $vehicle)
-    {
-        abort_unless($vehicle->user_id === $request->user()->id, 403);
-
-        audit_log('user_vehicle.unlink', $vehicle, [
-            'license_plate'  => $vehicle->license_plate,
-            'plate_province' => $vehicle->plate_province,
-        ]);
-
-        $vehicle->delete();
-
-        return back()->with('success', 'นำรถออกจากบัญชีแล้ว');
     }
 }

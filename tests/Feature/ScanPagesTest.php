@@ -94,10 +94,11 @@ class ScanPagesTest extends TestCase
         $unreadable = $this->scanRecord($adminLot, ['license_plate' => '', 'result' => LicensePlateScan::RESULT_UNREADABLE]);
         $mine = $this->scanRecord($ownerLot, ['license_plate' => 'ขค 2002']);
 
+        // ประวัติสแกนเป็นหน้า Log — ผู้ดูแลระบบเห็นผลของลาน Owner ด้วย (§17.1 แก้ไข 2026-09-28)
         $admin = $this->makeUser('admin');
         $all = $this->actingAs($admin)->get(route('admin.scan.history'))->assertOk()->assertViewIs('scan.history')
-            ->assertSee('ลานของผู้ดูแลระบบ')->assertSee('พบในบัญชีดำ')->assertDontSee('Scan History');
-        $this->assertEqualsCanonicalizing([$clean->id, $flagged->id, $unreadable->id], $all->viewData('scans')->pluck('id')->all());
+            ->assertSee('ทุกลาน')->assertSee('พบในบัญชีดำ')->assertDontSee('Scan History');
+        $this->assertEqualsCanonicalizing([$clean->id, $flagged->id, $unreadable->id, $mine->id], $all->viewData('scans')->pluck('id')->all());
 
         $blacklist = $this->actingAs($admin)->get(route('admin.scan.history', ['result' => 'blacklist']));
         $this->assertSame([$flagged->id], $blacklist->viewData('scans')->pluck('id')->all());
@@ -105,6 +106,7 @@ class ScanPagesTest extends TestCase
         $failed = $this->actingAs($admin)->get(route('admin.scan.history', ['result' => 'unreadable']));
         $this->assertSame([$unreadable->id], $failed->viewData('scans')->pluck('id')->all());
 
+        // เจ้าของลานยังเห็นเฉพาะลานตัวเอง
         $ownerView = $this->actingAs($owner)->get(route('owner.scan.history'))->assertOk()->assertViewIs('scan.history')->assertSee('ลานของคุณ');
         $this->assertSame([$mine->id], $ownerView->viewData('scans')->pluck('id')->all());
     }
