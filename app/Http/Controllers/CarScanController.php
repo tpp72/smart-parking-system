@@ -26,12 +26,15 @@ class CarScanController extends Controller
         return ParkingLot::query();
     }
 
-    /** ประวัติการสแกนแสดงตามขอบเขตสิทธิ์ (admin: ลานของ Admin, owner: ลานของตัวเอง) */
+    /**
+     * ประวัติสแกนเป็นหน้า Log — ผู้ดูแลระบบดูได้ทุกลาน (§17.1 แก้ไข 2026-09-28)
+     * เจ้าของลานยังเห็นเฉพาะลานของตัวเอง
+     */
     private function historyLots()
     {
         return Auth::user()->role === 'owner'
             ? ParkingLot::ownedBy(Auth::id())
-            : ParkingLot::unowned();
+            : ParkingLot::query();
     }
 
     /* ─────────────────────────────────────────────────────────────

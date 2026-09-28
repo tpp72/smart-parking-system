@@ -69,9 +69,13 @@ class AdminSystemTest extends TestCase
         return array_merge(['name' => $user->name, 'email' => $user->email, 'role' => $user->role], $overrides);
     }
 
-    // ─── Dashboard ทั้งระบบ ────────────────────────────────────────────────────
+    // ─── Dashboard: เฉพาะลานของผู้ดูแลระบบ (§17.1 แก้ไข 2026-09-28) ──────────────
 
-    public function test_admin_dashboard_covers_every_lot_while_management_pages_stay_admin_only(): void
+    /**
+     * ตัวเลขบนแดชบอร์ดเป็นของลานผู้ดูแลระบบเท่านั้น — ลานของเจ้าของลานไม่ถูกนับรวม
+     * ข้อมูลของลาน Owner ในเทสต์นี้ (รถที่จอด · มัดจำ · ผลสแกน · การจอง) ต้องไม่โผล่มาในตัวเลขใด
+     */
+    public function test_admin_dashboard_counts_only_admin_lots(): void
     {
         $admin = $this->makeUser('admin');
         $adminLot = ParkingLot::factory()->create(['owner_id' => null]);
@@ -107,20 +111,28 @@ class AdminSystemTest extends TestCase
         $response = $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk();
         $stats = $response->viewData('stats');
 
-        $this->assertSame(2, $stats['lots_total']);
-        $this->assertSame(1, $stats['admin_lots_total']);
-        $this->assertSame(3, $stats['slots_total']);
-        $this->assertSame(1, $stats['active_now']);
-        $this->assertSame(100.0, $stats['revenue_paid']);
-        $this->assertSame(40.0, $stats['revenue_deposit']);
+        // ลานของ Admin 1 ลาน 2 ช่อง — ลานของ Owner และช่องของมันไม่ถูกนับ
+        $this->assertSame(1, $stats['lots_total']);
+        $this->assertSame(2, $stats['slots_total']);
+        // รถที่จอดอยู่เป็นของลาน Owner จึงไม่นับ
+        $this->assertSame(0, $stats['active_now']);
+        // รับเงินเฉพาะค่าจอด 60 ของลาน Admin — มัดจำ 40 ของลาน Owner ไม่นับ
+        $this->assertSame(60.0, $stats['revenue_paid']);
+        $this->assertSame(0.0, $stats['revenue_deposit']);
         $this->assertSame(60.0, $stats['revenue_parking']);
-        $this->assertSame([3, 1, 2, 1], [$stats['scans_total'], $stats['scans_passed'], $stats['scans_failed'], $stats['scans_suspicious']]);
+        // ผลสแกนทั้ง 3 รายการอยู่ที่ลาน Owner
+        $this->assertSame([0, 0, 0, 0], [$stats['scans_total'], $stats['scans_passed'], $stats['scans_failed'], $stats['scans_suspicious']]);
 
         $statusData = $response->viewData('reservationStatus');
-        $this->assertSame([1, 1, 1], [$statusData['confirmed'], $statusData['checked_in'], $statusData['completed']]);
-        $this->assertCount(2, $response->viewData('lotsOverview'));
+        $this->assertSame([0, 0, 1], [$statusData['confirmed'], $statusData['checked_in'], $statusData['completed']]);
+        $this->assertCount(1, $response->viewData('lotsOverview'));
 
-        // เลือกลานเดียว: ตัวเลขเหลือเฉพาะลานนั้น แต่บัญชีดำยังเป็นของทั้งระบบ
+        // เลือกลานของ Owner ตรง ๆ ไม่ได้ — ไม่อยู่ในรายการให้เลือก ตัวเลขจึงตกกลับเป็นทุกลานของ Admin
+        $forced = $this->actingAs($admin)->get(route('admin.dashboard', ['lot_id' => $ownerLot->id]))->assertOk();
+        $this->assertNull($forced->viewData('lot'));
+        $this->assertSame(2, $forced->viewData('stats')['slots_total']);
+
+        // เลือกลานเดียวของตัวเอง: ตัวเลขเหลือเฉพาะลานนั้น แต่บัญชีดำยังเป็นของทั้งระบบ
         $scoped = $this->actingAs($admin)->get(route('admin.dashboard', ['lot_id' => $adminLot->id, 'range' => '7d']))->assertOk();
         $this->assertSame([2, 0, 60.0], [$scoped->viewData('stats')['slots_total'], $scoped->viewData('stats')['active_now'], $scoped->viewData('stats')['revenue_paid']]);
         $scoped->assertSee('กำลังดู')->assertSee('ดูรวมทุกลาน')->assertSee('ทั้งระบบ ไม่ขึ้นกับลานที่เลือก');
@@ -360,5 +372,54 @@ class AdminSystemTest extends TestCase
         $this->actingAs($admin)->post(route('admin.owner-applications.approve', $application))->assertSessionHas('success');
         $this->assertSame('approved', $application->fresh()->status);
         $this->assertSame('owner', $applicant->fresh()->role);
+    }
+
+    // ─── หน้า Log ดูได้ทุกลาน · หน้าจัดการดูได้เฉพาะลานตัวเอง (§17.1 แก้ไข 2026-09-28) ───
+
+    /** ประวัติการจอดเป็นหน้า Log — เห็นรถของลาน Owner ด้วย แต่กดเช็คเอาท์ให้ไม่ได้ */
+    public function test_admin_parking_log_shows_every_lot_but_only_offers_check_out_for_admin_lots(): void
+    {
+        $admin = $this->makeUser('admin');
+        $adminLot = ParkingLot::factory()->create(['owner_id' => null]);
+        $ownerLot = ParkingLot::factory()->create(['owner_id' => $this->makeUser('owner')->id]);
+
+        [$mine] = $this->parked($adminLot, $this->makeUser());
+        [$theirs] = $this->parked($ownerLot, $this->makeUser());
+
+        $response = $this->actingAs($admin)->get(route('admin.parking-logs.index'))->assertOk();
+
+        // เห็นทั้งสองลาน
+        $plates = $response->viewData('logs')->pluck('license_plate');
+        $this->assertTrue($plates->contains($mine->license_plate));
+        $this->assertTrue($plates->contains($theirs->license_plate));
+
+        // ปุ่มเช็คเอาท์ขึ้นเฉพาะลานที่จัดการได้ (URL ฝังอยู่ใน Js::from จึงตรวจที่ตัวรายการลานแทน)
+        $manageable = $response->viewData('manageableLotIds');
+        $this->assertTrue($manageable->contains($adminLot->id));
+        $this->assertFalse($manageable->contains($ownerLot->id));
+
+        // และถ้าดันเรียกตรง ๆ ก็ยังถูกปฏิเสธ
+        $this->actingAs($admin)->post(route('admin.reservations.check-out', $theirs->id))->assertForbidden();
+    }
+
+    /** หน้าจัดการยังผูกกับลานของผู้ดูแลระบบเหมือนเดิม — ไม่ได้หลวมตามหน้า Log */
+    public function test_management_pages_stay_scoped_to_admin_lots(): void
+    {
+        $admin = $this->makeUser('admin');
+        $adminLot = ParkingLot::factory()->create(['owner_id' => null]);
+        $ownerLot = ParkingLot::factory()->create(['owner_id' => $this->makeUser('owner')->id]);
+
+        [$theirs] = $this->parked($ownerLot, $this->makeUser());
+
+        foreach (['admin.parking-lots.index', 'admin.reservations.index', 'admin.payments.index'] as $route) {
+            $this->actingAs($admin)->get(route($route))->assertOk();
+        }
+
+        $lotIds = $this->actingAs($admin)->get(route('admin.parking-lots.index'))->viewData('lots')->pluck('id');
+        $this->assertTrue($lotIds->contains($adminLot->id));
+        $this->assertFalse($lotIds->contains($ownerLot->id));
+
+        $reservationIds = $this->actingAs($admin)->get(route('admin.reservations.index'))->viewData('reservations')->pluck('id');
+        $this->assertFalse($reservationIds->contains($theirs->id));
     }
 }

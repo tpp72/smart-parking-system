@@ -49,12 +49,12 @@ class ExportController extends Controller
             'id', 'reservation_id', 'walk_in', 'parking_lot', 'lot_owner', 'slot_number',
             'license_plate', 'plate_province', 'brand', 'color', 'user_name',
             'check_in_time', 'check_out_time', 'hourly_rate', 'total_hours', 'parking_fee',
-            'deposit_deduction', 'reservation_discount', 'total_amount', 'payment_status', 'paid_at',
+            'deposit_deduction', 'reservation_discount', 'prior_paid', 'total_amount', 'payment_status', 'paid_at',
         ], AdminExportQuery::parkingLogs($filters), fn ($r) => [
             $r->id, $r->reservation_id, $r->is_walk_in ? 'yes' : 'no', $r->lot_name, $r->owner_name ?? 'Admin', $r->slot_number,
             $r->license_plate, $r->plate_province, $r->brand, $r->color, $r->user_name,
             $r->check_in_time, $r->check_out_time, $r->hourly_rate, $r->total_hours, $r->parking_fee,
-            $r->deposit_deduction, $r->reservation_discount, $r->total_amount, $r->payment_status, $r->paid_at,
+            $r->deposit_deduction, $r->reservation_discount, $r->prior_paid, $r->total_amount, $r->payment_status, $r->paid_at,
         ]);
     }
 

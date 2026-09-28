@@ -50,7 +50,7 @@
             @elseif ($tab === 'active')
                 <div class="flex flex-col gap-4">
                     @foreach ($reservations as $reservation)
-                        @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'estimate' => $estimates[$reservation->id] ?? null])
+                        @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'exit' => $exits[$reservation->id] ?? null])
                     @endforeach
                 </div>
             @else
@@ -87,7 +87,8 @@
                                 <x-ui.status type="reservation" :value="$r->status" audience="user" />
                                 @if ($checkout)
                                     <p class="text-label text-fg-2">
-                                        ค่าจอด <span class="tabular font-semibold text-fg">{{ Format::baht($checkout->total_amount) }}</span>
+                                        {{-- ใบล่าสุด + ที่ชำระในใบก่อน ๆ = ยอดรวมของการจอดครั้งนี้ --}}
+                                        ค่าจอด <span class="tabular font-semibold text-fg">{{ Format::baht((float) $checkout->prior_paid + (float) $checkout->total_amount) }}</span>
                                     </p>
                                 @endif
                             </div>

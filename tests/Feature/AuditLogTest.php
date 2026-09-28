@@ -250,10 +250,18 @@ class AuditLogTest extends TestCase
         $this->assertAudited('reservation.walk_in', null, ['subject_id' => $walkIn->id]);
 
         $this->travel(1)->hours();
+
+        // ชำระก่อนออก (§12.6): คนขับ Walk-in ไม่มีบัญชี กด Check-out และชำระที่หน้าเช็คสถานะรถ
+        $credentials = ['plate_number' => $walkIn->license_plate, 'plate_province' => $walkIn->plate_province, 'reference_code' => $walkIn->reference_code];
+        $this->post(route('track.checkout'), $credentials)->assertOk();
+        $this->post(route('track.pay'), $credentials)->assertOk();
+
+        $this->assertAudited('reservation.checkout_request', null, ['subject_id' => $walkIn->id]);
+        $this->assertAudited('payment.checkout_paid', null);
+
         $this->scan($lot);
 
         $this->assertSame('auto', $this->assertAudited('reservation.check_out', null, ['subject_id' => $walkIn->id])->meta['mode']);
-        $this->assertAudited('payment.checkout_created', null);
 
         $this->scan($lot);
         $this->assertAudited('ai_scan.low_accuracy', null, ['subject_type' => 'LicensePlateScan']);

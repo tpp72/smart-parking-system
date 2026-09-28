@@ -32,12 +32,6 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Reservation::class);
     }
 
-    /** ทะเบียนรถที่ผู้ใช้ผูกไว้กับบัญชี (ผูกได้ต่อเมื่อพิสูจน์ด้วยรหัสอ้างอิงจากจอทางเข้าลาน) */
-    public function vehicles()
-    {
-        return $this->hasMany(UserVehicle::class);
-    }
-
     public function notifications()
     {
         return $this->hasMany(Notification::class);

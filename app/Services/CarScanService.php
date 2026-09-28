@@ -173,7 +173,8 @@ PROMPT;
      *
      * @param int $parkingLotId ลานที่กล้องติดตั้ง (Upload จำลอง Camera Input)
      */
-    public function scanAndSave(UploadedFile $file, int $userId, int $parkingLotId): LicensePlateScan
+    /** @param  int|null  $userId  null = สแกนจากหน้าสาธารณะ (คนขับที่ไม่ได้ล็อกอิน) */
+    public function scanAndSave(UploadedFile $file, ?int $userId, int $parkingLotId): LicensePlateScan
     {
         // 1. Store file
         $storedPath   = $file->store('car-scans', 'public');

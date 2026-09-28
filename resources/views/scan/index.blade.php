@@ -4,8 +4,9 @@
     ยังไม่มีผล = การ์ดกล้องอยู่กลางหน้า · มีผลแล้ว = กล้องซ้าย ผลขวา
 --}}
 @php
-    $role = auth()->user()->role;
-    $scanStoreRoute = route("{$role}.scan.store");
+    // คนขับ Walk-in เข้าหน้านี้ได้โดยไม่ต้องล็อกอิน — ใช้เส้นทางสาธารณะและไม่มีเมนูประวัติสแกน
+    $role = auth()->user()?->role;
+    $scanStoreRoute = $role ? route("{$role}.scan.store") : route('public.scan.store');
     $scanHistoryRoute = in_array($role, ['admin', 'owner'], true) ? route("{$role}.scan.history") : null;
     $threshold = config('carscan.accuracy_threshold', 85);
     $hasResult = session()->has('scan_result') || session()->has('scan_lot_full');

@@ -40,12 +40,36 @@ class ReservationController extends Controller
             'done'   => $mine()->whereNotIn('status', Reservation::ACTIVE_STATUSES)->count(),
         ];
 
-        // รถที่จอดอยู่: ประมาณค่าจอด ณ ตอนนี้ (ยอดจริงคิดตอน Check-out)
-        $estimates = $reservations->getCollection()
+        // รถที่จอดอยู่: สถานะการชำระก่อนออก (§12.6) — ค่าจอด ณ ตอนนี้ / ยอดที่ล็อกไว้ / ชำระแล้วรอออก
+        $exits = $reservations->getCollection()
             ->filter(fn (Reservation $r) => $r->status === 'checked_in' && $r->parkingLog && ! $r->parkingLog->check_out_time)
-            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->calculate($r, $r->parkingLog, now())]);
+            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->exitState($r, $r->parkingLog)]);
 
-        return view('user.reservations.index', compact('reservations', 'tab', 'counts', 'estimates'));
+        return view('user.reservations.index', compact('reservations', 'tab', 'counts', 'exits'));
+    }
+
+    /** กด Check-out — ล็อกยอด ณ ตอนนี้ ให้ชำระภายใน N นาที (§12.6) */
+    public function requestCheckout(Reservation $reservation, CheckOutService $checkOut)
+    {
+        abort_unless($reservation->user_id === Auth::id(), 403);
+
+        $result = $checkOut->requestCheckout($reservation, Auth::user());
+
+        return back()->with($result['success'] ? 'success' : 'error', $result['success']
+            ? 'ล็อกยอดค่าจอดแล้ว — กรุณาชำระภายใน '.CheckOutService::window().' นาที'
+            : $result['error']);
+    }
+
+    /** กดชำระ (จำลอง) — แล้วสแกนออกได้ภายใน N นาที (§12.6) */
+    public function payCheckout(Reservation $reservation, CheckOutService $checkOut)
+    {
+        abort_unless($reservation->user_id === Auth::id(), 403);
+
+        $result = $checkOut->payCheckout($reservation, Auth::user());
+
+        return back()->with($result['success'] ? 'success' : 'error', $result['success']
+            ? 'ชำระค่าจอดแล้ว — สแกนป้ายทะเบียนขาออกภายใน '.CheckOutService::window().' นาที'
+            : $result['error']);
     }
 
     /** ฟอร์มสร้างการจอง — User เลือกได้เฉพาะลาน (ลานที่เปิดรับจองและยังมีช่องว่าง) */

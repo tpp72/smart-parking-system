@@ -14,7 +14,7 @@
         'month' => now()->startOfMonth()->format('d/m').' – '.now()->format('d/m'),
         default => now()->format('d/m/Y'),
     };
-    $scopeLabel = $lot ? $lot->name : 'รวมทุกลาน ('.$stats['lots_total'].' ลาน)';
+    $scopeLabel = $lot ? $lot->name : 'รวมทุกลานของผู้ดูแลระบบ ('.$stats['lots_total'].' ลาน)';
 
     // ลิงก์ของหน้านี้ที่คงตัวกรองเดิมไว้ แล้วเลื่อนมาที่ตัวเลข
     $dashboardUrl = fn (array $params = []) => route('admin.dashboard', array_filter(
@@ -37,10 +37,9 @@
             <div class="max-w-3xl">
                 <h1 class="text-h1 text-fg">ภาพรวมระบบ</h1>
                 <p class="mt-1 text-fg-2">
-                    ทุกลานในระบบ <span class="tabular font-semibold text-fg">{{ $stats['lots_total'] }}</span> ลาน
-                    (ลานของผู้ดูแลระบบ <span class="tabular">{{ $stats['admin_lots_total'] }}</span> ลาน) · ข้อมูล ณ {{ Format::time(now()) }}
+                    ลานของผู้ดูแลระบบ <span class="tabular font-semibold text-fg">{{ $stats['lots_total'] }}</span> ลาน · ข้อมูล ณ {{ Format::time(now()) }}
                 </p>
-                <p class="mt-1 text-caption text-fg-3">ตัวเลขในหน้านี้ครอบคลุมทุกลาน ส่วนหน้าจัดการการจอง ชำระเงิน และลานจอด ใช้ได้เฉพาะลานของผู้ดูแลระบบ</p>
+                <p class="mt-1 text-caption text-fg-3">ตัวเลขในหน้านี้เป็นของลานผู้ดูแลระบบเท่านั้น — ตัวเลขของลานเจ้าของลานอยู่ในแดชบอร์ดของเจ้าของลานเอง · หน้าประวัติและ Log ยังดูได้ทุกลาน</p>
             </div>
             <x-ui.button variant="secondary" :href="route('admin.exports.index')">
                 <x-ui.icon name="export" class="h-4 w-4" /> ส่งออก CSV
@@ -87,7 +86,7 @@
                         <x-ui.select id="lot_id" name="lot_id" :placeholder="'ทุกลาน ('.$stats['lots_total'].' ลาน)'">
                             @foreach ($lots as $option)
                                 <option value="{{ $option->id }}" @selected($lot?->id === $option->id)>
-                                    {{ $option->name }} — {{ $option->owner ? 'เจ้าของ '.$option->owner->name : 'ลานของผู้ดูแลระบบ' }}
+                                    {{ $option->name }}
                                 </option>
                             @endforeach
                         </x-ui.select>
@@ -187,7 +186,7 @@
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 id="lots-title" class="text-h2 text-fg">ภาพรวมลานจอด</h2>
-                    <p class="mt-1 text-label text-fg-2">ทุกลาน {{ $lotsOverview->count() }} ลาน · กดลานเพื่อดูตัวเลขด้านบนเฉพาะลานนั้น · ช่องจอดเป็นสถานะตอนนี้ ส่วนรับเงินเป็นของ{{ $rangeLabel }}</p>
+                    <p class="mt-1 text-label text-fg-2">ลานของผู้ดูแลระบบ {{ $lotsOverview->count() }} ลาน · กดลานเพื่อดูตัวเลขด้านบนเฉพาะลานนั้น · ช่องจอดเป็นสถานะตอนนี้ ส่วนรับเงินเป็นของ{{ $rangeLabel }}</p>
                 </div>
                 <a href="{{ route('admin.parking-lots.index') }}" class="inline-flex min-h-touch items-center text-label font-semibold text-primary-ink underline-offset-4 hover:underline">จัดการลานของผู้ดูแลระบบ</a>
             </div>
@@ -213,8 +212,7 @@
                                     <span class="min-w-0">
                                         <span class="block truncate font-semibold text-fg">{{ $overview->name }}</span>
                                         <span class="block truncate text-caption text-fg-2">
-                                            {{ $overview->owner_name ? 'เจ้าของ '.$overview->owner_name : 'ลานของผู้ดูแลระบบ' }}
-                                            · <span class="tabular">{{ Format::baht($overview->hourly_rate) }}</span>/ชม.
+                                            <span class="tabular">{{ Format::baht($overview->hourly_rate) }}</span>/ชม.
                                         </span>
                                     </span>
                                     @if ($current)

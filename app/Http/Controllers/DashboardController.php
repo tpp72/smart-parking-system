@@ -34,20 +34,22 @@ class DashboardController extends Controller
             ->sortBy(fn (Reservation $r) => [$r->status === 'checked_in' ? 0 : 1, $r->reserve_start->getTimestamp()])
             ->values();
 
-        // รถที่จอดอยู่: ประมาณค่าจอด ณ ตอนนี้ด้วยสูตรเดียวกับตอน Check-out (ยอดจริงคิดตอนออก)
-        $estimates = $tickets
+        // รถที่จอดอยู่: สถานะการชำระก่อนออก (§12.6) — ค่าจอด ณ ตอนนี้ / ยอดที่ล็อกไว้ / ชำระแล้วรอออก
+        $exits = $tickets
             ->filter(fn (Reservation $r) => $r->status === 'checked_in' && $r->parkingLog && ! $r->parkingLog->check_out_time)
-            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->calculate($r, $r->parkingLog, now())]);
+            ->mapWithKeys(fn (Reservation $r) => [$r->id => $checkOut->exitState($r, $r->parkingLog)]);
 
-        $recentHistory = DB::table('parking_logs as pl')
+        $recentHistory = Payment::joinLatestCheckout(DB::table('parking_logs as pl')
             ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('payments as p', 'p.parking_log_id', '=', 'pl.id')
+            ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id'))
             ->where('r.user_id', $user->id)
             ->whereNotNull('pl.check_out_time')
             ->orderByDesc('pl.check_out_time')
             ->limit(3)
-            ->select(['pl.id as log_id', 'pl.license_plate', 'pl.plate_province', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time', 'p.total_amount', 'p.payment_status'])
+            ->select([
+                'pl.id as log_id', 'pl.license_plate', 'pl.plate_province', 'lot.name as lot_name', 'pl.check_in_time', 'pl.check_out_time',
+                DB::raw('(p.prior_paid + p.total_amount) as total_amount'), 'p.payment_status',
+            ])
             ->get();
 
         // แนะนำลานที่จองได้ทันที (เงื่อนไขเดียวกับหน้าจอง) — กดแล้วไปหน้าจองพร้อมเลือกลานนั้นไว้
@@ -59,20 +61,22 @@ class DashboardController extends Controller
             ->limit(5)
             ->get(['id', 'name', 'hourly_rate']);
 
-        return view('dashboard-user', compact('tickets', 'estimates', 'recentHistory', 'lotsAvailable'));
+        return view('dashboard-user', compact('tickets', 'exits', 'recentHistory', 'lotsAvailable'));
     }
 
     /**
-     * Admin Dashboard = ภาพรวมทั้งระบบ ทุกลาน (project-plan.md §17.1, §5.1.1)
-     * ตัวกรอง ?lot_id= (ว่าง = ทุกลาน) และ ?range= today | 7d | month ใช้กับ KPI กราฟ และรายการ — ทุกตัวเลขบอกขอบเขตของตัวเอง
-     * งานที่รอผู้ดูแลระบบและจำนวนบัญชีดำไม่ขึ้นกับตัวกรอง · การจัดการยังจำกัดเฉพาะลานของ Admin ในหน้าจัดการ
+     * Admin Dashboard = ลานของผู้ดูแลระบบ (owner_id = NULL) เท่านั้น (project-plan.md §17.1, §17.1.1)
+     * ตัวกรอง ?lot_id= (ว่าง = ทุกลานของผู้ดูแลระบบ) และ ?range= today | 7d | month ใช้กับ KPI กราฟ และรายการ
+     * งานที่รอผู้ดูแลระบบและจำนวนบัญชีดำเป็นรายการกลางของระบบ ไม่ขึ้นกับตัวกรอง
      */
     public function admin()
     {
         $range = in_array(request('range'), ['today', '7d', 'month'], true) ? request('range') : 'today';
 
-        $lots = ParkingLot::with('owner:id,name')->orderBy('name')->get(['id', 'name', 'owner_id', 'hourly_rate']);
-        $lot = $lots->firstWhere('id', (int) request('lot_id')); // null = ทุกลาน
+        // ลานของผู้ดูแลระบบเท่านั้น (owner_id = NULL) — ตัวเลขของลาน Owner เป็นของ Owner ดูเอง (§17.1 แก้ไข 2026-09-28)
+        // ยกเว้นหน้า Log ที่ยังดูได้ทุกลาน · บัญชีดำและงานอนุมัติเป็นรายการกลางของระบบ ไม่ผูกกับลาน
+        $lots = ParkingLot::unowned()->orderBy('name')->get(['id', 'name', 'hourly_rate']);
+        $lot = $lots->firstWhere('id', (int) request('lot_id')); // null = ทุกลานของผู้ดูแลระบบ
         $scopeLotIds = $lot ? collect([$lot->id]) : $lots->pluck('id');
 
         [$from, $to] = match ($range) {
@@ -119,7 +123,6 @@ class DashboardController extends Controller
 
         $stats = [
             'lots_total'       => $lots->count(),
-            'admin_lots_total' => $lots->whereNull('owner_id')->count(),
             'slots_total'      => (int) ($slotStats->total ?? 0),
             'slots_available'  => (int) ($slotStats->available ?? 0),
             'slots_reserved'   => (int) ($slotStats->reserved ?? 0),
@@ -146,8 +149,8 @@ class DashboardController extends Controller
             'blacklist_active' => SuspiciousVehicle::active()->count(),
         ];
 
-        // ── งานที่รอผู้ดูแลระบบ (ไม่ขึ้นกับตัวกรอง) ─────────────────────────
-        $adminLotIds = $lots->whereNull('owner_id')->pluck('id');
+        // ── งานที่รอผู้ดูแลระบบ (ไม่ขึ้นกับตัวกรองลาน — นับทุกลานของผู้ดูแลระบบเสมอ) ─────
+        $adminLotIds = $lots->pluck('id');
         $adminDeposits = $unpaid(Payment::TYPE_DEPOSIT, $adminLotIds);
         $adminCheckouts = $unpaid(Payment::TYPE_CHECKOUT, $adminLotIds);
 
@@ -171,9 +174,10 @@ class DashboardController extends Controller
         $reservationStatus = collect(Reservation::STATUSES)
             ->mapWithKeys(fn (string $status) => [$status => (int) ($statusCounts[$status] ?? 0)]);
 
-        // ── ลานที่มีการจองใหม่มากที่สุดในช่วงเวลา (เทียบทุกลานเสมอ) ──────────────
+        // ── ลานที่มีการจองใหม่มากที่สุดในช่วงเวลา (เทียบทุกลานของผู้ดูแลระบบ ไม่ขึ้นกับตัวกรองลาน) ──
         $topLots = DB::table('reservations as r')
             ->join('parking_lots as lot', 'lot.id', '=', 'r.parking_lot_id')
+            ->whereIn('r.parking_lot_id', $adminLotIds)
             ->whereBetween('r.created_at', [$from, $to])
             ->selectRaw('lot.id, lot.name, COUNT(*) as total')
             ->groupBy('lot.id', 'lot.name')
@@ -182,8 +186,9 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // ── ภาพรวมทุกลาน: สถานะช่อง ณ ตอนนี้ + รถที่จอดอยู่ + รับเงินในช่วงเวลา (แสดงทุกลาน ไม่จำกัดจำนวน) ──
+        // ── ภาพรวมทุกลานของผู้ดูแลระบบ: สถานะช่อง ณ ตอนนี้ + รถที่จอดอยู่ + รับเงินในช่วงเวลา ──
         $slotsByLot = DB::table('parking_slots')
+            ->whereIn('parking_lot_id', $adminLotIds)
             ->selectRaw("
                 parking_lot_id,
                 SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available,
@@ -195,6 +200,7 @@ class DashboardController extends Controller
             ->keyBy('parking_lot_id');
 
         $parkedByLot = DB::table('parking_logs')
+            ->whereIn('parking_lot_id', $adminLotIds)
             ->whereNull('check_out_time')
             ->selectRaw('parking_lot_id, COUNT(*) as total')
             ->groupBy('parking_lot_id')
@@ -209,7 +215,6 @@ class DashboardController extends Controller
         $lotsOverview = $lots->map(fn (ParkingLot $l) => (object) [
             'id'          => $l->id,
             'name'        => $l->name,
-            'owner_name'  => $l->owner?->name,
             'hourly_rate' => (float) $l->hourly_rate,
             'available'   => (int) ($slotsByLot[$l->id]->available ?? 0),
             'reserved'    => (int) ($slotsByLot[$l->id]->reserved ?? 0),

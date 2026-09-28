@@ -46,6 +46,10 @@ class ParkingLogController extends Controller
             ->filter(fn (ParkingLog $log) => ! $log->check_out_time && $log->reservation)
             ->mapWithKeys(fn (ParkingLog $log) => [$log->id => $checkOut->calculate($log->reservation, $log, now())]);
 
-        return view('staff.parking-logs', compact('logs', 'q', 'from', 'to', 'estimates') + ['scope' => 'owner']);
+        return view('staff.parking-logs', compact('logs', 'q', 'from', 'to', 'estimates') + [
+            'scope' => 'owner',
+            // เจ้าของลานเห็นแต่ลานตัวเองอยู่แล้ว จึงจัดการได้ทุกแถวที่เห็น
+            'manageableLotIds' => $ownedLotIds,
+        ]);
     }
 }
