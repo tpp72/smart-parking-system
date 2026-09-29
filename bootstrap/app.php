@@ -11,6 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // อยู่หลัง Cloudflare Tunnel/Proxy เสมอ — เชื่อ header X-Forwarded-* เพื่อให้ $request->ip()
+        // และ URL generation (https, host) ถูกต้องตามที่ผู้ใช้เห็นจริง ไม่ใช่ IP ของ proxy
+        $middleware->trustProxies(at: '*');
+
         // บัญชีระบบ (Walkin User) ใช้งานเว็บไม่ได้ทุกหน้า
         $middleware->web(append: [
             \App\Http\Middleware\EnsureNotSystemUser::class,
