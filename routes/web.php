@@ -120,9 +120,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'force.p
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
 
 // ===== หน้าสแกนสำหรับคนขับ Walk-in ที่ไม่มีบัญชี — หน้าเดียวกับของเจ้าหน้าที่ แค่ไม่ต้องล็อกอิน =====
-// ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย · หน้านี้เปิดสาธารณะจึงจำกัดแน่นกว่าของเจ้าหน้าที่มาก
+// ทุกครั้งที่สแกน = เรียก Claude API ซึ่งมีค่าใช้จ่าย · หน้านี้เปิดสาธารณะจึงจำกัดแน่นกว่าของเจ้าหน้าที่ (30/นาที)
 Route::get('/scan', [CarScanController::class, 'create'])->name('public.scan.create');
-Route::post('/scan', [CarScanController::class, 'store'])->middleware('throttle:3,1')->name('public.scan.store');
+Route::post('/scan', [CarScanController::class, 'store'])->middleware('throttle:15,1')->name('public.scan.store');
 
 // ===== เช็คสถานะรถโดยไม่ต้องล็อกอิน (ทะเบียน + จังหวัด + รหัสอ้างอิงจากจอทางเข้าลาน) =====
 // จำกัดจำนวนครั้งเพราะรหัสอ้างอิงคือหลักฐานยืนยันตัวคนขับ ต้องกันการไล่เดา
