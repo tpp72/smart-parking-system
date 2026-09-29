@@ -302,6 +302,16 @@ class AiScanTest extends TestCase
 
     // ─── [11] คนขับ Walk-in สแกนเองได้โดยไม่ต้องล็อกอิน ──────────────────────
 
+    /** หน้าสแกนสาธารณะอัปโหลดได้ 15 ครั้งต่อนาทีต่อ IP (ทุกครั้งเรียก Claude API ซึ่งมีค่าใช้จ่าย) */
+    public function test_public_scan_upload_is_limited_to_15_per_minute(): void
+    {
+        foreach (range(1, 15) as $attempt) {
+            $this->post(route('public.scan.store'))->assertStatus(302);
+        }
+
+        $this->post(route('public.scan.store'))->assertStatus(429);
+    }
+
     public function test_guest_can_open_the_scan_page_without_logging_in(): void
     {
         $this->ownerLot($this->makeUser('owner'));
