@@ -52,20 +52,26 @@ class CarScanController extends Controller
      ─────────────────────────────────────────────────────────────*/
     public function store(Request $request)
     {
+        // ขีดจำกัดจริงของเครื่อง — หน้าสแกนย่อรูปให้ก่อนส่งแล้ว ข้อความนี้จึงเจอเฉพาะเบราว์เซอร์ที่ย่อไม่ได้
+        $maxKb = CarScanService::maxUploadKb();
+        $tooLarge = sprintf('ไฟล์ใหญ่เกินไป — รับได้ไม่เกิน %s MB กรุณาลดขนาดรูปแล้วลองใหม่', rtrim(rtrim(number_format($maxKb / 1024, 1), '0'), '.'));
+
         $request->validate([
             'car_image' => [
                 'required',
                 'file',
                 'image',
                 'mimes:jpg,jpeg,png',
-                'max:5120',
+                'max:'.$maxKb,
             ],
             'parking_lot_id' => ['required', 'integer', 'exists:parking_lots,id'],
         ], [
             'car_image.required'      => 'กรุณาเลือกรูปภาพรถก่อน',
             'car_image.image'         => 'ไฟล์ต้องเป็นรูปภาพเท่านั้น',
             'car_image.mimes'         => 'รองรับเฉพาะ JPG และ PNG',
-            'car_image.max'           => 'ขนาดไฟล์ต้องไม่เกิน 5 MB',
+            'car_image.max'           => $tooLarge,
+            // PHP ตัดไฟล์ที่เกินขีดจำกัดของเครื่องทิ้งก่อนถึงโค้ด → Laravel เห็นเป็น "อัปโหลดไม่สำเร็จ"
+            'car_image.uploaded'      => $tooLarge,
             'parking_lot_id.required' => 'กรุณาเลือกลานจอด (จำลองตำแหน่งกล้อง)',
             'parking_lot_id.exists'   => 'ไม่พบลานจอดที่เลือก',
         ]);
