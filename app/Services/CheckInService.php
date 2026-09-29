@@ -8,7 +8,6 @@ use App\Models\ParkingSlot;
 use App\Models\Reservation;
 use App\Models\ReservationLog;
 use App\Models\User;
-use App\Models\UserVehicle;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -80,9 +79,8 @@ class CheckInService
                     'status'          => 'checked_in',
                     'checked_in_at'   => $now,
                     'parking_slot_id' => $slot->id,
-                    // ออกรหัสให้ทุกคันที่เข้าจอด ไม่ใช่เฉพาะ Walk-in — คนขับอาจไม่ใช่เจ้าของบัญชีที่จองไว้
-                    // และหน้าเช็คสถานะใช้รหัสนี้เป็นหลักฐานว่าอยู่กับรถจริง (ออกครั้งเดียว ไม่เปลี่ยนถ้ามีแล้ว)
-                    'reference_code'  => $reservation->reference_code ?: Reservation::generateReferenceCode(),
+                    // ไม่ออกรหัสอ้างอิงให้การจองล่วงหน้า (project-plan.md §4.0.1) — รหัสมีไว้สำหรับ Walk-in เท่านั้น
+                    // เจ้าของบัญชีดูช่องจอดและค่าจอดของตัวเองได้จากหน้าหลักอยู่แล้ว
                 ]);
 
                 ReservationLog::create([
@@ -136,12 +134,8 @@ class CheckInService
 
                 $now = now();
 
-                // ถ้าทะเบียนนี้ถูกผูกไว้กับบัญชีแล้ว ให้รายการเป็นของเจ้าของบัญชีนั้น ไม่ใช่บัญชีระบบ
-                // เขายังเข้าแบบ Walk-in อยู่ (is_walk_in = true → ไม่มีมัดจำ ไม่มีส่วนลด) แต่เห็นรถในหน้าหลักและได้แจ้งเตือน
-                $owner = UserVehicle::ownerOf($licensePlate, $plateProvince);
-
                 $reservation = Reservation::create([
-                    'user_id'         => $owner?->id ?? User::walkin()->id,
+                    'user_id'         => User::walkin()->id,
                     'is_walk_in'      => true,
                     'parking_lot_id'  => $lot->id,
                     'parking_slot_id' => $slot->id,
@@ -168,17 +162,6 @@ class CheckInService
 
                 $log = $this->park($reservation, $slot, $now);
 
-                // แจ้งเจ้าของบัญชีที่ผูกทะเบียนไว้ — รถที่ไม่มีเจ้าของบัญชีไม่มีใครรับการแจ้งเตือน
-                if ($owner) {
-                    notify_user($owner->id, 'รถของคุณเข้าจอดแล้ว', sprintf(
-                        'รถทะเบียน %s %s เข้าจอดที่ลาน %s ช่อง %s (ไม่ได้จองล่วงหน้า — คิดค่าจอดตามเวลาจริงตอนออกจากลาน)',
-                        $reservation->license_plate,
-                        $reservation->plate_province,
-                        $lot->name,
-                        $slot->slot_number
-                    ));
-                }
-
                 audit_by(null, 'reservation.walk_in', $reservation, [
                     'parking_lot_id'  => $lot->id,
                     'parking_log_id'  => $log->id,
@@ -186,7 +169,6 @@ class CheckInService
                     'slot_number'     => $slot->slot_number,
                     'license_plate'   => $licensePlate,
                     'plate_province'  => $plateProvince,
-                    'linked_user_id'  => $owner?->id,
                 ]);
 
                 return $this->success($reservation, $slot, $log);

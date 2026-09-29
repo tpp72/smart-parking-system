@@ -262,4 +262,110 @@ class AiScanTest extends TestCase
         $this->assertDatabaseCount('license_plate_scans', 0);
         $this->assertSame(0, ParkingLog::count());
     }
+
+    // ─── [12] อัปโหลดรูปใหญ่เกินขีดจำกัดของเครื่อง ──────────────────────────────
+
+    /** PHP ตัดไฟล์ที่เกิน upload_max_filesize ทิ้งก่อนถึงโค้ด — ต้องบอกผู้ใช้ว่าใหญ่เกิน ไม่ใช่ "อัปโหลดไม่สำเร็จ" เฉย ๆ */
+    public function test_file_rejected_by_php_size_limit_explains_the_real_limit(): void
+    {
+        $lot = $this->ownerLot($this->makeUser('owner'));
+        $tooBig = new UploadedFile(UploadedFile::fake()->image('car.jpg')->getPathname(), 'car.jpg', 'image/jpeg', UPLOAD_ERR_INI_SIZE, true);
+
+        $this->actingAs($this->makeUser())->post(route('user.scan.store'), [
+            'car_image' => $tooBig, 'parking_lot_id' => $lot->id,
+        ])->assertSessionHasErrors(['car_image' => sprintf(
+            'ไฟล์ใหญ่เกินไป — รับได้ไม่เกิน %s MB กรุณาลดขนาดรูปแล้วลองใหม่',
+            rtrim(rtrim(number_format(CarScanService::maxUploadKb() / 1024, 1), '0'), '.')
+        )]);
+
+        $this->assertDatabaseCount('license_plate_scans', 0);
+    }
+
+    /** ขีดจำกัดที่ตรวจต้องไม่เกินที่เครื่องรับได้จริง และไม่เกิน 5 MB ตามที่ระบบกำหนด */
+    public function test_upload_limit_never_exceeds_what_php_accepts(): void
+    {
+        $limit = CarScanService::maxUploadKb();
+
+        $this->assertGreaterThan(0, $limit);
+        $this->assertLessThanOrEqual(5120, $limit);
+    }
+
+    /** ต้องตรวจใบรับรอง SSL เสมอ — เครื่อง Windows ที่ไม่มี CA bundle ใช้ที่เก็บใบรับรองของ Windows แทน ไม่ใช่ปิดการตรวจ */
+    public function test_ai_connection_keeps_ssl_verification_on(): void
+    {
+        config(['carscan.verify_ssl' => true]);
+        $this->assertTrue(CarScanService::httpOptions()['verify']);
+
+        config(['carscan.verify_ssl' => false]);
+        $this->assertSame(['verify' => false], CarScanService::httpOptions());
+    }
+
+    // ─── [11] คนขับ Walk-in สแกนเองได้โดยไม่ต้องล็อกอิน ──────────────────────
+
+    /** หน้าสแกนสาธารณะอัปโหลดได้ 15 ครั้งต่อนาทีต่อ IP (ทุกครั้งเรียก Claude API ซึ่งมีค่าใช้จ่าย) */
+    public function test_public_scan_upload_is_limited_to_15_per_minute(): void
+    {
+        foreach (range(1, 15) as $attempt) {
+            $this->post(route('public.scan.store'))->assertStatus(302);
+        }
+
+        $this->post(route('public.scan.store'))->assertStatus(429);
+    }
+
+    public function test_guest_can_open_the_scan_page_without_logging_in(): void
+    {
+        $this->ownerLot($this->makeUser('owner'));
+
+        $this->get(route('public.scan.create'))->assertOk()->assertSee('AI สแกน');
+    }
+
+    public function test_guest_scan_checks_the_car_in_and_records_no_uploader(): void
+    {
+        $lot = $this->ownerLot($this->makeUser('owner'));
+        $this->fakeAi();
+
+        $this->from(route('public.scan.create'))
+            ->post(route('public.scan.store'), [
+                'car_image'      => UploadedFile::fake()->image('car.jpg'),
+                'parking_lot_id' => $lot->id,
+            ])->assertSessionHasNoErrors();
+
+        // ผลที่ประตูเหมือนกับที่เจ้าหน้าที่สแกน — รถเข้าจอดแบบ Walk-in พร้อมรหัสอ้างอิง
+        $reservation = Reservation::firstOrFail();
+        $this->assertTrue((bool) $reservation->is_walk_in);
+        $this->assertSame('checked_in', $reservation->status);
+        $this->assertSame(6, strlen((string) $reservation->reference_code));
+
+        // บันทึกว่าไม่มีบัญชีผู้อัปโหลด (ประวัติสแกนฝั่งเจ้าหน้าที่แสดงเป็น "ระบบ")
+        $this->assertNull(LicensePlateScan::firstOrFail()->user_id);
+    }
+
+    /** ข้อมูลส่วนบุคคลและงานหลังบ้านไม่หลุดไปหน้าสาธารณะ */
+    public function test_guest_result_hides_the_account_name_and_the_blacklist_flag(): void
+    {
+        $booker = $this->makeUser();
+        $lot = $this->ownerLot($this->makeUser('owner'));
+
+        Reservation::factory()->confirmed()->create([
+            'user_id'         => $booker->id,
+            'parking_lot_id'  => $lot->id,
+            'license_plate'   => self::PLATE,
+            'plate_province'  => self::PROVINCE,
+            'brand'           => 'Toyota',
+            'color'           => 'ขาว',
+            'reserve_start'   => now()->subMinutes(5),
+        ]);
+        SuspiciousVehicle::factory()->create([
+            'license_plate' => self::PLATE, 'plate_province' => self::PROVINCE, 'is_active' => true,
+        ]);
+        $this->fakeAi();
+
+        $this->from(route('public.scan.create'))->followingRedirects()
+            ->post(route('public.scan.store'), [
+                'car_image'      => UploadedFile::fake()->image('car.jpg'),
+                'parking_lot_id' => $lot->id,
+            ])->assertOk()
+            ->assertDontSee($booker->name)
+            ->assertDontSee('พบรถในบัญชีดำ');
+    }
 }

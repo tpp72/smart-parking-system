@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -11,11 +12,10 @@ class ParkingLogController extends Controller
     /** ประวัติการจอดทั้งหมดของ user ที่ login อยู่ (ผ่าน Reservation ของ user) */
     public function index()
     {
-        $logs = DB::table('parking_logs as pl')
+        $logs = Payment::joinLatestCheckout(DB::table('parking_logs as pl')
             ->join('reservations as r', 'r.id', '=', 'pl.reservation_id')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
-            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
-            ->leftJoin('payments as p', 'p.parking_log_id', '=', 'pl.id')
+            ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id'))
             ->where('r.user_id', Auth::id())
             ->orderByDesc('pl.check_in_time')
             ->select([
@@ -32,7 +32,9 @@ class ParkingLogController extends Controller
                 'p.parking_fee',
                 'p.deposit_deduction',
                 'p.reservation_discount',
-                'p.total_amount',
+                'p.prior_paid',
+                // ยอดรวมของการจอดครั้งนี้ (ใบล่าสุด + ที่ชำระในใบก่อน ๆ)
+                DB::raw('(p.prior_paid + p.total_amount) as total_amount'),
                 'p.payment_status',
             ])
             ->paginate(15);

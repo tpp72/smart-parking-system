@@ -1,14 +1,14 @@
 {{--
-    ประวัติการจอด (ใช้ร่วม Owner: ลานของตัวเอง · Admin: ลานของผู้ดูแลระบบ) — ค้นหาทะเบียน / ช่วงวันที่เข้า
-    · รถที่ยังจอดอยู่ทำ Manual Check-out ได้ (ใบเสร็จประมาณ) · Admin ส่งออก CSV ตามตัวกรอง (ทุกลาน)
-    ต้องการ: $logs, $q, $from, $to, $estimates, $scope ('owner' | 'admin')
+    ประวัติการจอด (Owner: ลานของตัวเอง · Admin: ทุกลาน เพราะเป็นหน้า Log) — ค้นหาทะเบียน / ช่วงวันที่เข้า
+    · รถที่ยังจอดอยู่ทำ Manual Check-out ได้เฉพาะลานที่ตัวเองจัดการได้ (ใบเสร็จประมาณ) · Admin ส่งออก CSV ตามตัวกรอง
+    ต้องการ: $logs, $q, $from, $to, $estimates, $scope ('owner' | 'admin'), $manageableLotIds (ลานที่กดเช็คเอาท์ได้)
 --}}
 @use('App\Support\Format')
 
 @php
     $hasFilter = $q !== '' || $from || $to;
     $isAdmin = $scope === 'admin';
-    $where = $isAdmin ? 'ลานของผู้ดูแลระบบ' : 'ลานของคุณ';
+    $where = $isAdmin ? 'ทุกลาน' : 'ลานของคุณ';
 @endphp
 
 <x-app-layout flash-toast>
@@ -91,7 +91,8 @@
 
                             <div class="flex flex-wrap items-center gap-2 lg:justify-end">
                                 <x-ui.status type="reservation" :value="$parked ? 'checked_in' : 'completed'" audience="staff" />
-                                @if ($parked && $estimate)
+                                {{-- ผู้ดูแลระบบดูประวัติได้ทุกลาน แต่เช็คเอาท์ได้เฉพาะลานของตัวเอง --}}
+                                @if ($parked && $estimate && $manageableLotIds->contains($log->parking_lot_id))
                                     <x-ui.button variant="secondary" size="sm"
                                         x-on:click="checkout = {{ Js::from([
                                             'plate' => $log->license_plate,

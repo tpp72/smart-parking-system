@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 class Payment extends Model
 {
@@ -26,6 +27,8 @@ class Payment extends Model
         'parking_fee'          => 'decimal:2',
         'deposit_deduction'    => 'decimal:2',
         'reservation_discount' => 'decimal:2',
+        // ยอดค่าจอดที่ชำระไปแล้วในใบก่อนหน้าของการจอดครั้งเดียวกัน (ชำระแล้วไม่ออกภายในเวลา → ใบใหม่เก็บส่วนที่เกิน)
+        'prior_paid'           => 'decimal:2',
         'total_amount'         => 'decimal:2',
         'paid_at'              => 'datetime',
     ];
@@ -44,5 +47,19 @@ class Payment extends Model
     public function paidBy()
     {
         return $this->belongsTo(User::class, 'paid_by');
+    }
+
+    /**
+     * join ใบค่าจอดใบล่าสุดของแต่ละการจอด (ไม่นับใบที่ยกเลิก)
+     *
+     * การจอดครั้งเดียวมีได้หลายใบเมื่อชำระแล้วไม่สแกนออกภายในเวลา (§12.6) — leftJoin ตรง ๆ จะได้แถวซ้ำ
+     * ใบล่าสุดอธิบายยอดทั้งหมดได้ในตัวเอง: ยอดรวม = prior_paid + total_amount
+     */
+    public static function joinLatestCheckout(QueryBuilder $query, string $alias = 'p', string $logColumn = 'pl.id'): QueryBuilder
+    {
+        return $query->leftJoin("payments as {$alias}", fn ($join) => $join->whereRaw(
+            "{$alias}.id = (select max(x.id) from payments x where x.parking_log_id = {$logColumn} and x.type = ? and x.payment_status <> ?)",
+            [self::TYPE_CHECKOUT, self::STATUS_VOID]
+        ));
     }
 }

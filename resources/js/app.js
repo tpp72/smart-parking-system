@@ -8,6 +8,7 @@ import { registerComponents } from './ui/components';
 import { initNavigationFeedback } from './ui/navigation';
 import { initPlateInputs } from './ui/plate-input';
 import { addressSelect } from './ui/address-select';
+import { carImage } from './ui/car-image';
 
 window.Alpine = Alpine;
 
@@ -15,6 +16,7 @@ initTheme();
 
 Alpine.data('spThemeSwitch', themeSwitch);
 Alpine.data('spAddressSelect', addressSelect);
+Alpine.data('spCarImage', carImage);
 registerToasts(Alpine);
 registerConfirm(Alpine);      // ดัก submit ของฟอร์ม data-confirm ก่อน (capture phase)
 registerComponents(Alpine);

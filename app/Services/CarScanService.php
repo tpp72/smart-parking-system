@@ -19,13 +19,60 @@ class CarScanService
 
     public function __construct()
     {
-        $guzzle = new GuzzleClient(['verify' => (bool) config('carscan.verify_ssl', true)]);
+        $guzzle = new GuzzleClient(self::httpOptions());
 
         $this->client = new Client(
             apiKey: config('carscan.anthropic_api_key', ''),
             requestOptions: RequestOptions::with(transporter: $guzzle),
         );
         $this->model = config('carscan.model', 'claude-opus-4-8');
+    }
+
+    /**
+     * ตัวเลือกการเชื่อมต่อ AI API
+     *
+     * PHP บน Windows มักไม่มี CA bundle (curl.cainfo / openssl.cafile ว่าง) จึงตรวจใบรับรองไม่ผ่าน (cURL error 60)
+     * กรณีนั้นให้ curl ใช้ที่เก็บใบรับรองของ Windows แทน — ยังตรวจใบรับรองอยู่ ไม่ได้ปิดการตรวจ
+     * เครื่องที่ตั้ง CA bundle ไว้แล้ว และ server Linux ใช้ค่าปกติ
+     */
+    /**
+     * ขนาดภาพรถสูงสุดที่รับได้จริง (KB) = ค่าต่ำสุดระหว่าง 5 MB กับขีดจำกัดอัปโหลดของ PHP บนเครื่องนั้น
+     * ไฟล์ที่เกินขีดจำกัดของ PHP ถูกตัดทิ้งก่อนถึงโค้ด — ถ้าบอกผู้ใช้ 5 MB แต่เครื่องรับได้ 2 MB ผู้ใช้จะไม่รู้ว่าผิดที่อะไร
+     */
+    public static function maxUploadKb(): int
+    {
+        $toKb = function (string|false $value): ?int {
+            $value = trim((string) $value);
+
+            if ($value === '' || $value === '0' || $value === '-1') {
+                return null; // ไม่จำกัด
+            }
+
+            $number = (float) $value;
+
+            return (int) match (strtolower(substr($value, -1))) {
+                'g' => $number * 1024 * 1024,
+                'm' => $number * 1024,
+                'k' => $number,
+                default => $number / 1024,
+            };
+        };
+
+        return min(array_filter([5120, $toKb(ini_get('upload_max_filesize')), $toKb(ini_get('post_max_size'))]));
+    }
+
+    public static function httpOptions(): array
+    {
+        $verify = (bool) config('carscan.verify_ssl', true);
+        $options = ['verify' => $verify];
+
+        $noCaBundle = ! ini_get('curl.cainfo') && ! ini_get('openssl.cafile');
+
+        if ($verify && $noCaBundle && PHP_OS_FAMILY === 'Windows' && defined('CURLSSLOPT_NATIVE_CA')) {
+            $options['curl'] = [CURLOPT_SSL_OPTIONS => CURLSSLOPT_NATIVE_CA];
+        }
+
+        return $options;
     }
 
     /**
@@ -173,7 +220,8 @@ PROMPT;
      *
      * @param int $parkingLotId ลานที่กล้องติดตั้ง (Upload จำลอง Camera Input)
      */
-    public function scanAndSave(UploadedFile $file, int $userId, int $parkingLotId): LicensePlateScan
+    /** @param  int|null  $userId  null = สแกนจากหน้าสาธารณะ (คนขับที่ไม่ได้ล็อกอิน) */
+    public function scanAndSave(UploadedFile $file, ?int $userId, int $parkingLotId): LicensePlateScan
     {
         // 1. Store file
         $storedPath   = $file->store('car-scans', 'public');

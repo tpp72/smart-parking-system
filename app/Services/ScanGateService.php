@@ -10,7 +10,8 @@ use App\Models\Reservation;
 /**
  * กล้องลานจอด (จำลองด้วย Upload) — ระบบตรวจทิศทางเองจากสถานะรถ (project-plan.md §10.1, §12.5)
  *
- * - รถ (ทะเบียน + จังหวัด) กำลังจอดอยู่ในลานที่สแกน → Auto Check-out
+ * - รถ (ทะเบียน + จังหวัด) กำลังจอดอยู่ในลานที่สแกน → Auto Check-out เฉพาะที่ชำระแล้ว (§12.6)
+ *   ยังไม่ชำระ → "Check-out ไม่สำเร็จ กรุณาชำระค่าจอด" รถยังจอดอยู่ในระบบ
  * - รถกำลังจอดอยู่ลานอื่น → ไม่ทำรายการ (บันทึก Audit Log)
  * - รถไม่ได้จอดอยู่ → Auto Check-in / Walk-in
  */
@@ -19,6 +20,8 @@ class ScanGateService
     const OUTCOME_CHECKED_OUT      = 'checked_out';
     const OUTCOME_PARKED_ELSEWHERE = 'parked_elsewhere';
     const OUTCOME_CHECK_OUT_FAILED = 'check_out_failed';
+    /** รถจอดอยู่ลานนี้แต่ยังไม่ได้ชำระค่าจอด (หรือเลยเวลาสแกนออกหลังชำระ) — ไม่ปล่อยออก §12.6 */
+    const OUTCOME_PAYMENT_REQUIRED = 'payment_required';
 
     public function __construct(
         private AutoCheckInService $autoCheckIn,
@@ -58,7 +61,18 @@ class ScanGateService
             );
         }
 
-        $result = $this->checkOut->checkOut($log->reservation);
+        // ปล่อยรถเฉพาะที่ชำระแล้ว (§12.6) — ยังไม่ชำระ / เลยเวลาสแกนออก → ไม่ปล่อย และไม่แจ้งเจ้าหน้าที่
+        // เพราะเป็นเรื่องปกติของคนขับที่ต้องไปกด Check-out และชำระก่อน ไม่ใช่ความผิดพลาดของระบบ
+        $result = $this->checkOut->checkOut($log->reservation, prepaid: true);
+
+        if (! $result['success'] && $result['code'] === CheckOutService::ERROR_PAYMENT_REQUIRED) {
+            audit_by(null, 'ai_scan.payment_required', $log->reservation, [
+                'scan_id'      => $scan->id,
+                'total_amount' => $result['charge']['total_amount'] ?? null,
+            ]);
+
+            return $this->result(self::OUTCOME_PAYMENT_REQUIRED, false, $result['error'], $log->reservation, $log->parkingSlot?->slot_number);
+        }
 
         if (!$result['success']) {
             $lot->notifyManagers('Check-out อัตโนมัติไม่สำเร็จ', sprintf(

@@ -51,19 +51,19 @@ class AdminExportQuery
     {
         $q = trim((string) ($filters['q'] ?? ''));
 
-        return DB::table('parking_logs as pl')
+        // ใบค่าจอดใบล่าสุดของแต่ละการจอด — ใบล่าสุดอธิบายยอดทั้งหมด (prior_paid = ที่ชำระในใบก่อน ๆ §12.6)
+        return Payment::joinLatestCheckout(DB::table('parking_logs as pl')
             ->join('parking_lots as lot', 'lot.id', '=', 'pl.parking_lot_id')
             ->leftJoin('users as o', 'o.id', '=', 'lot.owner_id')
             ->leftJoin('parking_slots as s', 's.id', '=', 'pl.parking_slot_id')
             ->leftJoin('reservations as r', 'r.id', '=', 'pl.reservation_id')
-            ->leftJoin('users as u', 'u.id', '=', 'r.user_id')
-            ->leftJoin('payments as p', 'p.parking_log_id', '=', 'pl.id')
+            ->leftJoin('users as u', 'u.id', '=', 'r.user_id'))
             ->select([
                 'pl.id', 'pl.reservation_id', 'pl.license_plate', 'pl.plate_province', 'pl.brand', 'pl.color',
                 'pl.check_in_time', 'pl.check_out_time', 'pl.hourly_rate',
                 'r.is_walk_in', 'u.name as user_name',
                 'lot.name as lot_name', 'o.name as owner_name', 's.slot_number',
-                'p.total_hours', 'p.parking_fee', 'p.deposit_deduction', 'p.reservation_discount',
+                'p.total_hours', 'p.parking_fee', 'p.deposit_deduction', 'p.reservation_discount', 'p.prior_paid',
                 'p.total_amount', 'p.payment_status', 'p.paid_at',
             ])
             ->when($q !== '', function ($query) use ($q) {

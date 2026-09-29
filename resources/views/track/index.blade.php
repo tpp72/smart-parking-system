@@ -1,6 +1,7 @@
 {{--
-    เช็คสถานะรถโดยไม่ต้องล็อกอิน — สำหรับคนขับที่เข้าลานแบบ Walk-in หรือคนที่ไม่ได้ล็อกอินอยู่
+    เช็คสถานะรถโดยไม่ต้องล็อกอิน — สำหรับคนขับที่เข้าลานแบบ Walk-in · กด Check-out และชำระก่อนสแกนออกได้ที่นี่ (§12.6)
     ยืนยันตัวด้วย ทะเบียน + จังหวัด + รหัสอ้างอิงที่ได้จากจอทางเข้าลาน
+    การจองล่วงหน้าไม่ออกรหัส (§4.0.1) — เจ้าของบัญชีดูรายการของตัวเองในหน้าหลักได้อยู่แล้ว
 
     แสดงเฉพาะข้อมูลของรถคันนั้น ณ ตอนนี้ · ไม่แสดงชื่อเจ้าของ อีเมล หรือประวัติครั้งก่อน
     ต้องการ: $result (null = ยังไม่ได้ค้นหา)
@@ -12,7 +13,7 @@
         @php
             $r = $result['reservation'];
             $log = $result['log'];
-            $est = $result['estimate'];
+            $est = $result['exit']['charge'];
             $minutes = (int) $log->check_in_time->diffInMinutes(now());
         @endphp
 
@@ -44,33 +45,19 @@
             </div>
         </dl>
 
-        <div class="mt-6 rounded-card border border-line bg-surface-2 p-4">
-            <p class="flex items-baseline justify-between gap-3">
-                <span class="text-label text-fg-2">ค่าจอด ณ ตอนนี้</span>
-                <span class="num text-h2 text-fg">{{ Format::baht($est['total_amount']) }}</span>
-            </p>
-            @if ($est['deposit_deduction'] > 0 || $est['reservation_discount'] > 0)
-                <p class="mt-2 text-caption text-fg-3">
-                    ค่าจอด <span class="tabular">{{ Format::baht($est['parking_fee']) }}</span>
-                    @if ($est['deposit_deduction'] > 0) · หักมัดจำ <span class="tabular">{{ Format::baht($est['deposit_deduction']) }}</span> @endif
-                    @if ($est['reservation_discount'] > 0) · ส่วนลด <span class="tabular">{{ Format::baht($est['reservation_discount']) }}</span> @endif
-                </p>
-            @endif
-            <p class="mt-2 text-caption text-fg-3">
-                เป็นยอดประมาณการ คิดรายชั่วโมง ปัดขึ้น ขั้นต่ำ 1 ชั่วโมง · ยอดจริงคิดตอนรถออกจากลาน และชำระที่เจ้าหน้าที่
-            </p>
+        {{-- ชำระก่อนออก (§12.6) — ปุ่มยืนยันตัวซ้ำด้วยทะเบียน + รหัสทุกครั้ง ไม่จำไว้ใน session --}}
+        <div class="mt-6">
+            @include('partials.checkout-panel', [
+                'exit' => $result['exit'],
+                'checkoutAction' => route('track.checkout'),
+                'payAction' => route('track.pay'),
+                'hidden' => $result['credentials'],
+                'error' => $result['error'],
+            ])
         </div>
 
-        <div class="mt-6 flex flex-col gap-3">
-            @if (! $result['claimedBy'])
-                {{-- ผูกรถกับบัญชีได้ เพราะเพิ่งพิสูจน์ด้วยรหัสอ้างอิงไปแล้วในรอบนี้ --}}
-                <x-ui.button :href="route('track.claim.form')" class="w-full">บันทึกรถคันนี้ไว้ในบัญชี</x-ui.button>
-                <p class="text-center text-caption text-fg-3">ครั้งต่อไปที่รถเข้าลานโดยไม่ได้จอง ระบบจะแจ้งเตือนคุณ ไม่ต้องใช้รหัสอีก</p>
-            @elseif (auth()->check() && $result['claimedBy']->id === auth()->id())
-                <p class="text-center text-caption text-fg-3">รถคันนี้ผูกกับบัญชีของคุณอยู่แล้ว</p>
-            @endif
-
-            <x-ui.button :href="route('track.show')" variant="secondary" class="w-full">ค้นหาคันอื่น</x-ui.button>
+        <div class="mt-4">
+            <x-ui.button :href="route('track.show')" variant="ghost" class="w-full">ค้นหาคันอื่น</x-ui.button>
         </div>
     @else
         <form method="POST" action="{{ route('track.find') }}" class="flex flex-col gap-5">
