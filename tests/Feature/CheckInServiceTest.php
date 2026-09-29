@@ -239,4 +239,21 @@ class CheckInServiceTest extends TestCase
         $this->assertSame('completed', $walkIn['reservation']->fresh()->status);
         $this->assertSame(0, Notification::where('user_id', User::walkin()->id)->count());
     }
+
+    // ─── [11] รหัสอ้างอิงออกให้เฉพาะ Walk-in (§4.0.1) ───────────────────────
+
+    /** การจองล่วงหน้าไม่ได้รหัส แม้หลังเช็คอินแล้ว — เจ้าของบัญชีดูรายการของตัวเองในหน้าหลักได้อยู่แล้ว */
+    public function test_only_walk_in_gets_a_reference_code_at_check_in(): void
+    {
+        $lot = $this->lotWithSlots(1);
+        $booking = $this->confirmedBooking($lot);
+
+        $this->assertTrue($this->service()->checkInReservation($booking)['success']);
+        $this->assertNull($booking->fresh()->reference_code);
+
+        // ทะเบียนคนละคัน เพราะคันแรกกำลังจอดอยู่แล้ว
+        $walkIn = $this->service()->checkInWalkIn($this->lotWithSlots(1), 'ขค 8888', self::PROVINCE, 'Honda', 'ดำ');
+        $this->assertTrue($walkIn['success']);
+        $this->assertSame(6, strlen((string) $walkIn['reservation']->reference_code));
+    }
 }

@@ -50,9 +50,11 @@ final class AuditCatalog
         'reservation.auto_check_in'   => 'Check-in อัตโนมัติ',
         'reservation.walk_in'         => 'รับรถ Walk-in',
         'reservation.check_out'       => 'Check-out',
+        'reservation.checkout_request' => 'กด Check-out (ล็อกยอดรอชำระ)',
 
         'payment.deposit_created'     => 'สร้างรายการมัดจำ',
         'payment.checkout_created'    => 'สร้างรายการค่าจอด',
+        'payment.checkout_paid'       => 'ชำระค่าจอดก่อนออก',
         'payment.mark_paid'           => 'ยืนยันรับเงิน',
         'payment.void'                => 'ยกเลิกรายการชำระเงิน',
 
@@ -61,12 +63,10 @@ final class AuditCatalog
         'suspicious_vehicle.toggle'   => 'เปิดใช้ / ระงับบัญชีดำ',
         'suspicious_vehicle.delete'   => 'ลบทะเบียนออกจากบัญชีดำ',
 
-        'user_vehicle.link'           => 'ผูกทะเบียนรถกับบัญชี',
-        'user_vehicle.unlink'         => 'นำทะเบียนรถออกจากบัญชี',
-
         'ai_scan.low_accuracy'        => 'AI สแกน: ความแม่นยำต่ำ',
         'ai_scan.unreadable'          => 'AI สแกน: อ่านทะเบียนไม่ได้',
         'ai_scan.blacklist_detected'  => 'AI สแกน: พบรถในบัญชีดำ',
+        'ai_scan.payment_required'    => 'AI สแกน: ขาออกแต่ยังไม่ชำระค่าจอด',
         'ai_scan.early_arrival'       => 'AI สแกน: รถมาก่อนเวลาจอง',
         'ai_scan.vehicle_mismatch'    => 'AI สแกน: ยี่ห้อ/สีไม่ตรงกับการจอง',
         'ai_scan.booking_not_used'    => 'AI สแกน: ใช้การจองไม่ได้ จึงรับเป็น Walk-in',
@@ -84,7 +84,6 @@ final class AuditCatalog
         'Payment'           => 'การชำระเงิน',
         'SuspiciousVehicle' => 'บัญชีดำ',
         'LicensePlateScan'  => 'ผลสแกน',
-        'UserVehicle'       => 'รถที่ผูกกับบัญชี',
     ];
 
     private const META_KEYS = [

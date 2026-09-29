@@ -70,8 +70,11 @@ class UserFlowPagesTest extends TestCase
         $response->assertSee('การจองที่ยังไม่จบ')
             ->assertSee('รอเจ้าหน้าที่ยืนยันรับเงิน')   // pending (มุมมองผู้ใช้)
             ->assertSee('รับมัดจำแล้ว')                  // ตรามัดจำของใบที่ยืนยันแล้ว
-            ->assertSee('ยอดที่ต้องชำระถ้าออกตอนนี้')   // 150 นาที → 3 ชม. × 40 = 120 − มัดจำ 40 − ส่วนลด 40
+            ->assertSee('ค่าจอด ณ ตอนนี้')              // 150 นาที → 3 ชม. × 40 = 120 − มัดจำ 40 − ส่วนลด 40
             ->assertSee('฿40.00', false)
+            // ชำระก่อนออก (§12.6): รถที่จอดอยู่มีปุ่ม Check-out ไปยังการจองของตัวเอง
+            ->assertSee(route('user.reservations.checkout-request', $parked), false)
+            ->assertSee('ต้องกด Check-out และชำระก่อน')
             ->assertDontSee('>checked_in<', false)
             ->assertDontSee('>pending<', false)
             ->assertDontSee('onsubmit="return confirm', false);

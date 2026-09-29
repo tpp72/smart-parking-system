@@ -1,13 +1,13 @@
 {{--
     บัตรจอดรถ 1 ใบ = การจอง 1 รายการที่ยังไม่จบ (รอยืนยันรับเงิน / ยืนยันแล้ว / กำลังจอด)
     ต้นขั้วซ้าย: ป้ายทะเบียน · ตัวบัตร: ลาน ช่อง เวลา มัดจำ · แถบช่วงเวลาเช็คอิน · สิ่งที่ต้องทำต่อ
-    ต้องการ: $reservation (with parkingLot, parkingSlot, depositPayment, parkingLog) · $estimate (array|null)
+    ต้องการ: $reservation (with parkingLot, parkingSlot, depositPayment, parkingLog) · $exit (CheckOutService::exitState|null — รถที่จอดอยู่)
 --}}
 @use('App\Support\Format')
 
 @php
     $r = $reservation;
-    $estimate ??= null;
+    $exit ??= null;
     $status = $r->status;
     $graceEnd = $r->reserve_start->copy()->addMinutes(\App\Models\Reservation::gracePeriodMinutes());
     $deposit = (float) $r->deposit_amount;
@@ -88,30 +88,15 @@
 
             @if ($canChange)
                 <x-ui.checkin-rail :start="$r->reserve_start" class="mt-5" />
-            @elseif ($estimate)
-                {{-- ใบเสร็จย่อ: ค่าจอดถึงตอนนี้ (ประมาณ) --}}
-                <dl class="mt-5 rounded-control border border-line bg-surface-2 px-4 py-3 text-label">
-                    <div class="flex justify-between gap-3">
-                        <dt class="text-fg-2">ค่าจอด <span class="num">{{ $estimate['total_hours'] }}</span> ชม. × <span class="num">{{ Format::baht($estimate['hourly_rate']) }}</span></dt>
-                        <dd class="num text-fg">{{ Format::baht($estimate['parking_fee']) }}</dd>
-                    </div>
-                    @if ($estimate['deposit_deduction'] > 0)
-                        <div class="mt-1 flex justify-between gap-3">
-                            <dt class="text-fg-2">หักมัดจำที่ชำระแล้ว</dt>
-                            <dd class="num text-fg">−{{ Format::baht($estimate['deposit_deduction']) }}</dd>
-                        </div>
-                    @endif
-                    @if ($estimate['reservation_discount'] > 0)
-                        <div class="mt-1 flex justify-between gap-3">
-                            <dt class="text-fg-2">ส่วนลดการจอง</dt>
-                            <dd class="num text-fg">−{{ Format::baht($estimate['reservation_discount']) }}</dd>
-                        </div>
-                    @endif
-                    <div class="mt-2 flex justify-between gap-3 border-t border-line pt-2 font-semibold">
-                        <dt class="text-fg">ยอดที่ต้องชำระถ้าออกตอนนี้</dt>
-                        <dd class="num text-fg">{{ Format::baht($estimate['total_amount']) }}</dd>
-                    </div>
-                </dl>
+            @elseif ($exit)
+                {{-- ชำระก่อนออก (§12.6): Check-out → ชำระ → สแกนออกภายในเวลา --}}
+                <div class="mt-5 max-w-md">
+                    @include('partials.checkout-panel', [
+                        'exit' => $exit,
+                        'checkoutAction' => route('user.reservations.checkout-request', $r),
+                        'payAction' => route('user.reservations.checkout-pay', $r),
+                    ])
+                </div>
             @endif
         </div>
     </div>
@@ -128,7 +113,7 @@
                     ระบบ Check-in ให้เมื่อสแกนแล้วป้ายทะเบียน จังหวัด และยี่ห้อหรือสีตรงกับการจอง
                     @break
                 @default
-                    ออกจากลานโดยสแกนป้ายทะเบียนขาออก ระบบคิดค่าจอดจริงตอน Check-out แล้วเจ้าหน้าที่ยืนยันรับเงิน
+                    ก่อนออกจากลาน กด Check-out แล้วชำระค่าจอด จากนั้นสแกนป้ายทะเบียนขาออกภายใน {{ \App\Services\CheckOutService::window() }} นาที
             @endswitch
         </p>
 

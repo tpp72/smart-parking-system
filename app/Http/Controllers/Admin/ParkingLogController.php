@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ParkingLog;
+use App\Models\ParkingLot;
 use App\Services\CheckOutService;
 use Illuminate\Http\Request;
 
-/** ประวัติการจอดของลาน Admin — Manual Check-out ใช้ปุ่มของการจอง (reservations.check-out) */
+/**
+ * ประวัติการจอด **ทุกลาน** — เป็นหน้า Log ผู้ดูแลระบบจึงดูได้ทั้งหมด (§17.1 แก้ไข 2026-09-28)
+ * ดูได้อย่างเดียว · การจัดการจริง (Manual Check-out) ยังทำได้เฉพาะลานของผู้ดูแลระบบ
+ * ผ่านปุ่มของการจอง (reservations.check-out) ซึ่งตรวจสิทธิ์แยกอยู่แล้ว
+ */
 class ParkingLogController extends Controller
 {
     public function index(Request $request, CheckOutService $checkOut)
@@ -23,7 +28,6 @@ class ParkingLogController extends Controller
                 'reservation:id,user_id,is_walk_in,reservation_fee,status',
                 'reservation.user:id,name',
             ])
-            ->whereHas('parkingLot', fn($q) => $q->whereNull('owner_id'))
             ->when($q !== '', fn($query) =>
                 $query->wherePlateLike($q)
             )
@@ -42,6 +46,10 @@ class ParkingLogController extends Controller
             ->filter(fn (ParkingLog $log) => ! $log->check_out_time && $log->reservation)
             ->mapWithKeys(fn (ParkingLog $log) => [$log->id => $checkOut->calculate($log->reservation, $log, now())]);
 
-        return view('staff.parking-logs', compact('logs', 'q', 'from', 'to', 'estimates') + ['scope' => 'admin']);
+        return view('staff.parking-logs', compact('logs', 'q', 'from', 'to', 'estimates') + [
+            'scope' => 'admin',
+            // ดูได้ทุกลาน แต่ปุ่มเช็คเอาท์ขึ้นเฉพาะลานที่ผู้ดูแลระบบจัดการได้จริง
+            'manageableLotIds' => ParkingLot::unowned()->pluck('id'),
+        ]);
     }
 }

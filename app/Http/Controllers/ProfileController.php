@@ -18,7 +18,7 @@ class ProfileController extends Controller
     public function edit(Request $request, UserAccountService $accounts): View
     {
         return view('profile.edit', [
-            'user' => $request->user()->load('vehicles'),
+            'user' => $request->user(),
             'deletionBlocker' => $accounts->selfDeletionBlocker($request->user()),
         ]);
     }

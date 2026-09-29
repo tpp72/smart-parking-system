@@ -173,13 +173,17 @@ class PublicTrackTest extends TestCase
         $this->lookup()->assertStatus(429);
     }
 
-    // ─── การจองล่วงหน้าก็ใช้หน้านี้ได้ หลังรถเข้าลานแล้ว ─────────────────────
+    // ─── หน้านี้ใช้ได้เฉพาะ Walk-in ────────────────────────────────────────
 
-    public function test_booked_car_also_works_after_check_in(): void
+    /**
+     * การจองล่วงหน้าไม่ออกรหัสอ้างอิง (§4.0.1) จึงเปิดดูผ่านหน้านี้ไม่ได้
+     * ต่อให้มีรหัสติดมาจากรายการเก่า เงื่อนไข is_walk_in ก็ยังกันไว้อีกชั้น
+     */
+    public function test_booked_car_cannot_be_looked_up_even_with_a_code(): void
     {
         $user = User::factory()->create(['role' => 'user', 'force_password_reset' => false, 'email_verified_at' => now()]);
 
-        $reservation = $this->parkedCar([
+        $this->parkedCar([
             'user_id'        => $user->id,
             'is_walk_in'     => false,
             'license_plate'  => 'ชล 4321',
@@ -188,12 +192,6 @@ class PublicTrackTest extends TestCase
         ]);
 
         $this->lookup(['plate_number' => 'ชล 4321', 'reference_code' => 'BKD567'])
-            ->assertOk()
-            ->assertSee('A007')
-            // ไม่เปิดเผยตัวตนเจ้าของบัญชี
-            ->assertDontSee($user->name)
-            ->assertDontSee($user->email);
-
-        $this->assertFalse((bool) $reservation->is_walk_in);
+            ->assertSessionHasErrors('reference_code');
     }
 }

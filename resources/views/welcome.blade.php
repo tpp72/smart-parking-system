@@ -51,6 +51,41 @@
             @include('layouts.shell.brand', ['nav' => ['homeHref' => url('/')], 'nameFromSm' => true])
 
             <nav aria-label="บัญชี" class="flex items-center gap-1.5">
+                {{--
+                    หมวด Walk-in: สองหน้าที่คนขับที่ไม่มีบัญชีใช้ — สแกนเข้าลาน แล้วกลับมาเช็คสถานะด้วยรหัสอ้างอิง
+                    รวมเป็นเมนูเดียวเพราะเป็นเส้นทางเดียวกัน และไม่ให้แย่งน้ำหนักกับปุ่มสมัครสมาชิก
+                    แสดงเฉพาะคนที่ยังไม่ล็อกอิน — ผู้ที่มีบัญชีมี "AI สแกน" ในเมนูของบทบาทตัวเองอยู่แล้ว
+                --}}
+                @guest
+                <x-ui.dropdown align="right" width="64">
+                    <x-slot name="trigger">
+                        <button type="button"
+                            class="inline-flex min-h-touch items-center gap-1.5 rounded-card px-2.5 text-label font-semibold text-fg transition-colors duration-fast hover:bg-surface-2">
+                            <x-ui.icon name="scan" class="h-4 w-4 text-fg-3" />
+                            Walk-in
+                            <x-ui.icon name="chevron-down" class="h-4 w-4 text-fg-3" />
+                            <span class="sr-only">เปิดเมนูสำหรับคนขับที่ไม่มีบัญชี</span>
+                        </button>
+                    </x-slot>
+
+                    <x-slot name="content">
+                        <div class="border-b border-line px-3 pb-2 pt-1">
+                            <p class="text-caption text-fg-3">ไม่มีบัญชีก็เข้าจอดได้</p>
+                        </div>
+                        <div class="py-1">
+                            <x-ui.dropdown-item :href="route('public.scan.create')">
+                                <x-ui.icon name="scan" class="h-5 w-5 text-fg-3" />
+                                สแกนรถเข้าลาน
+                            </x-ui.dropdown-item>
+                            <x-ui.dropdown-item :href="route('track.show')">
+                                <x-ui.icon name="ticket" class="h-5 w-5 text-fg-3" />
+                                เช็คสถานะรถ
+                            </x-ui.dropdown-item>
+                        </div>
+                    </x-slot>
+                </x-ui.dropdown>
+                @endguest
+
                 <x-ui.theme-switch popover />
                 @auth
                     <x-ui.button :href="route('dashboard')" size="sm">ไปที่หน้าหลัก</x-ui.button>
@@ -83,8 +118,6 @@
                         <x-ui.button :href="route('login')" variant="secondary">เข้าสู่ระบบ</x-ui.button>
                     @endauth
                 </div>
-
-                <p class="mt-6 text-label text-fg-3">โครงงานวิทยาการคอมพิวเตอร์ · ต้นแบบสำหรับสาธิต ไม่ได้ใช้งานกับลานจอดจริง</p>
             </div>
 
             {{-- บัตรจอดรถตัวอย่าง: ต้นขั้วป้ายทะเบียน + รอยปรุ + ลำดับขั้นพร้อมตำแหน่งปัจจุบัน --}}

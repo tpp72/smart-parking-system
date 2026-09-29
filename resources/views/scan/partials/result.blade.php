@@ -20,6 +20,8 @@
         $outcome === 'rejected' => ['warning', $scan?->result === LicensePlateScan::RESULT_UNREADABLE ? 'AI อ่านทะเบียนไม่ได้' : 'AI ไม่ผ่านเกณฑ์ความแม่นยำ'],
         $outcome === 'walk_in' => ['success', 'เช็คอินอัตโนมัติสำเร็จ (Walk-in)'],
         $outcome === 'checked_out' => ['success', 'เช็คเอาท์อัตโนมัติสำเร็จ'],
+        // ชำระก่อนออก (§12.6) — รถยังจอดอยู่ในระบบ ไม่ถือเป็นความผิดพลาด
+        $outcome === 'payment_required' => ['warning', 'ยังไม่ได้ชำระค่าจอด'],
         ($gate['success'] ?? false) => ['success', 'เช็คอินอัตโนมัติสำเร็จ'],
         default => ['warning', 'ไม่สามารถเช็คอิน/เช็คเอาท์อัตโนมัติได้'],
     };
@@ -73,11 +75,18 @@
                 @unless ($payment)
                     <p class="mt-1 text-label text-fg-2">{{ $gate['message'] ?? '' }}</p>
                 @endunless
+                @if ($outcome === 'payment_required')
+                    <p class="mt-2 text-label text-fg">
+                        กด <span class="font-semibold">Check-out</span> แล้วชำระค่าจอดที่หน้า
+                        <a href="{{ route('track.show') }}" class="font-semibold text-primary-ink underline underline-offset-4">เช็คสถานะรถ</a>
+                        (ไม่มีบัญชี) หรือหน้าหลักของบัญชี (ผู้ที่จองไว้) จากนั้นสแกนออกอีกครั้งภายใน {{ \App\Services\CheckOutService::window() }} นาที
+                    </p>
+                @endif
             @endif
         </div>
 
-        {{-- 2) บัญชีดำ — แจ้งเตือนแต่ยังให้เข้าลานตามกฎ --}}
-        @if ($scan?->is_suspicious || ($lotFull['is_suspicious'] ?? false))
+        {{-- 2) บัญชีดำ — แจ้งเตือนแต่ยังให้เข้าลานตามกฎ · ไม่แสดงให้คนขับที่ไม่ได้ล็อกอินเห็น เท่ากับบอกผู้ต้องสงสัยว่าถูกจับตาอยู่ --}}
+        @if (auth()->check() && ($scan?->is_suspicious || ($lotFull['is_suspicious'] ?? false)))
             <div class="border-b border-line px-5 py-4">
                 <x-ui.alert tone="danger" title="พบรถในบัญชีดำ">
                     ระบบแจ้งเจ้าของลานและผู้ดูแลระบบ และบันทึกเหตุการณ์แล้ว
@@ -141,6 +150,9 @@
                     @if ((float) $payment->reservation_discount > 0)
                         <div class="flex justify-between gap-3"><dt class="text-fg-2">ส่วนลดการจอง</dt><dd class="num text-fg">−{{ Format::baht($payment->reservation_discount) }}</dd></div>
                     @endif
+                    @if ((float) $payment->prior_paid > 0)
+                        <div class="flex justify-between gap-3"><dt class="text-fg-2">หักที่ชำระแล้ว</dt><dd class="num text-fg">−{{ Format::baht($payment->prior_paid) }}</dd></div>
+                    @endif
                     <div class="mt-1 flex justify-between gap-3 border-t border-line pt-2 font-semibold">
                         <dt class="text-fg">ยอดชำระ</dt>
                         <dd class="num text-h3 text-fg">{{ Format::baht($payment->total_amount) }}</dd>
@@ -156,7 +168,10 @@
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h3 class="text-label font-semibold text-fg">
                         {{ $reservation->is_walk_in ? 'Walk-in' : 'การจอง' }} <span class="num">#{{ $reservation->id }}</span>
-                        <span class="font-normal text-fg-2">· {{ $reservation->user?->name ?? '—' }}</span>
+                        {{-- ชื่อเจ้าของบัญชีเป็นข้อมูลส่วนบุคคล — คนขับที่ไม่ได้ล็อกอินไม่ควรเห็น (กฎเดียวกับหน้าเช็คสถานะรถ §4.0.2) --}}
+                        @auth
+                            <span class="font-normal text-fg-2">· {{ $reservation->user?->name ?? '—' }}</span>
+                        @endauth
                     </h3>
                     <x-ui.status type="reservation" :value="$reservation->status" audience="staff" />
                 </div>

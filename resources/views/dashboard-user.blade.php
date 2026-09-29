@@ -28,7 +28,7 @@
             <h2 id="tickets-title" class="sr-only">การจองและรถที่จอดอยู่</h2>
 
             @forelse ($tickets as $reservation)
-                @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'estimate' => $estimates[$reservation->id] ?? null])
+                @include('user.partials.reservation-ticket', ['reservation' => $reservation, 'exit' => $exits[$reservation->id] ?? null])
                 @unless ($loop->last)<div class="h-4"></div>@endunless
             @empty
                 <div class="rounded-card border border-line bg-surface shadow-1">
