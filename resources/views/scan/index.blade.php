@@ -72,18 +72,9 @@
                 @if ($lots->isEmpty())
                     <p class="mt-3 text-fg-2">ยังไม่มีลานจอดในระบบ</p>
                 @else
+                    {{-- ย่อรูปในเบราว์เซอร์ก่อนส่ง (resources/js/ui/car-image.js) — รูปมือถือมักเกินขีดจำกัดอัปโหลดของ PHP --}}
                     <form method="POST" action="{{ $scanStoreRoute }}" enctype="multipart/form-data" class="mt-5 flex flex-col gap-5"
-                        x-data="{
-                            preview: null, fileName: '',
-                            handleFile(event) {
-                                const file = event.target.files[0];
-                                if (!file) { this.preview = null; this.fileName = ''; return; }
-                                this.fileName = file.name;
-                                const reader = new FileReader();
-                                reader.onload = (e) => this.preview = e.target.result;
-                                reader.readAsDataURL(file);
-                            },
-                        }">
+                        x-data="spCarImage">
                         @csrf
 
                         <x-ui.field label="ลานจอด (ตำแหน่งกล้อง)" for="parking_lot_id" required hint="ระบบจริงกล้องติดอยู่ที่ลานนี้และส่งภาพมาเอง">
@@ -94,7 +85,7 @@
                             </x-ui.select>
                         </x-ui.field>
 
-                        <x-ui.field label="ภาพรถ" for="car_image" required hint="JPG หรือ PNG ไม่เกิน 5 MB · เห็นป้ายทะเบียนชัดเจน">
+                        <x-ui.field label="ภาพรถ" for="car_image" required hint="JPG หรือ PNG · ระบบย่อรูปขนาดใหญ่ให้อัตโนมัติ · เห็นป้ายทะเบียนชัดเจน">
                             <label for="car_image" @class([
                                 'relative flex min-h-44 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-card border-2 border-dashed bg-surface-2/60 text-center transition-colors duration-fast hover:border-fg-2',
                                 'border-danger' => $errors->has('car_image'),
@@ -112,9 +103,14 @@
                                     x-on:change="handleFile($event)">
                             </label>
                             <p x-show="fileName" x-cloak class="truncate text-caption text-fg-2" x-text="'ไฟล์: ' + fileName"></p>
+                            <p x-show="note" x-cloak class="text-caption text-fg-3" x-text="note"></p>
                         </x-ui.field>
 
-                        <x-ui.button type="submit" class="w-full">วิเคราะห์รูปรถ</x-ui.button>
+                        {{-- ห้ามส่งระหว่างย่อรูป ไม่งั้นจะส่งไฟล์ต้นฉบับขนาดใหญ่ออกไป --}}
+                        <x-ui.button type="submit" class="w-full" x-bind:disabled="busy">
+                            <span x-show="!busy">วิเคราะห์รูปรถ</span>
+                            <span x-show="busy" x-cloak>กำลังเตรียมรูป…</span>
+                        </x-ui.button>
                     </form>
                 @endif
             </section>

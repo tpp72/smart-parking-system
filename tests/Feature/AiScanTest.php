@@ -263,6 +263,43 @@ class AiScanTest extends TestCase
         $this->assertSame(0, ParkingLog::count());
     }
 
+    // ─── [12] อัปโหลดรูปใหญ่เกินขีดจำกัดของเครื่อง ──────────────────────────────
+
+    /** PHP ตัดไฟล์ที่เกิน upload_max_filesize ทิ้งก่อนถึงโค้ด — ต้องบอกผู้ใช้ว่าใหญ่เกิน ไม่ใช่ "อัปโหลดไม่สำเร็จ" เฉย ๆ */
+    public function test_file_rejected_by_php_size_limit_explains_the_real_limit(): void
+    {
+        $lot = $this->ownerLot($this->makeUser('owner'));
+        $tooBig = new UploadedFile(UploadedFile::fake()->image('car.jpg')->getPathname(), 'car.jpg', 'image/jpeg', UPLOAD_ERR_INI_SIZE, true);
+
+        $this->actingAs($this->makeUser())->post(route('user.scan.store'), [
+            'car_image' => $tooBig, 'parking_lot_id' => $lot->id,
+        ])->assertSessionHasErrors(['car_image' => sprintf(
+            'ไฟล์ใหญ่เกินไป — รับได้ไม่เกิน %s MB กรุณาลดขนาดรูปแล้วลองใหม่',
+            rtrim(rtrim(number_format(CarScanService::maxUploadKb() / 1024, 1), '0'), '.')
+        )]);
+
+        $this->assertDatabaseCount('license_plate_scans', 0);
+    }
+
+    /** ขีดจำกัดที่ตรวจต้องไม่เกินที่เครื่องรับได้จริง และไม่เกิน 5 MB ตามที่ระบบกำหนด */
+    public function test_upload_limit_never_exceeds_what_php_accepts(): void
+    {
+        $limit = CarScanService::maxUploadKb();
+
+        $this->assertGreaterThan(0, $limit);
+        $this->assertLessThanOrEqual(5120, $limit);
+    }
+
+    /** ต้องตรวจใบรับรอง SSL เสมอ — เครื่อง Windows ที่ไม่มี CA bundle ใช้ที่เก็บใบรับรองของ Windows แทน ไม่ใช่ปิดการตรวจ */
+    public function test_ai_connection_keeps_ssl_verification_on(): void
+    {
+        config(['carscan.verify_ssl' => true]);
+        $this->assertTrue(CarScanService::httpOptions()['verify']);
+
+        config(['carscan.verify_ssl' => false]);
+        $this->assertSame(['verify' => false], CarScanService::httpOptions());
+    }
+
     // ─── [11] คนขับ Walk-in สแกนเองได้โดยไม่ต้องล็อกอิน ──────────────────────
 
     public function test_guest_can_open_the_scan_page_without_logging_in(): void
