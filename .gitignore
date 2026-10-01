@@ -30,3 +30,6 @@ Thumbs.db
 .claude/skills/impeccable/
 .claude/agents/impeccable-*.md
 .impeccable/
+
+# สคริปต์เปิด demo ส่วนตัว — ฝัง path/username/โดเมนเฉพาะเครื่องนี้ ใช้เครื่องอื่นไม่ได้
+start-demo.bat
