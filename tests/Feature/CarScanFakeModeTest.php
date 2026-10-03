@@ -34,15 +34,21 @@ class CarScanFakeModeTest extends TestCase
         $this->assertSame(95.0, $unreadable['confidence']);
     }
 
-    public function test_fake_mode_is_off_by_default_and_never_enabled_in_production(): void
+    /**
+     * เปิดได้เฉพาะ APP_ENV=testing — เว็บ demo ใช้ local และเก็บข้อมูลประเมินผล ต้องเรียก AI จริงเสมอ
+     * ต่อให้มีคนเผลอตั้ง CARSCAN_FAKE=true ก็ตาม
+     */
+    public function test_fake_mode_is_off_by_default_and_only_works_while_testing(): void
     {
         $this->assertFalse(CarScanService::fakeEnabled());
 
         config(['carscan.fake' => true]);
         $this->assertTrue(CarScanService::fakeEnabled());
 
-        $this->app['env'] = 'production';
-        $this->assertFalse(CarScanService::fakeEnabled());
+        foreach (['local', 'production', 'staging'] as $env) {
+            $this->app['env'] = $env;
+            $this->assertFalse(CarScanService::fakeEnabled(), "โหมดจำลองเปิดได้ใน APP_ENV={$env}");
+        }
     }
 
     public function test_scan_in_fake_mode_runs_the_real_pipeline_without_calling_claude(): void

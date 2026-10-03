@@ -46,7 +46,8 @@ export default defineConfig({
     stderr: 'ignore', // PHP built-in server เขียน access log ทุก request ลง stderr
     timeout: 60_000,
     env: {
-      APP_ENV: 'local',
+      // โหมดจำลอง AI เปิดได้เฉพาะ APP_ENV=testing (CarScanService::fakeEnabled)
+      APP_ENV: 'testing',
       DB_DATABASE: process.env.E2E_DB_DATABASE,
       CARSCAN_FAKE: 'true',
     },
