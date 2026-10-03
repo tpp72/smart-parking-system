@@ -28,16 +28,26 @@
                 </x-ui.field>
 
                 @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
+                    @php $cooldown = $user->verificationCooldownRemaining(); @endphp
                     <x-ui.alert tone="warning" title="ยังไม่ได้ยืนยันอีเมล">
                         @if (session('status') === 'verification-link-sent')
                             ส่งลิงก์ยืนยันใหม่ไปที่ {{ $user->email }} แล้ว
+                        @elseif (session('verification-cooldown'))
+                            เพิ่งส่งลิงก์ไปเมื่อสักครู่ — ส่งใหม่ได้อีกครั้งในอีก {{ session('verification-cooldown') }} วินาที
                         @else
                             ต้องยืนยันอีเมลก่อนจึงจะใช้การจอง การสแกน และการแจ้งเตือนได้
                         @endif
-                        <button form="send-verification" type="submit"
-                            class="mt-2 inline-flex min-h-touch items-center font-semibold text-fg underline underline-offset-4">
-                            ส่งลิงก์ยืนยันอีกครั้ง
-                        </button>
+                        {{-- ส่งได้ครั้งละ 1 ครั้งต่อ 60 วินาที — นับถอยหลังบอกผู้ใช้ เซิร์ฟเวอร์ตรวจเองทุกครั้ง --}}
+                        <span class="block" x-data="{ left: {{ $cooldown }} }"
+                            x-init="if (left > 0) { const t = setInterval(() => { if (--left <= 0) clearInterval(t) }, 1000) }">
+                            <button form="send-verification" type="submit" @disabled($cooldown > 0) x-bind:disabled="left > 0"
+                                class="mt-2 inline-flex min-h-touch items-center font-semibold text-fg underline underline-offset-4 disabled:cursor-not-allowed disabled:text-fg-3 disabled:no-underline">
+                                <span x-show="left <= 0" @if ($cooldown > 0) style="display: none" @endif>ส่งลิงก์ยืนยันอีกครั้ง</span>
+                                <span x-show="left > 0" @if ($cooldown <= 0) style="display: none" @endif>
+                                    ส่งอีกครั้งได้ใน <span class="num" x-text="left">{{ $cooldown }}</span> วินาที
+                                </span>
+                            </button>
+                        </span>
                     </x-ui.alert>
                 @endif
 
