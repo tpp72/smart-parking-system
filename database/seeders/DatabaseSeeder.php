@@ -870,8 +870,11 @@ class DatabaseSeeder extends Seeder
     {
         $users = User::all()->keyBy('id');
 
-        // Admin: force password reset
-        $targets = User::where('role', 'user')->where('is_system', false)->inRandomOrder()->limit(3)->get();
+        // Admin: force password reset — ไม่สุ่มโดนบัญชีทดลอง @demo.com ที่ผู้ทดสอบและ E2E ใช้ล็อกอิน
+        // ไม่งั้นทุกครั้งที่ seed ใหม่ บัญชีทดลองมีโอกาสโดนบังคับตั้งรหัสผ่านใหม่จนเข้าใช้เมนูอื่นไม่ได้
+        $targets = User::where('role', 'user')->where('is_system', false)
+            ->where('email', 'not like', '%@demo.com')
+            ->inRandomOrder()->limit(3)->get();
         foreach ($targets as $target) {
             $target->update(['force_password_reset' => true]);
             $this->audit($admin, 'user.force_reset', 'User', $target->id, ['force_password_reset' => true], now()->subDays(random_int(1, 20)));

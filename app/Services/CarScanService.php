@@ -194,7 +194,9 @@ PROMPT;
      */
     public static function fakeEnabled(): bool
     {
-        return (bool) config('carscan.fake', false) && app()->environment(['local', 'testing']);
+        // เปิดได้เฉพาะตอนรันเทสต์ (phpunit / E2E) — เว็บ demo ใช้ APP_ENV=local และเก็บข้อมูลประเมินผล
+        // จึงต้องเรียก AI จริงเสมอ ต่อให้มีคนเผลอตั้ง CARSCAN_FAKE=true ก็ตาม (project-plan.md §25.2)
+        return (bool) config('carscan.fake', false) && app()->environment('testing');
     }
 
     /**
