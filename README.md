@@ -284,7 +284,7 @@ docs/                                         ← project-plan.md (Source of Tru
 
 | Variable | ค่าแนะนำ | คำอธิบาย |
 |---|---|---|
-| `APP_ENV` | `local` | `local` / `testing` เท่านั้นที่เปิดโหมดจำลอง AI ได้ |
+| `APP_ENV` | `local` | เฉพาะ `testing` (phpunit / E2E) ที่เปิดโหมดจำลอง AI ได้ |
 | `DB_CONNECTION` | `pgsql` | ระบบใช้ PostgreSQL (partial index / CHECK constraint) |
 | `DB_DATABASE` | `smart-parking-system` | ฐานข้อมูลหลัก (ฐานทดสอบคือ `smart_parking_test`) |
 | `DB_USERNAME` / `DB_PASSWORD` | — | บัญชี PostgreSQL ของโปรเจกต์ (แนะนำบัญชีเฉพาะที่มีสิทธิ์ CREATEDB ไม่ใช่ superuser `postgres`) |
@@ -292,7 +292,7 @@ docs/                                         ← project-plan.md (Source of Tru
 | `ANTHROPIC_API_KEY` | — | API Key ของ Claude ([console.anthropic.com](https://console.anthropic.com)) |
 | `CARSCAN_MODEL` | `claude-opus-4-8` | โมเดลที่ใช้อ่านภาพ |
 | `CARSCAN_VERIFY_SSL` | `true` | ปิดได้เฉพาะเครื่อง dev ที่ยังไม่ได้ตั้ง CA bundle |
-| `CARSCAN_FAKE` | `false` | `true` = จำลองผล AI จากชื่อไฟล์ (ใช้กับ E2E/เดโม) |
+| `CARSCAN_FAKE` | `false` | `true` = จำลองผล AI จากชื่อไฟล์ — มีผลเฉพาะ `APP_ENV=testing` (E2E) |
 | `E2E_DB_DATABASE` | `smart_parking_test` | ฐานข้อมูลที่ E2E ล้างและ seed (ชื่อต้องมีคำว่า `test`) |
 
 > Grace period ของการเช็คอินเป็นค่าคงที่ 60 นาทีใน `config/parking.php` (ไม่ตั้งผ่าน `.env`)

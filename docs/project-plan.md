@@ -1665,7 +1665,7 @@ User Login
 ### 25.4 รายละเอียดที่กำหนดเพิ่ม (2026-09-15)
 
 - **E2E (Playwright)** มี 2 Flow ตาม §25.2: `e2e/reservation-flow.test.js` และ `e2e/walk-in-flow.test.js` — รันด้วย `npm run test:e2e` กับฐานข้อมูลทดสอบ (`smart_parking_test` ค่าเริ่มต้น) ที่ `migrate:fresh --seed` ใหม่ทุกครั้ง; E2E ชุดเก่าที่อิง Flow เดิมถูกลบ
-- **AI Scan โหมดจำลอง** (`CARSCAN_FAKE=true`) อ่านผลจากชื่อไฟล์รูป `ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy` ไม่เรียก Claude API — เปิดได้เฉพาะ Environment `local` / `testing`
+- **AI Scan โหมดจำลอง** (`CARSCAN_FAKE=true`) อ่านผลจากชื่อไฟล์รูป `ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy` ไม่เรียก Claude API — เปิดได้เฉพาะ Environment `testing` (phpunit / E2E) — **แก้ไข 2026-10-03:** เดิมเปิดได้ทั้ง `local` / `testing` ตัด `local` ออกเพราะเว็บ demo (smart-parking.tpp72.com) ใช้ `APP_ENV=local` และเก็บข้อมูลประเมินผล ต้องเรียก AI จริงเสมอ
 - **Reservation Happy Path:** จอดไม่ถึง 1 ชม. มัดจำครอบคลุมค่าจอดทั้งหมด → ยอดสุทธิ 0 ระบบยืนยันชำระเอง (ขั้น "ยืนยัน Payment" ของ Flow นี้คือยืนยันรับเงินมัดจำ) · **Walk-in Flow:** Admin ยืนยันรับชำระค่าจอด
 - **ความลับ:** `phpunit.xml` ไม่เก็บรหัสผ่านฐานข้อมูล — อ่านจาก `.env` / `.env.testing` (ไม่ commit) หรือ Environment ของ CI
 - **CI (GitHub Actions):** `tests.yml` รัน PHPUnit บน `main` และ Pull Request ด้วย PHP 8.4 + PostgreSQL; workflow ที่ติดมากับ Laravel skeleton ถูกลบ

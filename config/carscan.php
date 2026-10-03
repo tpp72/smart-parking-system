@@ -38,10 +38,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Fake Mode (E2E / Demo)
+    | Fake Mode (เทสต์อัตโนมัติเท่านั้น)
     |--------------------------------------------------------------------------
     | ไม่เรียก Claude API — อ่านผลจากชื่อไฟล์รูป "ทะเบียน__จังหวัด__ยี่ห้อ__สี__Accuracy.png"
-    | ทำงานเฉพาะ APP_ENV=local หรือ testing เท่านั้น (ดู CarScanService::fakeEnabled)
+    | ทำงานเฉพาะ APP_ENV=testing (phpunit / E2E) — เว็บ demo (APP_ENV=local) ตั้ง true ก็ไม่มีผล
+    | เพราะเว็บ demo ใช้เก็บข้อมูลประเมินผล ต้องเรียก AI จริงเสมอ (ดู CarScanService::fakeEnabled)
     */
     'fake' => env('CARSCAN_FAKE', false),
 ];
