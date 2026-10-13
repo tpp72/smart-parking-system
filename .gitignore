@@ -36,3 +36,4 @@ start-demo.bat
 
 # ไดอะแกรมที่ Archify skill สร้าง (HTML + receipt ตรวจคุณภาพ) — ไฟล์ส่วนตัว ไม่ใช่ส่วนของแอป
 .archify/
+/docs/diagrams/
