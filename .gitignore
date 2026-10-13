@@ -33,3 +33,6 @@ Thumbs.db
 
 # สคริปต์เปิด demo ส่วนตัว — ฝัง path/username/โดเมนเฉพาะเครื่องนี้ ใช้เครื่องอื่นไม่ได้
 start-demo.bat
+
+# ไดอะแกรมที่ Archify skill สร้าง (HTML + receipt ตรวจคุณภาพ) — ไฟล์ส่วนตัว ไม่ใช่ส่วนของแอป
+.archify/
